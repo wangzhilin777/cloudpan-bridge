@@ -167,6 +167,23 @@ def test_auto_download_threshold_accepts_small_file(tmp_path) -> None:
     assert runner._should_auto_download(item) is True
 
 
+def test_auto_download_threshold_accepts_small_file_without_md5(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "auto_download_threshold_mb": 10
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    item = build_plan([SourceEntry(path="/src/a.txt", md5="", size=5 * 1024 * 1024, last_op_time="1", hash_type="none")], SyncState())[0][0]
+    assert runner._should_auto_download(item) is True
+
+
 def test_state_supports_pending_and_queue_roundtrip() -> None:
     state = SyncState(
         pending_files={
@@ -297,7 +314,10 @@ def test_openlist_extract_hash_fields_supports_md5_and_gcid() -> None:
             "provider": "Thunder",
         }
     )
-    assert result == {"md5": "ABC123", "gcid": "A" * 40, "hash_type": "md5"}
+    assert result["md5"] == "ABC123"
+    assert result["etag"] == "ABC123"
+    assert result["gcid"] == "A" * 40
+    assert result["hash_type"] == "md5"
     assert OpenListClient._extract_source_id({"fileId": 123}) == "123"
     assert OpenListClient._extract_provider({"provider": "Thunder"}) == "Thunder"
 
@@ -309,7 +329,23 @@ def test_openlist_extract_hash_fields_supports_gcid_only() -> None:
             "hash_info": {"gcid": "B" * 40},
         }
     )
-    assert result == {"md5": "", "gcid": "B" * 40, "hash_type": "gcid"}
+    assert result["md5"] == ""
+    assert result["gcid"] == "B" * 40
+    assert result["hash_type"] == "gcid"
+
+
+def test_openlist_extract_hash_fields_allows_non_fast_upload_fingerprint_only() -> None:
+    result = OpenListClient._extract_hash_fields(
+        {
+            "name": "demo.bin",
+            "hash_info": {"sha1": "C" * 40, "pickcode": "pc-1"},
+        }
+    )
+    assert result["md5"] == ""
+    assert result["gcid"] == ""
+    assert result["sha1"] == "C" * 40
+    assert result["pickcode"] == "pc-1"
+    assert result["hash_type"] == "sha1"
 
 
 def test_build_driver_prefill_values_matches_common_tokens() -> None:
@@ -572,12 +608,17 @@ def test_serialize_and_summarize_source_entries() -> None:
     entries = [
         SourceEntry(path="/a.bin", md5="abc", size=10, provider="openlist", hash_type="md5"),
         SourceEntry(path="/b.bin", md5="", size=20, provider="Thunder", hash_type="gcid", gcid="C" * 40),
+        SourceEntry(path="/c.bin", md5="", size=30, provider="Quark", hash_type="sha1", sha1="D" * 40, pickcode="pc-3"),
     ]
     assert serialize_source_entry(entries[1])["gcid"] == "C" * 40
+    assert serialize_source_entry(entries[2])["sha1"] == "D" * 40
     summary = summarize_source_entries(entries)
-    assert summary["total"] == 2
+    assert summary["total"] == 3
     assert summary["gcid_ready"] == 1
-    assert summary["missing_md5"] == 1
+    assert summary["sha1_ready"] == 1
+    assert summary["fast_upload_ready"] == 2
+    assert summary["missing_md5"] == 2
+    assert summary["missing_fast_upload"] == 1
     assert summary["provider_counts"]["Thunder"] == 1
 
 
@@ -585,6 +626,7 @@ def test_build_source_miaochuan_payload_uses_relative_paths() -> None:
     entries = [
         SourceEntry(path="/root/a.bin", md5="ABCDEF0123456789ABCDEF0123456789", size=10, provider="openlist", hash_type="md5"),
         SourceEntry(path="/root/sub/b.bin", md5="", size=20, provider="Thunder", hash_type="gcid", gcid="E" * 40),
+        SourceEntry(path="/root/sub/c.bin", md5="", size=30, provider="Quark", hash_type="sha1", sha1="F" * 40, pickcode="pc-9"),
     ]
     payload = build_source_miaochuan_payload(entries, "/root")
     assert payload["totalFilesCount"] == 2
@@ -592,3 +634,4 @@ def test_build_source_miaochuan_payload_uses_relative_paths() -> None:
     assert payload["files"][1]["path"] == "/sub/b.bin"
     assert payload["files"][0]["etag"] == "abcdef0123456789abcdef0123456789"
     assert payload["files"][1]["gcid"] == "E" * 40
+    assert payload["skipped"][0]["path"] == "/root/sub/c.bin"

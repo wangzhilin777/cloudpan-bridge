@@ -234,6 +234,12 @@ class OpenListClient:
                         provider=self._extract_provider(item),
                         hash_type=hash_fields["hash_type"],
                         gcid=hash_fields["gcid"],
+                        etag=hash_fields["etag"],
+                        sha1=hash_fields["sha1"],
+                        crc64=hash_fields["crc64"],
+                        pickcode=hash_fields["pickcode"],
+                        extra_hashes=dict(hash_fields["extra_hashes"] or {}),
+                        raw_hash_info=dict(hash_fields["raw_hash_info"] or {}),
                     )
                 )
             has_more = data.get("has_more")
@@ -331,28 +337,56 @@ class OpenListClient:
         return local_path
 
     @staticmethod
-    def _extract_hash_fields(item: dict[str, Any]) -> dict[str, str]:
+    def _extract_hash_fields(item: dict[str, Any]) -> dict[str, Any]:
         md5_hex = ""
         gcid = ""
+        etag = ""
+        sha1 = ""
+        crc64 = ""
+        pickcode = ""
+        extra_hashes: dict[str, str] = {}
+        raw_hash_info: dict[str, Any] = {}
         hash_info = item.get("hash_info") or {}
         if isinstance(hash_info, dict):
+            raw_hash_info.update({str(key): value for key, value in hash_info.items()})
             for key, value in hash_info.items():
                 key_lower = str(key).lower()
                 if key_lower == "md5" and value:
                     md5_hex = str(value).upper()
                 elif key_lower == "gcid" and value:
                     gcid = str(value).upper()
+                elif key_lower == "etag" and value:
+                    etag = str(value).upper()
+                elif key_lower == "sha1" and value:
+                    sha1 = str(value).upper()
+                elif key_lower == "crc64" and value:
+                    crc64 = str(value).upper()
+                elif key_lower == "pickcode" and value:
+                    pickcode = str(value)
+                elif value not in ("", None):
+                    extra_hashes[key_lower] = str(value)
         hash_info_str = str(item.get("hashinfo") or "").strip()
         if hash_info_str:
             try:
                 payload = json.loads(hash_info_str)
                 if isinstance(payload, dict):
+                    raw_hash_info.update({str(key): value for key, value in payload.items()})
                     for key, value in payload.items():
                         key_lower = str(key).lower()
                         if key_lower == "md5" and value and not md5_hex:
                             md5_hex = str(value).upper()
                         elif key_lower == "gcid" and value and not gcid:
                             gcid = str(value).upper()
+                        elif key_lower == "etag" and value and not etag:
+                            etag = str(value).upper()
+                        elif key_lower == "sha1" and value and not sha1:
+                            sha1 = str(value).upper()
+                        elif key_lower == "crc64" and value and not crc64:
+                            crc64 = str(value).upper()
+                        elif key_lower == "pickcode" and value and not pickcode:
+                            pickcode = str(value)
+                        elif value not in ("", None):
+                            extra_hashes.setdefault(key_lower, str(value))
             except json.JSONDecodeError:
                 pass
         if not md5_hex:
@@ -361,16 +395,47 @@ class OpenListClient:
                 if value:
                     md5_hex = str(value).upper()
                     break
+        if not etag:
+            value = item.get("etag")
+            if value:
+                etag = str(value).upper()
         if not gcid:
             for key in ("gcid", "file_gcid"):
                 value = item.get(key)
                 if value:
                     gcid = str(value).upper()
                     break
-        if not md5_hex and not gcid:
-            raise RuntimeError(f"OpenList 未返回 MD5/GCID，无法对文件做秒传判定: {item.get('name')}")
-        hash_type = "md5" if md5_hex else "gcid"
-        return {"md5": md5_hex, "gcid": gcid, "hash_type": hash_type}
+        if not sha1:
+            value = item.get("sha1")
+            if value:
+                sha1 = str(value).upper()
+        if not crc64:
+            value = item.get("crc64")
+            if value:
+                crc64 = str(value).upper()
+        if not pickcode:
+            value = item.get("pickcode")
+            if value:
+                pickcode = str(value)
+        hash_type = "md5" if md5_hex else "gcid" if gcid else "sha1" if sha1 else "none"
+        if md5_hex and not etag:
+            etag = md5_hex
+        extra_hashes = {
+            key: value
+            for key, value in extra_hashes.items()
+            if key not in {"md5", "gcid", "etag", "sha1", "crc64", "pickcode"}
+        }
+        return {
+            "md5": md5_hex,
+            "gcid": gcid,
+            "etag": etag,
+            "sha1": sha1,
+            "crc64": crc64,
+            "pickcode": pickcode,
+            "extra_hashes": extra_hashes,
+            "raw_hash_info": raw_hash_info,
+            "hash_type": hash_type,
+        }
 
     @staticmethod
     def _extract_source_id(item: dict[str, Any]) -> str:

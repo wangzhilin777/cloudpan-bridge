@@ -30,10 +30,20 @@ class SourceEntry:
     provider: str = "openlist"
     hash_type: str = "md5"
     gcid: str = ""
+    etag: str = ""
+    sha1: str = ""
+    crc64: str = ""
+    pickcode: str = ""
+    extra_hashes: dict[str, str] = field(default_factory=dict)
+    raw_hash_info: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.path = normalize_posix_path(self.path)
         self.md5 = self.md5.upper()
+        self.etag = self.etag.upper()
+        self.sha1 = self.sha1.upper()
+        self.crc64 = self.crc64.upper()
+        self.gcid = self.gcid.upper()
         self.size = int(self.size)
 
     @property
@@ -46,6 +56,18 @@ class SourceEntry:
 
     def signature(self) -> str:
         return f"{self.md5}:{self.size}:{self.last_op_time}"
+
+    @property
+    def provider_file_id(self) -> str:
+        return self.source_id
+
+    @property
+    def mtime(self) -> str:
+        return self.last_op_time
+
+    @property
+    def has_fast_upload_fingerprint(self) -> bool:
+        return bool(self.md5 or self.gcid)
 
 
 @dataclass(slots=True)
@@ -68,6 +90,11 @@ class SyncFileState:
     provider: str = "openlist"
     hash_type: str = "md5"
     gcid: str = ""
+    etag: str = ""
+    sha1: str = ""
+    crc64: str = ""
+    pickcode: str = ""
+    extra_hashes: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -88,6 +115,11 @@ class PendingFileState:
     provider: str = "openlist"
     hash_type: str = "md5"
     gcid: str = ""
+    etag: str = ""
+    sha1: str = ""
+    crc64: str = ""
+    pickcode: str = ""
+    extra_hashes: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -66,12 +66,19 @@ def serialize_source_entry(entry: SourceEntry) -> dict[str, object]:
     return {
         "path": entry.path,
         "md5": entry.md5,
+        "etag": entry.etag,
         "size": entry.size,
         "lastOpTime": entry.last_op_time,
         "sourceId": entry.source_id,
+        "providerFileId": entry.provider_file_id,
         "provider": entry.provider,
         "hashType": entry.hash_type,
         "gcid": entry.gcid,
+        "sha1": entry.sha1,
+        "crc64": entry.crc64,
+        "pickcode": entry.pickcode,
+        "extraHashes": dict(entry.extra_hashes or {}),
+        "rawHashInfo": dict(entry.raw_hash_info or {}),
     }
 
 
@@ -80,7 +87,10 @@ def summarize_source_entries(entries: list[SourceEntry]) -> dict[str, object]:
     hash_type_counts: dict[str, int] = {}
     gcid_ready = 0
     md5_ready = 0
+    sha1_ready = 0
     missing_md5 = 0
+    missing_fast_upload = 0
+    fast_upload_ready = 0
     total_size = 0
     for entry in entries:
         provider_counts[entry.provider] = provider_counts.get(entry.provider, 0) + 1
@@ -92,6 +102,12 @@ def summarize_source_entries(entries: list[SourceEntry]) -> dict[str, object]:
             md5_ready += 1
         else:
             missing_md5 += 1
+        if entry.sha1:
+            sha1_ready += 1
+        if entry.has_fast_upload_fingerprint:
+            fast_upload_ready += 1
+        else:
+            missing_fast_upload += 1
     return {
         "total": len(entries),
         "total_size": total_size,
@@ -99,7 +115,10 @@ def summarize_source_entries(entries: list[SourceEntry]) -> dict[str, object]:
         "hash_type_counts": hash_type_counts,
         "md5_ready": md5_ready,
         "gcid_ready": gcid_ready,
+        "sha1_ready": sha1_ready,
+        "fast_upload_ready": fast_upload_ready,
         "missing_md5": missing_md5,
+        "missing_fast_upload": missing_fast_upload,
     }
 
 
@@ -118,17 +137,26 @@ def build_source_miaochuan_payload(
             "provider": entry.provider,
             "hashType": entry.hash_type,
             "sourceId": entry.source_id,
+            "providerFileId": entry.provider_file_id,
         }
         if entry.md5:
             record["etag"] = entry.md5.lower()
         if entry.gcid:
             record["gcid"] = entry.gcid
+        if entry.sha1:
+            record["sha1"] = entry.sha1
+        if entry.crc64:
+            record["crc64"] = entry.crc64
+        if entry.pickcode:
+            record["pickcode"] = entry.pickcode
+        if entry.extra_hashes:
+            record["extraHashes"] = dict(entry.extra_hashes)
         if entry.md5 or entry.gcid:
             files.append(record)
         else:
             skipped.append({"path": entry.path, "reason": "missing md5/gcid"})
     return {
-        "scriptVersion": "cloud2guangya-source-export-2026.05.16",
+        "scriptVersion": "cloudpan-bridge-source-export-2026.05.16",
         "commonPath": "",
         "totalFilesCount": len(files),
         "totalSize": sum(int(item["size"]) for item in files),
@@ -422,6 +450,9 @@ class SyncRunner:
         return relative_target_path(source_root_override or self.source_root_for_target, source_path, self.config.target_path)
 
     def _try_direct_metadata_sync(self, item: SyncPlanItem, guangya: GuangyaService, state: SyncState) -> bool:
+        if not item.source.has_fast_upload_fingerprint:
+            self.log(f"[无秒传指纹] {item.source.path}: 缺少 MD5/GCID，改走降级路径。")
+            return False
         target_path = self._resolve_target_path(item.source.path)
         target_parent = str(PurePosixPath(target_path).parent)
         target_parent_id = guangya.ensure_directory(target_parent)
@@ -471,8 +502,6 @@ class SyncRunner:
         threshold_mb = max(0, int(self.config.auto_download_threshold_mb))
         if threshold_mb <= 0:
             return False
-        if not item.source.md5:
-            return False
         return item.source.size <= threshold_mb * 1024 * 1024
 
     @staticmethod
@@ -488,6 +517,11 @@ class SyncRunner:
             provider=entry.provider,
             hash_type=entry.hash_type,
             gcid=entry.gcid,
+            etag=entry.etag,
+            sha1=entry.sha1,
+            crc64=entry.crc64,
+            pickcode=entry.pickcode,
+            extra_hashes=dict(entry.extra_hashes or {}),
         )
         state.pending_files.pop(entry.path, None)
 
