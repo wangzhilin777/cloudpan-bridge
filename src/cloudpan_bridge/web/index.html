@@ -1,0 +1,2632 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CloudPan Bridge 控制台</title>
+  <style>
+    :root {
+      --bg: #f3efe7;
+      --panel: rgba(255, 251, 245, 0.92);
+      --line: #ddcfbc;
+      --text: #223035;
+      --muted: #667277;
+      --accent: #0c7a63;
+      --accent-2: #cf6a42;
+      --soft: #ece2d4;
+      --shadow: 0 14px 34px rgba(89, 66, 35, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(12,122,99,.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(207,106,66,.12), transparent 24%),
+        linear-gradient(180deg, #f8f3eb, var(--bg));
+    }
+    button, input, textarea, select {
+      font: inherit;
+    }
+    .app {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 42px);
+    }
+    .lead {
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 900px;
+    }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 18px;
+      align-items: start;
+    }
+    .main {
+      display: grid;
+      gap: 16px;
+      min-width: 0;
+    }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tab {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      background: #eadfce;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .tab.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .tab-panel {
+      display: none;
+    }
+    .tab-panel.active {
+      display: grid;
+      gap: 16px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+      min-width: 0;
+    }
+    .panel h2, .panel h3 {
+      margin: 0 0 12px;
+    }
+    .panel-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .col-span-2 {
+      grid-column: span 2;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    input[type="text"],
+    input[type="password"],
+    input[type="number"],
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: #fff;
+      color: var(--text);
+    }
+    textarea {
+      min-height: 140px;
+      resize: vertical;
+    }
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      background: var(--text);
+      color: #fff;
+      cursor: pointer;
+    }
+    button.secondary { background: var(--soft); color: var(--text); }
+    button.accent { background: var(--accent); }
+    button.warn { background: var(--accent-2); }
+    button:disabled { opacity: .62; cursor: wait; }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .stack {
+      display: grid;
+      gap: 14px;
+    }
+    .subtle {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #efe4d4;
+      font-size: 12px;
+    }
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .status-card {
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      padding: 12px;
+      background: rgba(255,255,255,.68);
+      min-width: 0;
+    }
+    .status-card strong {
+      display: block;
+      margin-bottom: 8px;
+    }
+    .notice {
+      min-height: 46px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border: 1px dashed var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,.65);
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+    .browser-list, .mount-list, .tree-wrap, .queue-list {
+      max-height: 520px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.72);
+      padding: 10px;
+    }
+    .row-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 10px 4px;
+      border-bottom: 1px dashed var(--line);
+    }
+    .row-item:last-child { border-bottom: 0; }
+    .mono {
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      color: var(--muted);
+      word-break: break-word;
+    }
+    .tree-node {
+      margin-left: 8px;
+      padding-left: 10px;
+      border-left: 2px solid rgba(221,207,188,.8);
+    }
+    .tree-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      padding: 4px 0;
+    }
+    .tree-toggle {
+      width: 26px;
+      border-radius: 10px;
+      padding: 2px 0;
+      background: #eadfce;
+      color: var(--text);
+    }
+    .tree-toggle.empty { visibility: hidden; }
+    .tree-label { flex: 1; min-width: 0; }
+    .drawer {
+      position: sticky;
+      top: 20px;
+      min-height: calc(100vh - 40px);
+    }
+    .drawer.hidden {
+      display: none;
+    }
+    .drawer .panel {
+      height: calc(100vh - 40px);
+      display: flex;
+      flex-direction: column;
+    }
+    .drawer-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    #logs {
+      flex: 1;
+      overflow: auto;
+      background: #1f2428;
+      color: #ecf2f1;
+      border-radius: 16px;
+      padding: 12px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    details {
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.56);
+      padding: 0 12px 12px;
+    }
+    summary {
+      cursor: pointer;
+      padding: 12px 0;
+      font-weight: 600;
+    }
+    .checkbox-inline {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      margin-right: 12px;
+      color: var(--text);
+    }
+    .hidden {
+      display: none !important;
+    }
+    .dialog-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(20, 28, 30, 0.42);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 50;
+    }
+    .dialog-card {
+      width: min(920px, 100%);
+      max-height: 85vh;
+      overflow: auto;
+      background: rgba(255, 251, 245, 0.98);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    .dialog-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .guide-steps {
+      display: grid;
+      gap: 10px;
+      margin: 12px 0 16px;
+    }
+    .guide-step {
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      padding: 12px;
+      background: rgba(255,255,255,.64);
+      line-height: 1.7;
+    }
+    @media (max-width: 1180px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+      .drawer {
+        position: static;
+        min-height: auto;
+      }
+      .drawer .panel {
+        height: 420px;
+      }
+    }
+    @media (max-width: 860px) {
+      .panel-grid, .status-grid {
+        grid-template-columns: 1fr;
+      }
+      .col-span-2 {
+        grid-column: span 1;
+      }
+      .hero {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="hero">
+      <div>
+        <h1>CloudPan Bridge</h1>
+        <div class="lead">统一读取 OpenList 挂载源，优先做秒传，未命中再进入自动补传或待补传目录树。页面会按配置恢复当前目录浏览位置，并把日志单独放到右侧抽屉，避免整页长滚动。</div>
+      </div>
+      <div class="hero-actions">
+        <select id="ui_language" style="width:auto;min-width:140px;">
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+          <option value="mix">中英混合</option>
+        </select>
+        <button class="secondary" id="toggle-logs" data-i18n="btn.toggle_logs_hide">隐藏日志</button>
+        <button class="secondary" id="reload-all" data-i18n="btn.reload_all">重新载入</button>
+        <button class="accent" id="save-config-top" data-i18n="btn.save_config_top">保存配置</button>
+      </div>
+    </div>
+
+    <div class="shell">
+      <div class="main">
+        <div class="tabs" id="tabs">
+          <button class="tab active" data-tab="overview" data-i18n="tab.overview">总览</button>
+          <button class="tab" data-tab="source" data-i18n="tab.source">源目录</button>
+          <button class="tab" data-tab="sync" data-i18n="tab.sync">同步</button>
+          <button class="tab" data-tab="pending" data-i18n="tab.pending">补传</button>
+          <button class="tab" data-tab="miaochuan" data-i18n="tab.miaochuan">秒传</button>
+          <button class="tab" data-tab="mounts" data-i18n="tab.mounts">挂载</button>
+          <button class="tab" data-tab="config" data-i18n="tab.config">配置</button>
+        </div>
+
+        <section class="tab-panel active" data-panel="overview">
+          <div class="panel">
+            <h2 data-i18n="panel.overview">运行概览</h2>
+            <div class="status-grid">
+              <div class="status-card">
+                <strong data-i18n="card.runtime">OpenList Runtime</strong>
+                <div id="runtime-summary">等待载入</div>
+              </div>
+              <div class="status-card">
+                <strong data-i18n="card.sync">同步状态</strong>
+                <div id="sync-summary">等待载入</div>
+              </div>
+              <div class="status-card">
+                <strong data-i18n="card.capture">光鸭抓取</strong>
+                <div id="capture-summary">等待载入</div>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="secondary" id="start-runtime" data-i18n="btn.start_runtime">启动托管 OpenList</button>
+              <button class="secondary" id="login-openlist" data-i18n="btn.login_openlist">登录 OpenList 并写回 Token</button>
+              <button class="secondary" id="capture-guangya" data-i18n="btn.capture_guangya">打开光鸭登录并自动抓取</button>
+              <button class="warn" id="run-direct-overview" data-i18n="btn.direct_sync">直接同步当前目录</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2 data-i18n="panel.current_task">当前任务</h2>
+            <div class="panel-grid">
+              <div>
+                <label data-i18n="label.source_path">当前源目录</label>
+                <input id="source_path">
+              </div>
+              <div>
+                <label data-i18n="label.target_path">光鸭目标目录</label>
+                <input id="target_path">
+              </div>
+              <div>
+                <label data-i18n="label.mounted_source_select">已挂载源目录</label>
+                <select id="mounted_source_select"></select>
+              </div>
+              <div>
+                <label data-i18n="label.effective_openlist_url">OpenList 实际访问地址</label>
+                <input id="effective_openlist_url" readonly>
+              </div>
+              <div>
+                <label data-i18n="label.auto_download_threshold_mb">小文件自动补传阈值(MB，0=只记录)</label>
+                <input id="auto_download_threshold_mb" type="number" min="0">
+              </div>
+            </div>
+            <div class="actions">
+              <button class="accent" id="save-config-overview" data-i18n="btn.save_task_config">保存当前任务配置</button>
+              <button class="secondary" id="use-mounted-source" data-i18n="btn.use_mounted_source">使用挂载源目录</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="source">
+          <div class="panel">
+            <h2 data-i18n="panel.source_browser">目录浏览</h2>
+            <div class="subtle" data-i18n="desc.source_browser">页面进入时会优先按配置里的 <code>source_path</code> 恢复当前浏览目录；如果该目录读取失败，再回退到挂载根目录。</div>
+            <div class="actions">
+              <button class="secondary" id="browse-root" data-i18n="btn.browse_root">浏览挂载根目录</button>
+              <button class="secondary" id="browse-up" data-i18n="btn.browse_up">返回上级</button>
+              <button class="secondary" id="browse-refresh" data-i18n="btn.browse_refresh">刷新当前目录</button>
+              <button class="accent" id="use-current-dir" data-i18n="btn.use_current_dir">使用当前目录作为源目录</button>
+            </div>
+            <div class="notice" id="dir-notice">等待操作</div>
+            <div class="mono" id="dir-current">当前浏览: 未载入</div>
+            <div class="browser-list" id="dir-browser-list">正在等待目录数据...</div>
+          </div>
+
+          <div class="panel">
+            <h2 data-i18n="panel.source_analyze">源端元数据分析</h2>
+            <div class="subtle" data-i18n="desc.source_analyze">开始真正同步前，先做一次源目录分析。这里会统计当前目录中有多少文件带 MD5、多少文件带 GCID、各 provider 占比，以及抽样展示前几条源文件元数据。</div>
+            <div class="actions">
+              <button class="secondary" id="analyze-source" data-i18n="btn.analyze_source">分析当前源目录</button>
+              <button class="secondary" id="build-source-miaochuan" data-i18n="btn.build_source_miaochuan">生成当前源目录秒传 JSON</button>
+            </div>
+            <div class="notice" id="source-analyze-notice">等待分析</div>
+            <div class="mount-list" id="source-analyze-summary">暂无分析结果</div>
+          </div>
+
+        </section>
+
+        <section class="tab-panel" data-panel="sync">
+          <div class="panel">
+            <h2 data-i18n="panel.sync_actions">同步执行</h2>
+            <div class="actions">
+              <button class="secondary" id="run-dry" data-i18n="btn.run_dry">只看计划 dry-run</button>
+              <button class="warn" id="run-direct" data-i18n="btn.direct_sync">直接同步当前目录</button>
+              <button class="secondary" id="run-next-queue" data-i18n="btn.run_next_queue">执行队列下一个</button>
+              <button class="secondary" id="run-all-queue" data-i18n="btn.run_all_queue">连续执行整个队列</button>
+            </div>
+            <div class="notice" id="sync-notice">等待操作</div>
+          </div>
+
+          <div class="panel">
+            <h2 data-i18n="panel.leaf_mode">最底层目录模式</h2>
+            <div class="subtle" data-i18n="desc.leaf_mode">适合防风控慢跑。可以直接边扫边同步，也可以先把叶子目录加入队列后分批执行。</div>
+            <div class="actions">
+              <button class="secondary" id="add-current-queue" data-i18n="btn.add_current_queue">当前目录加入队列</button>
+              <button class="secondary" id="add-leaf-queue" data-i18n="btn.add_leaf_queue">当前目录最底层批量入队</button>
+              <button class="warn" id="run-leaf-direct" data-i18n="btn.run_leaf_direct">最底层边扫边秒传</button>
+              <button class="warn" id="run-leaf-full" data-i18n="btn.run_leaf_full">最底层边扫边同步+补传</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2 data-i18n="panel.queue">目录队列</h2>
+            <div class="queue-list" id="queue-list">暂无目录队列</div>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="pending">
+          <div class="panel">
+            <h2 data-i18n="panel.pending_tree">待补传目录树</h2>
+            <div class="actions">
+              <button class="secondary" id="pending-select-all" data-i18n="btn.select_all">全选</button>
+              <button class="secondary" id="pending-clear-all" data-i18n="btn.clear_all">全不选</button>
+              <button class="warn" id="pending-run-selected" data-i18n="btn.pending_run_selected">补传已勾选文件</button>
+              <button class="warn" id="pending-run-stream" data-i18n="btn.pending_run_stream">按勾选目录最底层顺序补传</button>
+            </div>
+            <div class="subtle" data-i18n="desc.pending_tree">这里按真实目录树展示，父目录勾选会联动所有子目录和文件。</div>
+            <div class="tree-wrap" id="pending-tree">暂无待补传文件</div>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="miaochuan">
+          <div class="panel">
+            <h2 data-i18n="panel.miaochuan">秒传 JSON 直导</h2>
+            <div class="subtle" data-i18n="desc.miaochuan">支持直接粘贴油猴或插件导出的 JSON。若你已自动抓取到光鸭 Authorization，会优先使用它。</div>
+            <label data-i18n="label.miaochuan_payload">秒传 JSON</label>
+            <textarea id="miaochuan_payload" placeholder='{"files":[{"path":"/demo.zip","size":"123","etag":"md5"}]}'></textarea>
+            <div class="actions">
+              <button class="secondary" id="diagnose-miaochuan" data-i18n="btn.diagnose_miaochuan">诊断当前秒传 JSON</button>
+              <button class="warn" id="run-miaochuan" data-i18n="btn.run_miaochuan">直接导入光鸭</button>
+            </div>
+            <div class="notice" id="miaochuan-notice">等待操作</div>
+            <div class="mount-list" id="miaochuan-diagnosis">暂无诊断结果</div>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="mounts">
+          <div class="panel">
+            <h2 data-i18n="panel.mount_overview">OpenList 挂载总览</h2>
+            <div class="actions">
+              <button class="secondary" id="refresh-storages" data-i18n="btn.refresh_storages">刷新挂载列表</button>
+              <button class="secondary" id="refresh-drivers" data-i18n="btn.refresh_drivers">刷新驱动列表</button>
+            </div>
+            <div class="mount-list" id="storage-list">正在载入挂载列表...</div>
+          </div>
+
+          <div class="panel">
+            <h2 data-i18n="panel.provider_capture">源网盘登录抓取</h2>
+            <div class="subtle" data-i18n="desc.provider_capture">如果还没有挂载，或想直接从网页登录态抓取 Cookie / Token / Header，可以先在这里选网盘类型，打开登录页抓取，再一键写入当前挂载表单。</div>
+            <div class="panel-grid">
+              <div>
+                <label data-i18n="label.provider_select">源网盘类型</label>
+                <select id="provider-select"></select>
+              </div>
+              <div>
+                <label data-i18n="label.provider_capture_hint">抓取提示</label>
+                <div class="notice" id="provider-driver-hint">等待选择网盘类型。</div>
+              </div>
+              <div class="col-span-2">
+                <label>Login URL</label>
+                <input id="provider-login-url" placeholder="https://...">
+              </div>
+              <div class="col-span-2">
+                <div class="notice" id="provider-capture-summary">等待抓取状态...</div>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="secondary" id="start-provider-capture" data-i18n="btn.start_provider_capture">打开网页登录并抓取</button>
+              <button class="accent" id="apply-provider-fields" data-i18n="btn.apply_provider_fields">写入当前挂载表单</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2 data-i18n="panel.create_mount">新增挂载</h2>
+            <div class="panel-grid">
+              <div>
+                <label data-i18n="label.driver_select">驱动类型</label>
+                <select id="driver-select"></select>
+              </div>
+              <div>
+                <label data-i18n="label.driver_notice">说明</label>
+                <div class="notice" id="driver-notice">选择驱动后会动态加载字段。</div>
+              </div>
+              <div class="col-span-2">
+                <div class="notice" id="driver-guide-inline">选择驱动后，这里会显示该驱动的接入说明、官方文档和推荐默认值。</div>
+              </div>
+              <div class="col-span-2">
+                <div class="panel-grid" id="driver-fields"></div>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="secondary" id="show-driver-guide" data-i18n="btn.show_driver_guide">查看接入流程</button>
+              <button class="secondary" id="apply-driver-defaults" data-i18n="btn.apply_driver_defaults">套用推荐默认值</button>
+              <button class="accent" id="create-storage" data-i18n="btn.create_storage">创建挂载</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="config">
+          <div class="panel">
+            <h2 data-i18n="panel.config">基础配置</h2>
+            <div class="panel-grid">
+              <div>
+                <label data-i18n="label.openlist_mode">OpenList 模式</label>
+                <select id="openlist_mode">
+                  <option value="external" data-i18n-option="option.openlist_mode.external">external</option>
+                  <option value="managed" data-i18n-option="option.openlist_mode.managed">managed</option>
+                </select>
+              </div>
+              <div>
+                <label data-i18n="label.rate_limit_mode">Rate Limit 模式</label>
+                <select id="rate_limit_mode">
+                  <option value="safe" data-i18n-option="option.rate_limit_mode.safe">safe</option>
+                  <option value="balanced" data-i18n-option="option.rate_limit_mode.balanced">balanced</option>
+                  <option value="fast" data-i18n-option="option.rate_limit_mode.fast">fast</option>
+                  <option value="custom" data-i18n-option="option.rate_limit_mode.custom">custom</option>
+                </select>
+              </div>
+              <div>
+                <label data-i18n="label.openlist_url">OpenList 地址</label>
+                <input id="openlist_url">
+              </div>
+              <div>
+                <label data-i18n="label.openlist_token">OpenList Token</label>
+                <input id="openlist_token">
+              </div>
+              <div>
+                <label data-i18n="label.openlist_username">OpenList 用户名</label>
+                <input id="openlist_username">
+              </div>
+              <div>
+                <label data-i18n="label.openlist_password">OpenList 密码</label>
+                <input id="openlist_password" type="password">
+              </div>
+              <div>
+                <label data-i18n="label.managed_openlist_bin">托管 OpenList 可执行文件</label>
+                <input id="managed_openlist_bin">
+              </div>
+              <div>
+                <label data-i18n="label.managed_openlist_data_dir">托管 OpenList 数据目录</label>
+                <input id="managed_openlist_data_dir">
+              </div>
+              <div>
+                <label data-i18n="label.managed_openlist_port">托管 OpenList 端口</label>
+                <input id="managed_openlist_port" type="number" min="1">
+              </div>
+              <div>
+                <label data-i18n="label.log_file">日志文件</label>
+                <input id="log_file">
+              </div>
+              <div>
+                <label data-i18n="label.temp_dir">临时下载目录</label>
+                <input id="temp_dir">
+              </div>
+              <div>
+                <label data-i18n="label.state_file">状态文件</label>
+                <input id="state_file">
+              </div>
+              <div>
+                <label data-i18n="label.openlist_page_size">OpenList 每页数</label>
+                <input id="openlist_page_size" type="number" min="1">
+              </div>
+              <div>
+                <label data-i18n="label.openlist_request_interval_ms">OpenList 请求间隔(ms)</label>
+                <input id="openlist_request_interval_ms" type="number" min="0">
+              </div>
+              <div>
+                <label data-i18n="label.queue_interval_ms">目录间隔(ms)</label>
+                <input id="queue_interval_ms" type="number" min="0">
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2 data-i18n="panel.guangya_auth">光鸭登录信息</h2>
+            <div class="panel-grid">
+              <div>
+                <label data-i18n="label.guangya_phone">光鸭手机号</label>
+                <input id="guangya_phone">
+              </div>
+              <div>
+                <label data-i18n="label.guangya_device_id">光鸭 Device ID</label>
+                <input id="guangya_device_id">
+              </div>
+              <div>
+                <label data-i18n="label.guangya_access_token">光鸭 Access Token</label>
+                <input id="guangya_access_token">
+              </div>
+              <div>
+                <label data-i18n="label.guangya_refresh_token">光鸭 Refresh Token</label>
+                <input id="guangya_refresh_token">
+              </div>
+              <div class="col-span-2">
+                <label data-i18n="label.guangya_authorization">光鸭 Authorization</label>
+                <input id="guangya_authorization" placeholder="Bearer ...">
+              </div>
+            </div>
+            <div class="actions">
+              <button class="accent" id="save-config-bottom" data-i18n="btn.save_all_config">保存全部配置</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <aside class="drawer" id="log-drawer">
+        <div class="panel">
+          <div class="drawer-head">
+            <h2 data-i18n="panel.logs">实时日志</h2>
+            <div class="actions">
+              <button class="secondary" id="clear-logs" data-i18n="btn.clear_logs">清空日志</button>
+            </div>
+          </div>
+          <div class="subtle" data-i18n="desc.logs">这里会自动滚动到最新日志。同步、队列、挂载和光鸭抓取状态都可以从这里看。</div>
+          <div id="logs">等待日志...</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <div class="dialog-backdrop hidden" id="driver-guide-dialog">
+    <div class="dialog-card">
+      <div class="dialog-head">
+        <h2 id="driver-guide-title">驱动接入流程</h2>
+        <button class="secondary" id="close-driver-guide" data-i18n="btn.close_dialog">关闭</button>
+      </div>
+      <div class="notice" id="driver-guide-summary">等待选择驱动。</div>
+      <div class="guide-steps" id="driver-guide-steps"></div>
+      <div class="actions">
+        <button class="secondary" id="open-driver-doc" data-i18n="btn.open_driver_doc">打开官方文档</button>
+        <button class="accent" id="apply-driver-defaults-dialog" data-i18n="btn.apply_driver_defaults">套用推荐默认值</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CONFIG_FIELDS = [
+      "source_path", "target_path", "openlist_mode", "managed_openlist_bin", "managed_openlist_data_dir",
+      "managed_openlist_port", "openlist_url", "openlist_token", "openlist_username", "openlist_password",
+      "guangya_phone", "guangya_authorization", "guangya_access_token", "guangya_refresh_token",
+      "guangya_device_id", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
+      "auto_download_threshold_mb", "rate_limit_mode", "log_file", "temp_dir", "state_file"
+    ];
+    const PANEL_STATE_KEY = "cloud2guangya-tabs";
+    const UI_LANGUAGE_KEY = "cloud2guangya-ui-language";
+    const AUTO_GUANGYA_CAPTURE_KEY = "cloud2guangya-auto-guangya-capture";
+    const RATE_PRESETS = {
+      default: { openlist_page_size: 100, openlist_request_interval_ms: 800, queue_interval_ms: 3000 },
+      safe: { openlist_page_size: 80, openlist_request_interval_ms: 1200, queue_interval_ms: 5000 },
+      balanced: { openlist_page_size: 120, openlist_request_interval_ms: 700, queue_interval_ms: 2500 },
+      fast: { openlist_page_size: 200, openlist_request_interval_ms: 300, queue_interval_ms: 1000 },
+      "189cloud": { openlist_page_size: 60, openlist_request_interval_ms: 1200, queue_interval_ms: 5000 },
+      "quark": { openlist_page_size: 80, openlist_request_interval_ms: 1000, queue_interval_ms: 3500 },
+      "123pan": { openlist_page_size: 100, openlist_request_interval_ms: 900, queue_interval_ms: 3000 },
+      "baidu": { openlist_page_size: 50, openlist_request_interval_ms: 1500, queue_interval_ms: 6000 },
+      "thunder": { openlist_page_size: 80, openlist_request_interval_ms: 1000, queue_interval_ms: 3500 },
+      "aliyun": { openlist_page_size: 120, openlist_request_interval_ms: 700, queue_interval_ms: 2500 }
+    };
+    const I18N = {
+      zh: {
+        "tab.overview": "总览",
+        "tab.source": "源目录",
+        "tab.sync": "同步",
+        "tab.pending": "补传",
+        "tab.miaochuan": "秒传",
+        "tab.mounts": "挂载",
+        "tab.config": "配置",
+        "panel.overview": "运行概览",
+        "panel.current_task": "当前任务",
+        "panel.source_browser": "目录浏览",
+        "panel.source_analyze": "源端元数据分析",
+        "panel.leaf_mode": "最底层目录模式",
+        "panel.sync_actions": "同步执行",
+        "panel.queue": "目录队列",
+        "panel.pending_tree": "待补传目录树",
+        "panel.miaochuan": "秒传 JSON 直导",
+        "panel.mount_overview": "OpenList 挂载总览",
+        "panel.provider_capture": "源网盘登录抓取",
+        "panel.create_mount": "新增挂载",
+        "panel.config": "基础配置",
+        "panel.guangya_auth": "光鸭登录信息",
+        "panel.logs": "实时日志",
+        "card.runtime": "OpenList Runtime",
+        "card.sync": "同步状态",
+        "card.capture": "光鸭抓取",
+        "btn.start_runtime": "启动托管 OpenList",
+        "btn.login_openlist": "登录 OpenList 并写回 Token",
+        "btn.capture_guangya": "打开光鸭登录并自动抓取",
+        "btn.direct_sync": "直接同步当前目录",
+        "btn.save_task_config": "保存当前任务配置",
+        "btn.browse_root": "浏览挂载根目录",
+        "btn.browse_up": "返回上级",
+        "btn.browse_refresh": "刷新当前目录",
+        "btn.analyze_source": "分析当前源目录",
+        "btn.build_source_miaochuan": "生成当前源目录秒传 JSON",
+        "btn.use_current_dir": "使用当前目录作为源目录",
+        "btn.add_current_queue": "当前目录加入队列",
+        "btn.add_leaf_queue": "当前目录最底层批量入队",
+        "btn.run_leaf_direct": "最底层边扫边秒传",
+        "btn.run_leaf_full": "最底层边扫边同步+补传",
+        "btn.run_dry": "只看计划 dry-run",
+        "btn.run_next_queue": "执行队列下一个",
+        "btn.run_all_queue": "连续执行整个队列",
+        "btn.select_all": "全选",
+        "btn.clear_all": "全不选",
+        "btn.pending_run_selected": "补传已勾选文件",
+        "btn.pending_run_stream": "按勾选目录最底层顺序补传",
+        "btn.diagnose_miaochuan": "诊断当前秒传 JSON",
+        "btn.run_miaochuan": "直接导入光鸭",
+        "btn.refresh_storages": "刷新挂载列表",
+        "btn.refresh_drivers": "刷新驱动列表",
+        "btn.start_provider_capture": "打开网页登录并抓取",
+        "btn.apply_provider_fields": "写入当前挂载表单",
+        "btn.create_storage": "创建挂载",
+        "btn.show_driver_guide": "查看接入流程",
+        "btn.apply_driver_defaults": "套用推荐默认值",
+        "btn.close_dialog": "关闭",
+        "btn.open_driver_doc": "打开官方文档",
+        "btn.save_all_config": "保存全部配置",
+        "btn.clear_logs": "清空日志",
+        "btn.reload_all": "重新载入",
+        "btn.save_config_top": "保存配置",
+        "btn.toggle_logs_hide": "隐藏日志",
+        "btn.toggle_logs_show": "显示日志",
+        "btn.use_mounted_source": "使用挂载源目录",
+        "label.source_path": "当前源目录",
+        "label.target_path": "光鸭目标目录",
+        "label.effective_openlist_url": "OpenList 实际访问地址",
+        "label.mounted_source_select": "已挂载源目录",
+        "label.auto_download_threshold_mb": "小文件自动补传阈值(MB，0=只记录)",
+        "label.miaochuan_payload": "秒传 JSON",
+        "label.driver_select": "驱动类型",
+        "label.provider_select": "源网盘类型",
+        "label.provider_capture_hint": "抓取提示",
+        "label.driver_notice": "说明",
+        "label.openlist_mode": "OpenList 模式",
+        "label.rate_limit_mode": "Rate Limit 模式",
+        "label.openlist_url": "OpenList 地址",
+        "label.openlist_token": "OpenList Token",
+        "label.openlist_username": "OpenList 用户名",
+        "label.openlist_password": "OpenList 密码",
+        "label.managed_openlist_bin": "托管 OpenList 可执行文件",
+        "label.managed_openlist_data_dir": "托管 OpenList 数据目录",
+        "label.managed_openlist_port": "托管 OpenList 端口",
+        "label.log_file": "日志文件",
+        "label.temp_dir": "临时下载目录",
+        "label.state_file": "状态文件",
+        "label.openlist_page_size": "OpenList 每页数",
+        "label.openlist_request_interval_ms": "OpenList 请求间隔(ms)",
+        "label.queue_interval_ms": "目录间隔(ms)",
+        "label.guangya_phone": "光鸭手机号",
+        "label.guangya_device_id": "光鸭 Device ID",
+        "label.guangya_access_token": "光鸭 Access Token",
+        "label.guangya_refresh_token": "光鸭 Refresh Token",
+        "label.guangya_authorization": "光鸭 Authorization",
+        "desc.source_browser": "页面进入时会优先按配置里的 source_path 恢复当前浏览目录；如果该目录读取失败，再回退到挂载根目录。",
+        "desc.source_analyze": "开始真正同步前，先做一次源目录分析。这里会统计当前目录中有多少文件带 MD5、多少文件带 GCID、各 provider 占比，以及抽样展示前几条源文件元数据。",
+        "desc.leaf_mode": "适合防风控慢跑。可以直接边扫边同步，也可以先把叶子目录加入队列后分批执行。",
+        "desc.pending_tree": "这里按真实目录树展示，父目录勾选会联动所有子目录和文件。",
+        "desc.miaochuan": "支持直接粘贴油猴或插件导出的 JSON。若你已自动抓取到光鸭 Authorization，会优先使用它。",
+        "desc.provider_capture": "如果还没有挂载，或想直接从网页登录态抓取 Cookie / Token / Header，可以先在这里选网盘类型，打开登录页抓取，再一键写入当前挂载表单。",
+        "desc.logs": "这里会自动滚动到最新日志。同步、队列、挂载和光鸭抓取状态都可以从这里看。",
+        "option.openlist_mode.external": "外部模式",
+        "option.openlist_mode.managed": "托管模式",
+        "option.rate_limit_mode.safe": "稳妥",
+        "option.rate_limit_mode.balanced": "平衡",
+        "option.rate_limit_mode.fast": "快速",
+        "option.rate_limit_mode.custom": "自定义"
+      },
+      en: {
+        "tab.overview": "Overview",
+        "tab.source": "Source",
+        "tab.sync": "Sync",
+        "tab.pending": "Reupload",
+        "tab.miaochuan": "Flash Upload",
+        "tab.mounts": "Mounts",
+        "tab.config": "Config",
+        "panel.overview": "Runtime Overview",
+        "panel.current_task": "Current Task",
+        "panel.source_browser": "Directory Browser",
+        "panel.source_analyze": "Source Metadata Analysis",
+        "panel.leaf_mode": "Leaf Directory Mode",
+        "panel.sync_actions": "Sync Actions",
+        "panel.queue": "Directory Queue",
+        "panel.pending_tree": "Pending Reupload Tree",
+        "panel.miaochuan": "Flash Upload JSON Import",
+        "panel.mount_overview": "OpenList Mount Overview",
+        "panel.provider_capture": "Source Provider Capture",
+        "panel.create_mount": "Create Mount",
+        "panel.config": "Base Config",
+        "panel.guangya_auth": "Guangya Auth",
+        "panel.logs": "Live Logs",
+        "card.runtime": "OpenList Runtime",
+        "card.sync": "Sync Status",
+        "card.capture": "Guangya Capture",
+        "btn.start_runtime": "Start Managed OpenList",
+        "btn.login_openlist": "Login OpenList and Save Token",
+        "btn.capture_guangya": "Open Guangya Login Capture",
+        "btn.direct_sync": "Sync Current Source",
+        "btn.save_task_config": "Save Task Config",
+        "btn.browse_root": "Browse Mount Root",
+        "btn.browse_up": "Go Parent",
+        "btn.browse_refresh": "Refresh Current Directory",
+        "btn.analyze_source": "Analyze Current Source",
+        "btn.build_source_miaochuan": "Build Flash Upload JSON",
+        "btn.use_current_dir": "Use Current Directory as Source",
+        "btn.add_current_queue": "Add Current Directory to Queue",
+        "btn.add_leaf_queue": "Queue All Leaf Directories",
+        "btn.run_leaf_direct": "Leaf Scan and Flash Sync",
+        "btn.run_leaf_full": "Leaf Scan with Reupload",
+        "btn.run_dry": "Dry Run Only",
+        "btn.run_next_queue": "Run Next Queue Item",
+        "btn.run_all_queue": "Run Full Queue",
+        "btn.select_all": "Select All",
+        "btn.clear_all": "Clear All",
+        "btn.pending_run_selected": "Reupload Selected Files",
+        "btn.pending_run_stream": "Reupload by Selected Leaf Order",
+        "btn.diagnose_miaochuan": "Diagnose Current Flash JSON",
+        "btn.run_miaochuan": "Import to Guangya",
+        "btn.refresh_storages": "Refresh Mount List",
+        "btn.refresh_drivers": "Refresh Driver List",
+        "btn.start_provider_capture": "Open Login Capture",
+        "btn.apply_provider_fields": "Apply to Mount Form",
+        "btn.create_storage": "Create Mount",
+        "btn.show_driver_guide": "View Setup Guide",
+        "btn.apply_driver_defaults": "Apply Recommended Defaults",
+        "btn.close_dialog": "Close",
+        "btn.open_driver_doc": "Open Official Doc",
+        "btn.save_all_config": "Save All Config",
+        "btn.clear_logs": "Clear Logs",
+        "btn.reload_all": "Reload",
+        "btn.save_config_top": "Save Config",
+        "btn.toggle_logs_hide": "Hide Logs",
+        "btn.toggle_logs_show": "Show Logs",
+        "btn.use_mounted_source": "Use Mounted Source",
+        "label.source_path": "Current Source Path",
+        "label.target_path": "Guangya Target Path",
+        "label.effective_openlist_url": "Effective OpenList URL",
+        "label.mounted_source_select": "Mounted Source",
+        "label.auto_download_threshold_mb": "Auto Reupload Threshold (MB, 0 = record only)",
+        "label.miaochuan_payload": "Flash Upload JSON",
+        "label.driver_select": "Driver Type",
+        "label.provider_select": "Source Provider",
+        "label.provider_capture_hint": "Capture Hint",
+        "label.driver_notice": "Description",
+        "label.openlist_mode": "OpenList Mode",
+        "label.rate_limit_mode": "Rate Limit Mode",
+        "label.openlist_url": "OpenList URL",
+        "label.openlist_token": "OpenList Token",
+        "label.openlist_username": "OpenList Username",
+        "label.openlist_password": "OpenList Password",
+        "label.managed_openlist_bin": "Managed OpenList Binary",
+        "label.managed_openlist_data_dir": "Managed OpenList Data Dir",
+        "label.managed_openlist_port": "Managed OpenList Port",
+        "label.log_file": "Log File",
+        "label.temp_dir": "Temp Download Dir",
+        "label.state_file": "State File",
+        "label.openlist_page_size": "OpenList Page Size",
+        "label.openlist_request_interval_ms": "OpenList Request Interval (ms)",
+        "label.queue_interval_ms": "Directory Interval (ms)",
+        "label.guangya_phone": "Guangya Phone",
+        "label.guangya_device_id": "Guangya Device ID",
+        "label.guangya_access_token": "Guangya Access Token",
+        "label.guangya_refresh_token": "Guangya Refresh Token",
+        "label.guangya_authorization": "Guangya Authorization",
+        "desc.source_browser": "On load, the page restores the browser to source_path first. If that path fails, it falls back to the mount root.",
+        "desc.source_analyze": "Before starting a real sync, run a source analysis first. It counts how many files have MD5, how many have GCID, shows provider distribution, and previews the first few source file metadata rows.",
+        "desc.leaf_mode": "Best for throttled syncing. You can sync while scanning, or queue leaf directories first.",
+        "desc.pending_tree": "This tree follows the real directory hierarchy. Parent selection cascades to children and files.",
+        "desc.miaochuan": "Paste JSON exported by your userscript or plugin. If Guangya Authorization has been captured, it will be used first.",
+        "desc.provider_capture": "If you do not have a mount yet, or want to capture Cookie / Token / Header directly from a web login session, choose the provider here, start login capture, then apply the result to the current mount form.",
+        "desc.logs": "Logs auto-scroll to the newest line. Sync, queue, mount, and capture activity all appear here.",
+        "option.openlist_mode.external": "External",
+        "option.openlist_mode.managed": "Managed",
+        "option.rate_limit_mode.safe": "Safe",
+        "option.rate_limit_mode.balanced": "Balanced",
+        "option.rate_limit_mode.fast": "Fast",
+        "option.rate_limit_mode.custom": "Custom"
+      },
+      mix: {}
+    };
+    const DRIVER_FIELD_I18N = {
+      mountpath: { zh: "挂载路径", en: "Mount Path" },
+      order: { zh: "排序值", en: "Order" },
+      remark: { zh: "备注", en: "Remark" },
+      cacheexpiration: { zh: "缓存过期时间", en: "Cache Expiration" },
+      customcachepolicies: { zh: "自定义缓存策略", en: "Custom Cache Policies" },
+      webdavpolicy: { zh: "WebDAV 策略", en: "WebDAV Policy" },
+      downproxyurl: { zh: "下载代理地址", en: "Download Proxy URL" },
+      webproxy: { zh: "网页代理", en: "Web Proxy" },
+      proxyrange: { zh: "代理 Range", en: "Proxy Range" },
+      disableproxysign: { zh: "禁用代理签名", en: "Disable Proxy Sign" },
+      orderby: { zh: "排序字段", en: "Sort By" },
+      orderdirection: { zh: "排序方向", en: "Sort Direction" },
+      disableindex: { zh: "禁用索引", en: "Disable Index" },
+      extractfolder: { zh: "文件夹排序", en: "Extract Folder" },
+      enablesigning: { zh: "启用签名", en: "Enable Signing" },
+      ref: { zh: "引用挂载", en: "Reference Mount" },
+    };
+    const DRIVER_HELP_PATTERNS = [
+      { includes: ["mount to", "unique", "repeated"], zh: "要挂载到的位置，对外显示的名称，必须唯一不能重复。", en: "The mount location and external display name. It must be unique and cannot be repeated." },
+      { includes: ["use to sort"], zh: "用于排序，数值越小越靠前。", en: "Used for sorting. Smaller values appear first." },
+      { includes: ["cache expiration time", "this storage"], zh: "这个存储的目录结构缓存时间。", en: "Cache duration for this storage directory structure." },
+      { includes: ["cache expiration rules", "this storage"], zh: "这个存储的自定义缓存规则。", en: "Custom cache rules for this storage." },
+      { includes: ["need to enable proxy"], zh: "是否启用代理功能。", en: "Whether proxy should be enabled." },
+      { includes: ["disable sign", "download proxy"], zh: "是否禁用下载代理 URL 的签名。", en: "Whether to disable signing for the download proxy URL." },
+      { includes: ["sort by what"], zh: "按什么字段排序。", en: "Which field to sort by." },
+      { includes: ["ascending or descending"], zh: "排序方向，升序或降序。", en: "Sort direction, ascending or descending." },
+      { includes: ["put all folders to the front"], zh: "排序时将所有文件夹放到前面。", en: "Put all folders in front when sorting." },
+      { includes: ["put all folders to the back"], zh: "排序时将所有文件夹放到后面。", en: "Put all folders at the back when sorting." },
+      { includes: ["web preview", "direct link", "transfer"], zh: "网页预览、下载和直链是否通过 OpenList 中转。", en: "Whether web preview, download, and direct links go through OpenList transfer." },
+      { includes: ["redirect to the real link"], zh: "302 重定向到真实链接。", en: "302 redirect to the real link." },
+      { includes: ["redirect to proxy url"], zh: "重定向到代理 URL。", en: "Redirect to the proxy URL." },
+      { includes: ["return data directly through local transit"], zh: "通过本地中转直接返回数据，兼容性最好。", en: "Return data directly through local transit for best compatibility." },
+      { includes: ["proxy is turned on", "local machine"], zh: "开启代理但未填写地址时，默认使用本机中转。", en: "If proxy is enabled without a URL, the local machine is used for transfer by default." },
+      { includes: ["allow users to disable storage indexing"], zh: "允许对这个存储禁用索引。", en: "Allow users to disable storage indexing." },
+      { includes: ["reference authentication", "tokens"], zh: "从其他已挂载存储引用认证信息和令牌。", en: "Reference authentication data and tokens from another mounted storage." },
+    ];
+    const DRIVER_OPTIONS_I18N = {
+      "name,size,modified": { zh: "可选: 名称、大小、修改时间", en: "Options: name, size, modified" },
+      "asc,desc": { zh: "可选: 升序、降序", en: "Options: asc, desc" },
+      "302_redirect,use_proxy_url,native_proxy": { zh: "可选: 302 重定向、使用代理 URL、本机代理", en: "Options: 302 redirect, use proxy URL, native proxy" },
+      "extract_front,extract_back": { zh: "可选: 文件夹前置、文件夹后置", en: "Options: extract to front, extract to back" },
+    };
+    const DRIVER_GUIDES = {
+      aliyundriveopen: {
+        docUrl: "https://doc.oplist.org/guide/drivers/aliyundrive_open",
+        summary: {
+          zh: "AliyundriveOpen 不是简单网页登录就能完成的驱动。通常要先去 OpenList/官方页面获取令牌，再回到这里填写 Refresh Token、Root Folder ID、在线 API 等参数。",
+          en: "AliyundriveOpen is not a simple web-login-only driver. You usually need to obtain tokens first, then come back and fill Refresh Token, Root Folder ID, online API and related fields."
+        },
+        steps: {
+          zh: [
+            "先阅读官方文档，确认你走的是 OpenList 内置参数方案，还是你自己的开放平台应用方案。",
+            "获取令牌时，打开 api.oplist.org，选择阿里云盘应用登录；如果使用 OpenList 提供参数，则客户端 ID 和密钥留空。",
+            "扫码授权后，保存 Refresh Token；Access Token 只作临时展示，真正挂载时重点是 Refresh Token。",
+            "新增挂载时，Root Folder ID 默认可填 root；如果只挂某个子目录，就去阿里云盘网页打开该目录，取 URL 里的 folder/file_id。",
+            "如果走 OpenList 提供参数方案，勾选 Use online api，并把 Api url address 填成 https://api.oplist.org/alicloud/renewapi 。",
+            "如使用自己的开放平台应用，则不要勾选 Use online api，自己填写 Client ID / App Secret，Api url address 留空。"
+          ],
+          en: [
+            "Read the official doc first and decide whether you use OpenList built-in parameters or your own Open Platform app.",
+            "Open api.oplist.org and choose AliYun Drive App Login. If using OpenList parameters, leave Client ID and App Secret empty.",
+            "After QR authorization, save the Refresh Token. Access Token is only temporary; the mount mainly needs Refresh Token.",
+            "For mounting, Root Folder ID can be root by default. If you only want a subfolder, open that folder on Aliyun Drive web and copy the folder/file_id from the URL.",
+            "If using OpenList parameters, enable Use online api and set Api url address to https://api.oplist.org/alicloud/renewapi .",
+            "If using your own app, do not enable Use online api, fill Client ID / App Secret yourself, and leave Api url address empty."
+          ]
+        },
+        defaults: {
+          root_folder_id: "root",
+          use_online_api: "true",
+          api_url: "https://api.oplist.org/alicloud/renewapi",
+          cloud_drive_type: "Default",
+          livp_download_format: "Jpeg"
+        }
+      },
+      123open: {
+        docUrl: "https://doc.oplist.org/guide/drivers/123_open",
+        summary: {
+          zh: "123 Open 必须使用你自己的开发者密钥，不能只靠网页登录抓取。需要先申请 client_id 和 client_secret，再填写 Root Folder ID 等参数。",
+          en: "123 Open requires your own developer client_id and client_secret. Web login capture alone is not enough."
+        },
+        steps: {
+          zh: [
+            "先去 123 开放平台申请开发者，等待审核通过，拿到 client_id 和 client_secret。",
+            "申请过程中如果需要云盘 UID，请先登录 123 网盘网页端，在设置页查看账号 ID。",
+            "新增挂载时，Refresh Token 保持留空，直接填写你自己的 Client ID 和 Client Secret。",
+            "Root Folder ID 默认填 0；如果只挂某个目录，就在 123 网盘网页打开该目录，取 URL 里的 homeFilePath 数字。",
+            "如果要启用直链，先在 123 网盘网页端手动开启直链空间（VIP），再回来配置 Direct Link 相关字段。"
+          ],
+          en: [
+            "Apply for a developer account on 123 Open Platform and wait for approval to obtain client_id and client_secret.",
+            "If the application requires Cloud Drive UID, log in to 123 web and find Account ID in Settings.",
+            "When mounting, keep Refresh Token empty and fill your own Client ID and Client Secret directly.",
+            "Root Folder ID defaults to 0. If you only want one subfolder, open it on 123 web and copy the homeFilePath number from the URL.",
+            "If you want direct links, enable direct-link space manually on the 123 web side first, then come back to configure related fields."
+          ]
+        },
+        defaults: {
+          refresh_token: "",
+          root_folder_id: "0"
+        }
+      },
+      quark: {
+        docUrl: "https://doc.oplist.org/guide/drivers/quark.html",
+        summary: {
+          zh: "夸克 / QuarkOpen 主要依赖 Cookie，且官方文档明确说明现在只能强制使用本地代理传输，不能把网页登录抓取理解成“抓完就稳定可用”。",
+          en: "Quark / QuarkOpen mainly relies on Cookie. The official doc also states transfers now require local proxy, so web capture alone is not the whole setup."
+        },
+        steps: {
+          zh: [
+            "打开夸克网页端并登录，按 F12 打开开发者工具，在 Network 里找任意带 Cookie 的请求。",
+            "把完整 Cookie 抓出来后回填到挂载字段；如果驱动要求别的认证参数，也一起从请求头里补齐。",
+            "根据 OpenList 官方说明，夸克现在传输阶段只能强制使用本地代理，建议 WebDAV/Web 代理策略优先走本机代理。",
+            "如果你只是做目录读取，Cookie 抓到后通常就能先试挂；如果还要播放或下载，大概率还要配代理。"
+          ],
+          en: [
+            "Log in to Quark web, open F12 DevTools, and find any request carrying Cookie in Network.",
+            "Copy the full Cookie back into mount fields and add any extra auth headers required by the driver.",
+            "According to OpenList docs, Quark transfers now require local proxy, so prefer native/local proxy policies.",
+            "Cookie is usually enough for directory listing, but playback/download often still needs proxy."
+          ]
+        },
+        defaults: {
+          web_proxy: "true",
+          webdav_policy: "native_proxy",
+          proxy_range: "true"
+        }
+      },
+      thunder: {
+        docUrl: "https://doc.oplist.org/guide/drivers/thunder",
+        summary: {
+          zh: "迅雷驱动不是普通网页登录模式，通常需要较完整的客户端参数，例如 Authorization、Device ID、Client ID、Captcha Token 等。",
+          en: "Thunder is not a simple browser-login driver. It often needs more complete client parameters such as Authorization, Device ID, Client ID and Captcha Token."
+        },
+        steps: {
+          zh: [
+            "优先参考 OpenList 官方文档确认当前支持的客户端来源和版本限制。",
+            "如果页面抓取只拿到了部分 Header，不足以挂载时，需要从正式客户端或浏览器请求中补齐 Authorization、x-device-id、x-client-id、x-captcha-token。",
+            "填写完成后先用小目录验证；迅雷这类逆向驱动更容易因为参数缺失导致后续列表或下载异常。",
+            "如果你主要是读取目录而不是传输，先确认能稳定列目录，再考虑代理和下载策略。"
+          ],
+          en: [
+            "Check the official OpenList doc first for supported client source and version limits.",
+            "If browser capture only gets part of the headers, supplement Authorization, x-device-id, x-client-id and x-captcha-token from the real client/browser requests.",
+            "Validate with a small directory first. Reverse-engineered drivers like Thunder are sensitive to missing parameters.",
+            "If your goal is directory listing first, make that stable before tuning proxy and download behavior."
+          ]
+        },
+        defaults: {
+          proxy_range: "true"
+        }
+      },
+      baidu: {
+        docUrl: "https://doc.oplist.org/guide/drivers/baidu",
+        summary: {
+          zh: "百度网盘支持多种令牌获取方式。简单 Cookie 抓取并不能替代 Refresh Token / Online API 方案，尤其是正式挂载和大文件下载时。",
+          en: "Baidu Netdisk supports multiple token acquisition flows. Simple Cookie capture is not a replacement for Refresh Token / Online API based mounting."
+        },
+        steps: {
+          zh: [
+            "优先使用 OpenList 官方 Token 获取工具获取 Refresh Token；如果有开发者权限，可以走自己的 AppKey/SecretKey。",
+            "如果没有开发者权限，可以使用 OpenList 提供参数或 OOB 授权方案。",
+            "挂载时如果使用 OpenList 在线 API，要勾选 Use Online API；如果使用自己的开发者参数，反而不要勾选。",
+            "百度大文件下载经常需要 User-Agent: pan.baidu.com，若你后续下载异常，优先启用代理或补 UA。"
+          ],
+          en: [
+            "Prefer the official OpenList token tool to get Refresh Token. If you have developer access, you can use your own AppKey/SecretKey.",
+            "Without developer access, use OpenList provided parameters or the OOB authorization flow.",
+            "If mounting with OpenList online API, enable Use Online API. If using your own developer keys, do not enable it.",
+            "Large Baidu downloads often require User-Agent: pan.baidu.com, so enable proxy or add UA if downloads fail later."
+          ]
+        },
+        defaults: {
+          use_online_api: "true",
+          root_folder_path: "/",
+          web_proxy: "true"
+        }
+      },
+      onedrive: {
+        docUrl: "https://doc.oplist.org/guide/drivers/onedrive",
+        summary: {
+          zh: "OneDrive 可以走 OpenList 在线 API，也可以自己注册 Azure 应用。前者简单，后者更稳更独立。",
+          en: "OneDrive can use the OpenList online API or your own Azure application. The first is simpler, the second is more independent and stable."
+        },
+        steps: {
+          zh: [
+            "如果想快速挂载，先去 api.oplist.org 按账号类型选择对应 OneDrive 版本，勾选使用 OpenList 提供参数并获取 Refresh Token。",
+            "挂载时勾选 Use online API，填入 Refresh Token 即可。",
+            "如果担心公共 API 限流，可以按官方文档在 Azure 注册自己的应用，再把 client_id / client_secret 填回来。",
+            "如果你的账号本身不支持 API，可以退回 WebDAV 方案。"
+          ],
+          en: [
+            "For quick setup, go to api.oplist.org, choose the matching OneDrive type, enable OpenList provided parameters, and get Refresh Token.",
+            "Enable Use online API when mounting and fill the Refresh Token.",
+            "If you worry about public API limits, register your own Azure application and fill client_id / client_secret.",
+            "If your account does not support API, fall back to WebDAV."
+          ]
+        },
+        defaults: {
+          use_online_api: "true",
+          chunk_size: "5"
+        }
+      },
+      pikpak: {
+        docUrl: "https://doc.oplist.org/guide/drivers/pikpak.html",
+        summary: {
+          zh: "PikPak 可以直接账号密码登录，但不同平台和 Refresh Token 来源要对应；如果后续播放/下载异常，通常还要调整平台和代理策略。",
+          en: "PikPak can log in with account/password directly, but platform choice and Refresh Token source must match. Playback/download issues often still require proxy tuning."
+        },
+        steps: {
+          zh: [
+            "优先直接填账号密码；如果驱动支持 Oauth2 刷新令牌方式，保存后通常会自动补出 Refresh Token 和设备信息。",
+            "如果直接登录不稳定，再按官方文档从 Web 端或 Android 端获取对应平台的 Refresh Token。",
+            "Root Folder ID 默认可以填 root；如果你只想挂某个目录，就去 PikPak 网页读取对应目录 ID。",
+            "如果出现媒体链接异常或自动转码问题，优先启用 Disable media link 或代理策略。"
+          ],
+          en: [
+            "Start with account/password. If the driver supports Oauth2 refresh-token mode, saving usually auto-fills Refresh Token and device info.",
+            "If direct login is unstable, obtain a matching Refresh Token from Web or Android according to the official guide.",
+            "Root Folder ID can default to root. If mounting a specific folder only, read the folder ID from PikPak web.",
+            "If media links or transcoding cause issues, enable Disable media link or adjust proxy policy first."
+          ]
+        },
+        defaults: {
+          root_folder_id: "root"
+        }
+      },
+      139yun: {
+        docUrl: "https://doc.oplist.org/guide/drivers/139.html",
+        summary: {
+          zh: "139Yun 依赖浏览器开发者工具抓参数，通常不是单次网页登录抓取就够。重点是 Authorization、云盘类型、目录 ID，以及代理相关设置。",
+          en: "139Yun often requires grabbing parameters from browser DevTools, not just a one-click web login capture."
+        },
+        steps: {
+          zh: [
+            "先确认 OpenList 版本符合文档要求，再打开 139 云盘网页。",
+            "通过浏览器开发者工具 Network 搜索关键词，抓取 Authorization 等关键参数。",
+            "Authorization 只填写 Basic 空格后面的内容，不要把 Basic 前缀一起填进去。",
+            "如果要挂某个目录，先进入该目录，再取 currentCatalogID 作为对应文件夹 ID。",
+            "如果遇到视频在线播放、断点续传异常，优先启用 Web Proxy 或 WebDAV 本地代理，再考虑打开 Proxy Range。"
+          ],
+          en: [
+            "Make sure your OpenList version matches the doc requirement, then open 139Yun web.",
+            "Use browser DevTools Network search to capture Authorization and other key parameters.",
+            "For Authorization, only fill the content after 'Basic ' and do not include the Basic prefix itself.",
+            "If mounting a specific folder, enter that folder first and use currentCatalogID as the folder ID.",
+            "If playback or range download behaves badly, enable Web Proxy or WebDAV native proxy first, then consider Proxy Range."
+          ]
+        },
+        defaults: {
+          proxy_range: "true"
+        }
+      }
+    };
+    const currentLang = () => localStorage.getItem(UI_LANGUAGE_KEY) || "zh";
+    let configCache = {};
+    let currentDirectoryPath = "/";
+    let currentParentPath = null;
+    let pendingSelection = new Set();
+    let pendingExpanded = new Set(["/"]);
+    let pendingDirectoryFiles = new Map();
+    let pendingSelectionTouched = false;
+    let latestPendingItems = [];
+    let autoRefresher = null;
+    let driversCache = [];
+    let currentDriverInfo = null;
+    let storageRecords = [];
+    let sourceAnalyzeCache = null;
+    let providerDefinitions = [];
+    let providerSnapshots = {};
+    let driverCaptureBlueprint = null;
+    let currentDriverGuide = null;
+    const PROVIDER_DRIVER_HINTS = {
+      "189cloud": ["189Cloud", "189CloudPC", "189CloudTV"],
+      "quark": ["Quark", "QuarkOpen", "QuarkTV"],
+      "123pan": ["123Pan"],
+      "baidu": ["BaiduNetdisk", "BaiduPhoto"],
+      "thunder": ["Thunder", "ThunderX", "ThunderExpert"],
+      "guangya": ["guangya"],
+    };
+
+    function escapeHtml(text) {
+      return String(text ?? "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;"
+      }[ch]));
+    }
+
+    function formatBytes(bytes) {
+      const num = Number(bytes || 0);
+      if (!num) return "0 B";
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      let value = num;
+      let index = 0;
+      while (value >= 1024 && index < units.length - 1) {
+        value /= 1024;
+        index += 1;
+      }
+      return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+    }
+
+    async function call(url, options = {}) {
+      const response = await fetch(url, {
+        headers: { "content-type": "application/json", ...(options.headers || {}) },
+        ...options,
+      });
+      if (!response.ok) {
+        let detail = response.statusText;
+        try {
+          const data = await response.json();
+          detail = data.detail || data.message || JSON.stringify(data);
+        } catch {}
+        throw new Error(detail);
+      }
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) return response.json();
+      return response.text();
+    }
+
+    function getPanelState() {
+      try {
+        return JSON.parse(localStorage.getItem(PANEL_STATE_KEY) || "{}");
+      } catch {
+        return {};
+      }
+    }
+
+    function setPanelState(nextState) {
+      localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(nextState));
+    }
+
+    function activateTab(tabId) {
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.classList.toggle("active", tab.dataset.tab === tabId);
+      });
+      document.querySelectorAll(".tab-panel").forEach((panel) => {
+        panel.classList.toggle("active", panel.dataset.panel === tabId);
+      });
+      const state = getPanelState();
+      state.activeTab = tabId;
+      setPanelState(state);
+    }
+
+    function t(key) {
+      const lang = currentLang();
+      if (lang === "mix") {
+        const zh = I18N.zh[key] || key;
+        const en = I18N.en[key] || key;
+        return `${zh} / ${en}`;
+      }
+      return I18N[lang]?.[key] || I18N.zh[key] || key;
+    }
+
+    function applyI18n() {
+      document.querySelectorAll("[data-i18n]").forEach((el) => {
+        const key = el.getAttribute("data-i18n");
+        if (!key) return;
+        if (el.classList.contains("subtle")) el.innerHTML = t(key);
+        else el.textContent = t(key);
+      });
+      document.querySelectorAll("[data-i18n-option]").forEach((el) => {
+        const key = el.getAttribute("data-i18n-option");
+        if (key) el.textContent = t(key);
+      });
+      const toggleLogs = document.getElementById("toggle-logs");
+      if (toggleLogs) {
+        const key = document.getElementById("log-drawer").classList.contains("hidden") ? "btn.toggle_logs_show" : "btn.toggle_logs_hide";
+        toggleLogs.textContent = t(key);
+      }
+      if (storageRecords.length) populateMountedSources(storageRecords);
+      if (providerDefinitions.length) {
+        renderProviderOptions(providerDefinitions);
+        renderProviderCapturePanel();
+      }
+    }
+
+    function initTabs() {
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => activateTab(tab.dataset.tab));
+      });
+      activateTab(getPanelState().activeTab || "overview");
+      const langSelect = document.getElementById("ui_language");
+      langSelect.value = currentLang();
+      langSelect.addEventListener("change", () => {
+        localStorage.setItem(UI_LANGUAGE_KEY, langSelect.value);
+        applyI18n();
+      });
+    }
+
+    function setNotice(id, message) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = message;
+    }
+
+    function translateDriverText(zh, en) {
+      return currentLang() === "en" ? en : currentLang() === "mix" ? `${zh} / ${en}` : zh;
+    }
+
+    function normalizeDriverKey(value) {
+      return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    }
+
+    function humanizeDriverFieldName(value) {
+      return String(value || "")
+        .replace(/[_-]+/g, " ")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/\b\w/g, (m) => m.toUpperCase());
+    }
+
+    function driverFieldLabel(name) {
+      const key = normalizeDriverKey(name);
+      const mapped = DRIVER_FIELD_I18N[key];
+      if (!mapped) return humanizeDriverFieldName(name);
+      return translateDriverText(mapped.zh, mapped.en);
+    }
+
+    function driverFieldHelp(text) {
+      const raw = String(text || "").trim();
+      if (!raw) return "";
+      const normalized = raw.toLowerCase();
+      const matched = DRIVER_HELP_PATTERNS.find((item) => item.includes.every((part) => normalized.includes(part)));
+      if (matched) return translateDriverText(matched.zh, matched.en);
+      return currentLang() === "en" ? raw : currentLang() === "mix" ? `${raw}` : raw;
+    }
+
+    function driverFieldOptions(text) {
+      const raw = String(text || "").trim();
+      if (!raw) return "";
+      const mapped = DRIVER_OPTIONS_I18N[raw];
+      if (mapped) return translateDriverText(mapped.zh, mapped.en);
+      return raw;
+    }
+
+    function guideTextPair(pair) {
+      if (!pair) return "";
+      return translateDriverText(pair.zh || "", pair.en || "");
+    }
+
+    function getDriverGuide(driver) {
+      const normalized = normalizeDriverKey(driver);
+      if (driverCaptureBlueprint?.driver && normalizeDriverKey(driverCaptureBlueprint.driver) === normalized && driverCaptureBlueprint.guide) {
+        return driverCaptureBlueprint.guide;
+      }
+      return DRIVER_GUIDES[normalized] || null;
+    }
+
+    function renderDriverGuide(driver) {
+      const guide = getDriverGuide(driver);
+      currentDriverGuide = guide;
+      const inline = document.getElementById("driver-guide-inline");
+      const summary = document.getElementById("driver-guide-summary");
+      const stepsRoot = document.getElementById("driver-guide-steps");
+      const title = document.getElementById("driver-guide-title");
+      const openDocButton = document.getElementById("open-driver-doc");
+      if (!guide) {
+        const empty = currentLang() === "en"
+          ? "This driver currently has no built-in special guide. You can still use the dynamic fields below or check the OpenList docs manually."
+          : currentLang() === "mix"
+            ? "当前驱动暂时没有内置专属流程说明，可先用下方动态字段，也可以手动查 OpenList 文档。 / No built-in special guide yet."
+            : "当前驱动暂时没有内置专属流程说明，可先用下方动态字段，也可以手动查 OpenList 文档。";
+        if (inline) inline.textContent = empty;
+        if (summary) summary.textContent = empty;
+        if (stepsRoot) stepsRoot.innerHTML = "";
+        if (title) title.textContent = currentLang() === "en" ? "Driver Access Guide" : currentLang() === "mix" ? "驱动接入流程 / Driver Access Guide" : "驱动接入流程";
+        if (openDocButton) openDocButton.disabled = true;
+        return;
+      }
+      const summaryText = guideTextPair(guide.summary);
+      if (inline) {
+        inline.innerHTML = `
+          <div>${escapeHtml(summaryText)}</div>
+          <div class="mono">${currentLang() === "en" ? "Official doc" : currentLang() === "mix" ? "官方文档 / Official doc" : "官方文档"}: ${escapeHtml(guide.docUrl)}</div>
+        `;
+      }
+      if (summary) summary.textContent = summaryText;
+      if (title) title.textContent = `${driver} ${currentLang() === "en" ? "Guide" : currentLang() === "mix" ? "接入流程 / Guide" : "接入流程"}`;
+      const steps = currentLang() === "en" ? guide.steps.en : currentLang() === "mix" ? guide.steps.zh.map((item, index) => `${item}\n\n${guide.steps.en[index] || ""}`) : guide.steps.zh;
+      if (stepsRoot) {
+        stepsRoot.innerHTML = steps.map((item, index) => `
+          <div class="guide-step">
+            <strong>${index + 1}.</strong> ${escapeHtml(item)}
+          </div>
+        `).join("");
+      }
+      if (openDocButton) openDocButton.disabled = false;
+    }
+
+    function applyDriverGuideDefaults() {
+      if (!currentDriverGuide?.defaults) {
+        setNotice("driver-notice", currentLang() === "en"
+          ? "No built-in recommended defaults for this driver."
+          : currentLang() === "mix"
+            ? "当前驱动没有内置推荐默认值。 / No built-in recommended defaults."
+            : "当前驱动没有内置推荐默认值。");
+        return;
+      }
+      let changed = 0;
+      const inputs = [...document.querySelectorAll("[data-driver-field]")];
+      for (const [fieldName, value] of Object.entries(currentDriverGuide.defaults)) {
+        const input = inputs.find((item) => normalizeDriverKey(item.getAttribute("data-driver-field") || "") === normalizeDriverKey(fieldName));
+        if (input) {
+          input.value = String(value);
+          changed += 1;
+        }
+      }
+      setNotice("driver-notice", currentLang() === "en"
+        ? `Applied ${changed} recommended default values.`
+        : currentLang() === "mix"
+          ? `已套用 ${changed} 个推荐默认值。 / Applied ${changed} recommended defaults.`
+          : `已套用 ${changed} 个推荐默认值。`);
+    }
+
+    function toggleDriverGuideDialog(visible) {
+      const dialog = document.getElementById("driver-guide-dialog");
+      if (!dialog) return;
+      dialog.classList.toggle("hidden", !visible);
+    }
+
+    function chooseRatePreset(driver, mode) {
+      const normalizedDriver = String(driver || "").toLowerCase();
+      if (mode === "custom") return null;
+      for (const [key, preset] of Object.entries(RATE_PRESETS)) {
+        if (key === "default" || key === "safe" || key === "balanced" || key === "fast") continue;
+        if (normalizedDriver.includes(key)) return preset;
+      }
+      return RATE_PRESETS[mode] || RATE_PRESETS.default;
+    }
+
+    function inferProviderFromDriver(driver) {
+      const text = String(driver || "").toLowerCase();
+      if (!text) return "189cloud";
+      if (text.includes("quark")) return "quark";
+      if (text.includes("123")) return "123pan";
+      if (text.includes("baidu")) return "baidu";
+      if (text.includes("thunder") || text.includes("xunlei")) return "thunder";
+      if (text.includes("189")) return "189cloud";
+      if (text.includes("guangya")) return "guangya";
+      if (driverCaptureBlueprint?.key) return driverCaptureBlueprint.key;
+      return "189cloud";
+    }
+
+    function maskValue(value) {
+      const text = String(value || "");
+      if (!text) return "";
+      if (text.length <= 12) return `${text.slice(0, 2)}***${text.slice(-2)}`;
+      return `${text.slice(0, 6)}***${text.slice(-4)}`;
+    }
+
+    function fieldStatus(value) {
+      if (value) return currentLang() === "en" ? "captured" : currentLang() === "mix" ? "已抓取 / captured" : "已抓取";
+      return currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未抓取 / missing" : "未抓取";
+    }
+
+    function normalizeProviderFieldValue(fieldName, captured, provider) {
+      const key = String(fieldName || "").toLowerCase();
+      const data = captured || {};
+      if (key.includes("cookie")) return data.cookie_header || "";
+      if (key.includes("bdstoken")) return data.bdstoken || "";
+      if (key.includes("refresh")) return data.refresh_token || "";
+      if (key.includes("access") || key.endsWith("token")) return data.access_token || data.token || "";
+      if (key.includes("auth")) return data.authorization || "";
+      if (key.includes("device") || key === "did") return data.device_id || data.did || "";
+      if (key === "dt") return data.dt || "";
+      if (key.includes("captcha")) return data.captcha_token || "";
+      if (key.includes("client")) return data.client_id || "";
+      if (key.includes("session")) return data.session_key || "";
+      if (provider === "quark" && key.includes("cookie")) return data.cookie_header || "";
+      return "";
+    }
+
+    function renderProviderOptions(definitions) {
+      const select = document.getElementById("provider-select");
+      if (!select) return;
+      const items = [...(Array.isArray(definitions) ? definitions : [])];
+      if (driverCaptureBlueprint?.key && !items.some((item) => item.key === driverCaptureBlueprint.key)) {
+        items.push(driverCaptureBlueprint);
+      }
+      if (!items.length) {
+        select.innerHTML = `<option value="">${currentLang() === "en" ? "No providers" : currentLang() === "mix" ? "暂无 provider / No providers" : "暂无 provider"}</option>`;
+        return;
+      }
+      const current = select.value || inferProviderFromDriver(document.getElementById("driver-select")?.value || "");
+      select.innerHTML = items.map((item) => {
+        const selected = item.key === current ? "selected" : "";
+        return `<option value="${escapeHtml(item.key)}" ${selected}>${escapeHtml(item.label)}</option>`;
+      }).join("");
+    }
+
+    function renderProviderCapturePanel() {
+      const select = document.getElementById("provider-select");
+      if (!select) return;
+      const items = [...providerDefinitions];
+      if (driverCaptureBlueprint?.key && !items.some((item) => item.key === driverCaptureBlueprint.key)) {
+        items.push(driverCaptureBlueprint);
+      }
+      const provider = select.value || items[0]?.key || "189cloud";
+      const definition = items.find((item) => item.key === provider);
+      const snapshot = providerSnapshots?.[provider] || {};
+      const captured = snapshot.captured || {};
+      const requiredKeys = Array.isArray(definition?.required_keys) ? definition.required_keys : [];
+      const recommended = Array.isArray(definition?.recommended_drivers) && definition.recommended_drivers.length
+        ? definition.recommended_drivers
+        : (PROVIDER_DRIVER_HINTS[provider] || []);
+      const lines = requiredKeys.length
+        ? requiredKeys.map((key) => `<div class="mono">${escapeHtml(key)}: ${fieldStatus(captured[key])}${captured[key] ? ` | ${escapeHtml(maskValue(captured[key]))}` : ""}</div>`).join("")
+        : `<div class="mono">${currentLang() === "en" ? "No required fields declared." : currentLang() === "mix" ? "未声明必需字段 / No required fields declared." : "未声明必需字段。"}</div>`;
+      document.getElementById("provider-driver-hint").innerHTML = `
+        <div>${escapeHtml(definition?.description || "")}</div>
+        <div class="mono">${currentLang() === "en" ? "Login URL" : currentLang() === "mix" ? "登录地址 / Login URL" : "登录地址"}: ${escapeHtml(definition?.login_url || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Recommended drivers" : currentLang() === "mix" ? "建议驱动 / Recommended drivers" : "建议驱动"}: ${escapeHtml(recommended.join(", ") || "-")}</div>
+      `;
+      const loginUrlInput = document.getElementById("provider-login-url");
+      if (loginUrlInput) {
+        loginUrlInput.value = definition?.login_url || "";
+      }
+      document.getElementById("provider-capture-summary").innerHTML = `
+        <div class="badge">${escapeHtml(snapshot.status || "idle")}</div>
+        <div class="mono">${escapeHtml(snapshot.message || "")}</div>
+        ${lines}
+        ${captured.cookie_header ? `<div class="mono">cookie_header: ${escapeHtml(maskValue(captured.cookie_header))}</div>` : ""}
+      `;
+    }
+
+    function applyProviderSelectionFromDriver(driver) {
+      const select = document.getElementById("provider-select");
+      if (!select) return;
+      const provider = inferProviderFromDriver(driver);
+      if ([...select.options].some((item) => item.value === provider)) {
+        select.value = provider;
+        renderProviderCapturePanel();
+      }
+    }
+
+    async function applyCapturedProviderFields() {
+      const provider = document.getElementById("provider-select")?.value || "";
+      const driver = document.getElementById("driver-select")?.value || "";
+      const data = await call("/api/provider/capture/prefill", {
+        method: "POST",
+        body: JSON.stringify({ provider, driver }),
+      });
+      const values = data?.values || {};
+      let changed = 0;
+      document.querySelectorAll("[data-driver-field]").forEach((el) => {
+        const fieldName = el.getAttribute("data-driver-field") || "";
+        const nextValue = values[fieldName] || "";
+        if (nextValue && !el.value) {
+          el.value = nextValue;
+          changed += 1;
+        }
+      });
+      const missingRequired = Array.isArray(data?.missing_required) ? data.missing_required : [];
+      const missingText = missingRequired.length
+        ? (currentLang() === "en"
+          ? ` Missing required fields: ${missingRequired.join(", ")}`
+          : currentLang() === "mix"
+            ? ` 缺少必填字段 / Missing required fields: ${missingRequired.join(", ")}`
+            : ` 缺少必填字段: ${missingRequired.join(", ")}`)
+        : "";
+      setNotice(
+        "driver-notice",
+        changed
+          ? (currentLang() === "en"
+            ? `Applied ${changed} captured values to the mount form.${missingText}`
+            : currentLang() === "mix"
+              ? `已写入 ${changed} 个抓取字段 / Applied ${changed} values.${missingText}`
+              : `已写入 ${changed} 个抓取字段到当前挂载表单。${missingText}`)
+          : (currentLang() === "en"
+            ? `No matching captured values were found for the current mount form.${missingText}`
+            : currentLang() === "mix"
+              ? `当前挂载表单没有可匹配字段 / No matching captured values were found.${missingText}`
+              : `当前挂载表单没有可匹配的抓取字段。${missingText}`)
+      );
+    }
+
+    function applyRatePresetForMount(mountPath) {
+      const mode = String(document.getElementById("rate_limit_mode").value || "safe");
+      if (mode === "custom") return;
+      const selected = storageRecords.find((item) => {
+        const current = item.mount_path || item.mountPath || item.path || "/";
+        return String(current) === String(mountPath);
+      });
+      const driver = selected?.driver || selected?.driver_name || selected?.driverName || "";
+      const preset = chooseRatePreset(driver, mode);
+      if (!preset) return;
+      document.getElementById("openlist_page_size").value = String(preset.openlist_page_size);
+      document.getElementById("openlist_request_interval_ms").value = String(preset.openlist_request_interval_ms);
+      document.getElementById("queue_interval_ms").value = String(preset.queue_interval_ms);
+      setNotice("sync-notice", `已按 ${driver || "默认驱动"} 应用 ${mode} 频率策略。`);
+    }
+
+    function toggleDrawer(forceVisible = null) {
+      const drawer = document.getElementById("log-drawer");
+      const hidden = forceVisible === null ? !drawer.classList.contains("hidden") : !forceVisible;
+      drawer.classList.toggle("hidden", hidden);
+      applyI18n();
+    }
+
+    function getConfigFromForm() {
+      const payload = { ...configCache };
+      for (const field of CONFIG_FIELDS) {
+        const el = document.getElementById(field);
+        if (!el) continue;
+        payload[field] = el.type === "number" ? Number(el.value || 0) : el.value;
+      }
+      payload.panel_open_states = payload.panel_open_states || {};
+      return payload;
+    }
+
+    function applyConfigToForm(config) {
+      configCache = { ...(config || {}) };
+      for (const field of CONFIG_FIELDS) {
+        const el = document.getElementById(field);
+        if (!el) continue;
+        el.value = config?.[field] ?? "";
+      }
+      document.getElementById("effective_openlist_url").value = config?.effective_openlist_url || "";
+    }
+
+    async function saveConfig() {
+      const payload = getConfigFromForm();
+      await call("/api/config", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      configCache = payload;
+      setNotice("sync-notice", "配置已保存");
+      setNotice("dir-notice", "配置已保存");
+    }
+
+    async function loadConfig() {
+      const data = await call("/api/config");
+      applyConfigToForm(data);
+      return data;
+    }
+
+    async function ensureDirectoryBrowserReady(force = false) {
+      const sourcePath = String(document.getElementById("source_path").value || "/").trim() || "/";
+      if (!force && currentDirectoryPath && currentDirectoryPath !== "/" && currentDirectoryPath === sourcePath) {
+        return;
+      }
+      try {
+        await browseDirectory(sourcePath);
+        setNotice("dir-notice", `已按配置恢复目录浏览位置: ${sourcePath}`);
+      } catch (error) {
+        await browseDirectory("/");
+        setNotice("dir-notice", `按配置恢复目录失败，已回退到根目录: ${error.message}`);
+      }
+    }
+
+    async function browseDirectory(path) {
+      const data = await call("/api/openlist/list_dirs", {
+        method: "POST",
+        body: JSON.stringify({
+          openlist_url: document.getElementById("openlist_url").value,
+          openlist_username: document.getElementById("openlist_username").value,
+          openlist_password: document.getElementById("openlist_password").value,
+          openlist_token: document.getElementById("openlist_token").value,
+          path,
+        }),
+      });
+      renderDirectoryBrowser(data);
+    }
+
+    function renderDirectoryBrowser(data) {
+      currentDirectoryPath = data?.path || "/";
+      currentParentPath = data?.parent_path || null;
+      document.getElementById("dir-current").textContent = `当前浏览: ${currentDirectoryPath}`;
+      const root = document.getElementById("dir-browser-list");
+      const dirs = Array.isArray(data?.directories) ? data.directories : [];
+      if (!dirs.length) {
+        root.innerHTML = `<div class="subtle">这个目录下没有子目录，可以直接把它设为同步源目录。</div>`;
+        return;
+      }
+      root.innerHTML = dirs.map((item) => `
+        <div class="row-item">
+          <div>
+            <div>${escapeHtml(item.name || "")}</div>
+            <div class="mono">${escapeHtml(item.path || "")}</div>
+          </div>
+          <button class="secondary" data-open-dir="${escapeHtml(item.path || "/")}">进入</button>
+        </div>
+      `).join("");
+      root.querySelectorAll("[data-open-dir]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await browseDirectory(button.getAttribute("data-open-dir") || "/");
+        });
+      });
+    }
+
+    function renderSync(sync) {
+      const running = sync?.running ? (currentLang() === "en" ? "running" : currentLang() === "mix" ? "运行中 / running" : "运行中") : (currentLang() === "en" ? "idle" : currentLang() === "mix" ? "空闲 / idle" : "空闲");
+      const summary = sync?.last_summary || {};
+      const queue = sync?.queue_runner || {};
+      document.getElementById("sync-summary").innerHTML = `
+        <div class="badge">${escapeHtml(running)}</div>
+        <div class="mono">${currentLang() === "en" ? "Last error" : currentLang() === "mix" ? "最近错误 / Last error" : "最近错误"}: ${escapeHtml(sync?.last_error || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Current queue source" : currentLang() === "mix" ? "当前队列目录 / Current queue source" : "当前队列目录"}: ${escapeHtml(queue.current_source || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Remaining" : currentLang() === "mix" ? "待处理剩余 / Remaining" : "待处理剩余"}: ${queue.remaining ?? "-"}</div>
+        <div class="mono">${currentLang() === "en" ? "Last summary" : currentLang() === "mix" ? "最近结果 / Last summary" : "最近结果"}: total=${summary.total ?? 0}, direct=${summary.direct_success ?? 0}, downloaded=${summary.downloaded_success ?? 0}, failed=${summary.failed ?? 0}</div>
+      `;
+    }
+
+    function renderRuntime(runtime) {
+      document.getElementById("runtime-summary").innerHTML = `
+        <div class="badge">${escapeHtml(runtime?.mode || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Configured" : currentLang() === "mix" ? "配置地址 / Configured" : "配置地址"}: ${escapeHtml(runtime?.configured_url || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Active" : currentLang() === "mix" ? "实际地址 / Active" : "实际地址"}: ${escapeHtml(runtime?.active_url || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Running" : currentLang() === "mix" ? "运行状态 / Running" : "运行状态"}: ${runtime?.running ? "yes" : "no"} ${runtime?.pid ? `(pid ${runtime.pid})` : ""}</div>
+        <div class="mono">${escapeHtml(runtime?.message || "")}</div>
+      `;
+    }
+
+    function renderCapture(capture) {
+      const captured = capture?.captured || {};
+      const missing = !captured.authorization && !captured.access_token && !captured.refresh_token;
+      document.getElementById("capture-summary").innerHTML = `
+        <div class="badge">${escapeHtml(capture?.status || "idle")}</div>
+        <div class="mono">${escapeHtml(capture?.message || "")}</div>
+        <div class="mono">Authorization: ${captured.authorization ? (currentLang() === "en" ? "captured" : currentLang() === "mix" ? "已抓取 / captured" : "已抓取") : (currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未抓取 / missing" : "未抓取")}</div>
+        <div class="mono">Access Token: ${captured.access_token ? (currentLang() === "en" ? "captured" : currentLang() === "mix" ? "已抓取 / captured" : "已抓取") : (currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未抓取 / missing" : "未抓取")}</div>
+        <div class="mono">Refresh Token: ${captured.refresh_token ? (currentLang() === "en" ? "captured" : currentLang() === "mix" ? "已抓取 / captured" : "已抓取") : (currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未抓取 / missing" : "未抓取")}</div>
+        ${missing ? `<div class="mono">${currentLang() === "en" ? "Hint: click Guangya capture to auto-fill the login data." : currentLang() === "mix" ? "提示 / Hint: 点击光鸭抓取按钮自动回填登录信息。" : "提示: 需要点击“打开光鸭登录并自动抓取”完成自动回填。"}</div>` : ""}
+      `;
+    }
+
+    function renderSourceAnalyze(data) {
+      sourceAnalyzeCache = data || null;
+      const root = document.getElementById("source-analyze-summary");
+      const summary = data?.summary || {};
+      const entries = Array.isArray(data?.entries) ? data.entries : [];
+      if (!data) {
+        root.textContent = currentLang() === "en" ? "No analysis result" : currentLang() === "mix" ? "暂无分析结果 / No analysis result" : "暂无分析结果";
+        return;
+      }
+      const providerCounts = Object.entries(summary.provider_counts || {}).map(([key, value]) => `${key}: ${value}`).join(" | ") || "-";
+      const hashCounts = Object.entries(summary.hash_type_counts || {}).map(([key, value]) => `${key}: ${value}`).join(" | ") || "-";
+      const recommendation = summary.missing_md5 > 0
+        ? (summary.gcid_ready > 0
+          ? (currentLang() === "en"
+            ? "Some files do not have MD5 but do have GCID. Prefer metadata sync first, then inspect pending items carefully."
+            : currentLang() === "mix"
+              ? "部分文件没有 MD5 但有 GCID，建议先走元数据秒传，再重点检查待补传。 / Prefer metadata sync first, then inspect pending items carefully."
+              : "部分文件没有 MD5 但有 GCID，建议先走元数据秒传，再重点检查待补传。")
+          : (currentLang() === "en"
+            ? "Some files do not have MD5. Avoid aggressive auto-download and inspect source/provider compatibility first."
+            : currentLang() === "mix"
+              ? "部分文件没有 MD5，建议先确认源端兼容性，不要过激进地自动补传。 / Avoid aggressive auto-download first."
+              : "部分文件没有 MD5，建议先确认源端兼容性，不要过激进地自动补传。"))
+        : (currentLang() === "en"
+          ? "Most files are MD5-ready. This directory is suitable for normal metadata-first sync."
+          : currentLang() === "mix"
+            ? "大多数文件已具备 MD5，适合正常先秒传再补传。 / This directory looks good for metadata-first sync."
+            : "大多数文件已具备 MD5，适合正常先秒传再补传。");
+      root.innerHTML = `
+        <div class="row-item">
+          <div>
+            <div>${escapeHtml(data.source_path || "-")}</div>
+            <div class="mono">${currentLang() === "en" ? "Total files" : currentLang() === "mix" ? "文件总数 / Total files" : "文件总数"}: ${summary.total ?? 0} | ${currentLang() === "en" ? "Plan total" : currentLang() === "mix" ? "待同步 / Plan total" : "待同步"}: ${data.plan_total ?? 0} | ${currentLang() === "en" ? "Removed" : currentLang() === "mix" ? "源端已删除 / Removed" : "源端已删除"}: ${data.removed_total ?? 0}</div>
+            <div class="mono">${currentLang() === "en" ? "MD5 ready" : currentLang() === "mix" ? "具备 MD5 / MD5 ready" : "具备 MD5"}: ${summary.md5_ready ?? 0} | GCID: ${summary.gcid_ready ?? 0} | ${currentLang() === "en" ? "Missing MD5" : currentLang() === "mix" ? "缺少 MD5 / Missing MD5" : "缺少 MD5"}: ${summary.missing_md5 ?? 0}</div>
+            <div class="mono">provider: ${escapeHtml(providerCounts)}</div>
+            <div class="mono">hash: ${escapeHtml(hashCounts)}</div>
+            <div class="mono">${escapeHtml(recommendation)}</div>
+          </div>
+        </div>
+        ${entries.map((item) => `
+          <div class="row-item">
+            <div>
+              <div>${escapeHtml(item.path || "")}</div>
+              <div class="mono">provider=${escapeHtml(item.provider || "-")} | hashType=${escapeHtml(item.hashType || "-")} | size=${escapeHtml(String(item.size ?? 0))}</div>
+              <div class="mono">md5=${escapeHtml(item.md5 || "-")} | gcid=${escapeHtml(item.gcid || "-")} | sourceId=${escapeHtml(item.sourceId || "-")}</div>
+            </div>
+          </div>
+        `).join("")}
+        ${data.truncated ? `<div class="subtle">${currentLang() === "en" ? "Only the first preview rows are shown here. Full export has been written to the local export file." : currentLang() === "mix" ? "这里只展示前几条样本，完整结果已写入本地导出文件。 / Only preview rows are shown here." : "这里只展示前几条样本，完整结果已写入本地导出文件。"}</div>` : ""}
+      `;
+    }
+
+    function renderMiaochuanDiagnosis(data) {
+      const root = document.getElementById("miaochuan-diagnosis");
+      if (!data) {
+        root.textContent = currentLang() === "en"
+          ? "No diagnosis result"
+          : currentLang() === "mix"
+            ? "暂无诊断结果 / No diagnosis result"
+            : "暂无诊断结果";
+        return;
+      }
+      const providerCounts = Object.entries(data.provider_counts || {})
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(" | ") || "-";
+      const sample = Array.isArray(data.sample) ? data.sample : [];
+      root.innerHTML = `
+        <div class="row-item">
+          <div>
+            <div>${currentLang() === "en" ? "Flash Upload JSON Diagnosis" : currentLang() === "mix" ? "秒传 JSON 诊断 / Flash Upload JSON Diagnosis" : "秒传 JSON 诊断"}</div>
+            <div class="mono">${currentLang() === "en" ? "Total files" : currentLang() === "mix" ? "文件总数 / Total files" : "文件总数"}: ${data.total ?? 0}</div>
+            <div class="mono">${currentLang() === "en" ? "Total size" : currentLang() === "mix" ? "总大小 / Total size" : "总大小"}: ${formatBytes(data.total_size || 0)}</div>
+            <div class="mono">MD5: ${data.md5_count ?? 0} | GCID: ${data.gcid_count ?? 0}</div>
+            <div class="mono">provider: ${escapeHtml(providerCounts)}</div>
+          </div>
+        </div>
+        ${sample.map((item) => `
+          <div class="row-item">
+            <div>
+              <div>${escapeHtml(item.path || "-")}</div>
+              <div class="mono">provider=${escapeHtml(item.provider || "unknown")} | hashType=${escapeHtml(item.hashType || "-")} | size=${formatBytes(item.size || 0)}</div>
+              <div class="mono">md5=${escapeHtml(item.etag || "-")} | gcid=${escapeHtml(item.gcid || "-")}</div>
+            </div>
+          </div>
+        `).join("")}
+        ${sample.length === 0 ? `<div class="subtle">${currentLang() === "en" ? "No sample rows available." : currentLang() === "mix" ? "没有可展示的样本行。 / No sample rows available." : "没有可展示的样本行。"}</div>` : ""}
+      `;
+    }
+
+    function populateMountedSources(items) {
+      const select = document.getElementById("mounted_source_select");
+      const list = Array.isArray(items) ? items : [];
+      if (!list.length) {
+        select.innerHTML = `<option value="">${currentLang() === "en" ? "No mounts" : currentLang() === "mix" ? "暂无挂载 / No mounts" : "暂无挂载"}</option>`;
+        return;
+      }
+      const sourcePath = String(document.getElementById("source_path").value || "").trim();
+      select.innerHTML = list.map((item) => {
+        const mountPath = item.mount_path || item.mountPath || item.path || "/";
+        const driver = item.driver || item.driver_name || item.driverName || "-";
+        const selected = sourcePath.startsWith(String(mountPath)) ? "selected" : "";
+        return `<option value="${escapeHtml(mountPath)}" ${selected}>${escapeHtml(mountPath)} | ${escapeHtml(driver)}</option>`;
+      }).join("");
+    }
+
+    function renderQueue(items) {
+      const root = document.getElementById("queue-list");
+      const list = Array.isArray(items) ? items : [];
+      if (!list.length) {
+        root.textContent = currentLang() === "en" ? "No queued directories" : currentLang() === "mix" ? "暂无目录队列 / No queued directories" : "暂无目录队列";
+        return;
+      }
+      root.innerHTML = list.map((item) => `
+        <div class="row-item">
+          <div>
+            <div>${escapeHtml(item.source_path)}</div>
+            <div class="mono">${currentLang() === "en" ? "Status" : currentLang() === "mix" ? "状态 / Status" : "状态"}: ${escapeHtml(item.last_status || "idle")} ${item.last_run_at ? `| ${currentLang() === "en" ? "Last run" : currentLang() === "mix" ? "上次 / Last run" : "上次"}: ${escapeHtml(item.last_run_at)}` : ""}</div>
+          </div>
+          <button class="secondary" data-remove-queue="${escapeHtml(item.source_path)}">${currentLang() === "en" ? "Remove" : currentLang() === "mix" ? "移除 / Remove" : "移除"}</button>
+        </div>
+      `).join("");
+      root.querySelectorAll("[data-remove-queue]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await call("/api/queue/remove", {
+            method: "POST",
+            body: JSON.stringify({ source_path: button.getAttribute("data-remove-queue") || "" }),
+          });
+          await refreshStatus();
+        });
+      });
+    }
+
+    function buildPendingTree(items) {
+      const root = { name: "/", path: "/", directories: new Map(), files: [] };
+      for (const item of items) {
+        const path = String(item?.path || "");
+        const parts = path.split("/").filter(Boolean);
+        let cursor = root;
+        let current = "";
+        for (let index = 0; index < parts.length - 1; index += 1) {
+          const part = parts[index];
+          current += `/${part}`;
+          if (!cursor.directories.has(part)) {
+            cursor.directories.set(part, { name: part, path: current, directories: new Map(), files: [] });
+          }
+          cursor = cursor.directories.get(part);
+        }
+        cursor.files.push(item);
+      }
+      return root;
+    }
+
+    function collectNodeFilePaths(node) {
+      let result = [];
+      for (const file of node.files || []) {
+        if (file?.path) result.push(file.path);
+      }
+      for (const child of node.directories?.values() || []) {
+        result = result.concat(collectNodeFilePaths(child));
+      }
+      return result;
+    }
+
+    function refreshPendingDirectoryMap(root) {
+      pendingDirectoryFiles = new Map();
+      function walk(node) {
+        pendingDirectoryFiles.set(node.path, collectNodeFilePaths(node));
+        for (const child of node.directories?.values() || []) walk(child);
+      }
+      walk(root);
+    }
+
+    function renderPendingNode(node) {
+      const childDirs = [...(node.directories?.values() || [])].sort((a, b) => a.path.localeCompare(b.path, "zh-CN"));
+      const files = [...(node.files || [])].sort((a, b) => String(a.path || "").localeCompare(String(b.path || ""), "zh-CN"));
+      const allPaths = collectNodeFilePaths(node);
+      const checkedCount = allPaths.filter((path) => pendingSelection.has(path)).length;
+      const expanded = pendingExpanded.has(node.path);
+      return `
+        <div class="tree-node">
+          <div class="tree-row">
+            <button type="button" class="tree-toggle ${childDirs.length ? "" : "empty"}" data-toggle-node="${escapeHtml(node.path)}">${childDirs.length ? (expanded ? "-" : "+") : ""}</button>
+            <input type="checkbox" data-select-dir="${escapeHtml(node.path)}" ${allPaths.length && checkedCount === allPaths.length ? "checked" : ""}>
+            <div class="tree-label">
+              <div>${escapeHtml(node.name || "/")}</div>
+              <div class="mono">${escapeHtml(node.path)} | ${allPaths.length} 个文件</div>
+            </div>
+          </div>
+          ${expanded ? `
+            <div>
+              ${childDirs.map((child) => renderPendingNode(child)).join("")}
+              ${files.map((file) => `
+                <label class="tree-row">
+                  <span class="tree-toggle empty"></span>
+                  <input type="checkbox" data-select-file="${escapeHtml(file.path || "")}" ${pendingSelection.has(file.path) ? "checked" : ""}>
+                  <div class="tree-label">
+                    <div>${escapeHtml((file.path || "").split("/").filter(Boolean).pop() || file.path || "")}</div>
+                    <div class="mono">${escapeHtml(file.path || "")} | ${formatBytes(file.size)} | ${escapeHtml(file.reason || "-")}</div>
+                  </div>
+                </label>
+              `).join("")}
+            </div>
+          ` : ""}
+        </div>
+      `;
+    }
+
+    function syncPendingCheckboxState(root) {
+      root.querySelectorAll("[data-select-dir]").forEach((box) => {
+        const dir = box.getAttribute("data-select-dir");
+        const paths = pendingDirectoryFiles.get(dir) || [];
+        const count = paths.filter((path) => pendingSelection.has(path)).length;
+        box.checked = paths.length > 0 && count === paths.length;
+        box.indeterminate = count > 0 && count < paths.length;
+      });
+    }
+
+    function bindPendingEvents(items) {
+      const root = document.getElementById("pending-tree");
+      root.querySelectorAll("[data-toggle-node]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const node = button.getAttribute("data-toggle-node");
+          if (!node) return;
+          if (pendingExpanded.has(node)) pendingExpanded.delete(node);
+          else pendingExpanded.add(node);
+          renderPendingTree(items);
+        });
+      });
+      root.querySelectorAll("[data-select-file]").forEach((box) => {
+        box.addEventListener("change", () => {
+          const path = box.getAttribute("data-select-file");
+          if (!path) return;
+          if (box.checked) pendingSelection.add(path);
+          else pendingSelection.delete(path);
+          pendingSelectionTouched = true;
+          syncPendingCheckboxState(root);
+        });
+      });
+      root.querySelectorAll("[data-select-dir]").forEach((box) => {
+        box.addEventListener("change", () => {
+          const dir = box.getAttribute("data-select-dir");
+          const paths = pendingDirectoryFiles.get(dir) || [];
+          for (const path of paths) {
+            if (box.checked) pendingSelection.add(path);
+            else pendingSelection.delete(path);
+          }
+          pendingSelectionTouched = true;
+          renderPendingTree(items);
+        });
+      });
+    }
+
+    function renderPendingTree(items) {
+      const root = document.getElementById("pending-tree");
+      const list = Array.isArray(items) ? items : [];
+      latestPendingItems = list;
+      if (!list.length) {
+        root.textContent = currentLang() === "en" ? "No pending reupload files" : currentLang() === "mix" ? "暂无待补传文件 / No pending reupload files" : "暂无待补传文件";
+        pendingSelection = new Set();
+        pendingDirectoryFiles = new Map();
+        pendingExpanded = new Set(["/"]);
+        return;
+      }
+      const available = new Set(list.map((item) => item?.path).filter(Boolean));
+      pendingSelection = new Set([...pendingSelection].filter((path) => available.has(path)));
+      if (!pendingSelectionTouched && pendingSelection.size === 0) {
+        pendingSelection = new Set(available);
+      }
+      const tree = buildPendingTree(list);
+      refreshPendingDirectoryMap(tree);
+      if (pendingExpanded.size <= 1) {
+        for (const item of list) {
+          const parts = String(item.path || "").split("/").filter(Boolean);
+          let current = "";
+          for (let index = 0; index < Math.min(parts.length - 1, 2); index += 1) {
+            current += `/${parts[index]}`;
+            pendingExpanded.add(current);
+          }
+        }
+      }
+      const children = [...tree.directories.values()].sort((a, b) => a.path.localeCompare(b.path, "zh-CN"));
+      root.innerHTML = `
+        <div class="subtle" style="margin-bottom:10px;">${currentLang() === "en" ? `Total ${list.length} pending files. Expand, collapse, and select by real directory tree.` : currentLang() === "mix" ? `共 ${list.length} 个待补传文件 / Total ${list.length} pending files. 可按目录树展开、折叠和联动勾选。` : `共 ${list.length} 个待补传文件，可按目录树展开、折叠和联动勾选。`}</div>
+        ${children.map((child) => renderPendingNode(child)).join("")}
+      `;
+      bindPendingEvents(list);
+      syncPendingCheckboxState(root);
+    }
+
+    function renderStorages(payload) {
+      const root = document.getElementById("storage-list");
+      const content = payload?.data?.content || payload?.data || [];
+      const list = Array.isArray(content) ? content : [];
+      storageRecords = list;
+      populateMountedSources(list);
+      const selectedMount = document.getElementById("mounted_source_select")?.value || "";
+      const selectedStorage = list.find((item) => String(item.mount_path || item.mountPath || item.path || "/") === String(selectedMount));
+      if (selectedStorage) applyProviderSelectionFromDriver(selectedStorage.driver || selectedStorage.driver_name || selectedStorage.driverName || "");
+      if (!list.length) {
+        root.textContent = currentLang() === "en" ? "No mounts" : currentLang() === "mix" ? "暂无挂载 / No mounts" : "暂无挂载";
+        return;
+      }
+      root.innerHTML = list.map((item) => {
+        const mountPath = item.mount_path || item.mountPath || item.path || "/";
+        const driver = item.driver || item.driver_name || item.driverName || "-";
+        return `
+          <div class="row-item">
+            <div>
+              <div>${escapeHtml(mountPath)}</div>
+              <div class="mono">driver: ${escapeHtml(driver)} | ${currentLang() === "en" ? "status" : currentLang() === "mix" ? "状态 / status" : "状态"}: ${escapeHtml(String(item.status ?? "-"))}</div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function loadDrivers() {
+      const data = await call("/api/openlist/drivers");
+      driversCache = Array.isArray(data?.items) ? data.items : [];
+      const select = document.getElementById("driver-select");
+      select.innerHTML = driversCache.map((driver) => `<option value="${escapeHtml(driver)}">${escapeHtml(driver)}</option>`).join("");
+      if (driversCache.length) {
+        await loadDriverInfo(select.value);
+      } else {
+        document.getElementById("driver-fields").innerHTML = `<div class='subtle'>${currentLang() === "en" ? "No drivers loaded." : currentLang() === "mix" ? "未获取到驱动列表 / No drivers loaded." : "未获取到驱动列表。"}</div>`;
+      }
+      applyProviderSelectionFromDriver(select.value || "");
+    }
+
+    function renderDriverFields(info) {
+      currentDriverInfo = info;
+      const fields = [...(info?.common || []), ...(info?.additional || [])];
+      const root = document.getElementById("driver-fields");
+      document.getElementById("driver-notice").textContent = currentLang() === "en"
+        ? `${info?.name || "-"}: ${fields.length} fields generated from OpenList driver metadata.`
+        : currentLang() === "mix"
+          ? `${info?.name || "-"}：共 ${fields.length} 个字段 / ${fields.length} fields generated from OpenList driver metadata.`
+          : `${info?.name || "-"}：共 ${fields.length} 个字段，已按 OpenList 驱动描述动态生成。`;
+      root.innerHTML = fields.map((field) => {
+        const type = String(field.type || "string").toLowerCase();
+        const id = `driver-field-${field.name}`;
+        if (type === "bool") {
+          return `
+            <div>
+              <label>${escapeHtml(driverFieldLabel(field.name))} ${field.required ? (currentLang() === "en" ? "(Required)" : currentLang() === "mix" ? "(必填 / Required)" : "(必填)") : ""}</label>
+              <select id="${escapeHtml(id)}" data-driver-field="${escapeHtml(field.name)}">
+                <option value="">${currentLang() === "en" ? "Default" : currentLang() === "mix" ? "默认 / Default" : "默认"}</option>
+                <option value="true" ${String(field.default) === "True" || String(field.default) === "true" ? "selected" : ""}>${currentLang() === "en" ? "true" : currentLang() === "mix" ? "是 / true" : "是"}</option>
+                <option value="false" ${String(field.default) === "False" || String(field.default) === "false" ? "selected" : ""}>${currentLang() === "en" ? "false" : currentLang() === "mix" ? "否 / false" : "否"}</option>
+              </select>
+              <div class="mono">${escapeHtml(driverFieldHelp(field.help || ""))}</div>
+            </div>
+          `;
+        }
+        return `
+          <div>
+            <label>${escapeHtml(driverFieldLabel(field.name))} ${field.required ? (currentLang() === "en" ? "(Required)" : currentLang() === "mix" ? "(必填 / Required)" : "(必填)") : ""}</label>
+            <input id="${escapeHtml(id)}" data-driver-field="${escapeHtml(field.name)}" value="${escapeHtml(field.default || "")}">
+            <div class="mono">${escapeHtml(driverFieldHelp(field.help || "") || driverFieldOptions(field.options || "") || String(field.options || ""))}</div>
+          </div>
+        `;
+      }).join("");
+      renderDriverGuide(info?.name || "");
+      renderProviderCapturePanel();
+    }
+
+    async function loadDriverInfo(driver) {
+      if (!driver) return;
+      const info = await call(`/api/openlist/driver_info?driver=${encodeURIComponent(driver)}`);
+      renderDriverFields(info);
+      try {
+        driverCaptureBlueprint = await call(`/api/provider/driver_blueprint?driver=${encodeURIComponent(driver)}`);
+      } catch (_error) {
+        driverCaptureBlueprint = null;
+      }
+      renderDriverGuide(info?.name || "");
+      renderProviderOptions(providerDefinitions);
+      applyProviderSelectionFromDriver(driver);
+    }
+
+    async function refreshStorages() {
+      const data = await call("/api/openlist/storages");
+      renderStorages(data);
+    }
+
+    async function attemptAutoOpenListLogin() {
+      const token = String(document.getElementById("openlist_token").value || "").trim();
+      const username = String(document.getElementById("openlist_username").value || "").trim();
+      const password = String(document.getElementById("openlist_password").value || "");
+      if (token || !username || !password) return false;
+      try {
+        await call("/api/openlist/login", {
+          method: "POST",
+          body: JSON.stringify({
+            openlist_url: document.getElementById("openlist_url").value,
+            openlist_username: username,
+            openlist_password: password,
+            openlist_token: token,
+          }),
+        });
+        await loadConfig();
+        setNotice("sync-notice", "已自动完成 OpenList 登录并写回 Token。");
+        return true;
+      } catch (error) {
+        setNotice("sync-notice", `OpenList 自动登录失败: ${error.message}`);
+        return false;
+      }
+    }
+
+    async function attemptAutoGuangyaCapture() {
+      const values = [
+        document.getElementById("guangya_authorization").value,
+        document.getElementById("guangya_access_token").value,
+        document.getElementById("guangya_refresh_token").value,
+        document.getElementById("guangya_device_id").value,
+      ].map((item) => String(item || "").trim());
+      const hasAll = values.every(Boolean);
+      if (hasAll || sessionStorage.getItem(AUTO_GUANGYA_CAPTURE_KEY) === "1") return false;
+      try {
+        await call("/api/guangya/capture/start", { method: "POST" });
+        sessionStorage.setItem(AUTO_GUANGYA_CAPTURE_KEY, "1");
+        setNotice("sync-notice", "检测到光鸭登录信息不完整，已自动启动一次抓取窗口。");
+        return true;
+      } catch (error) {
+        setNotice("sync-notice", `自动启动光鸭抓取失败: ${error.message}`);
+        return false;
+      }
+    }
+
+    function renderLogs(records) {
+      const root = document.getElementById("logs");
+      root.textContent = (records || []).map((row) => `[${row.ts}] [${row.level}] ${row.message}`).join("\n");
+      root.scrollTop = root.scrollHeight;
+    }
+
+    async function refreshStatus() {
+      const data = await call("/api/status");
+      renderSync(data.sync || {});
+      renderRuntime(data.openlist_runtime || {});
+      renderCapture(data.guangya_capture || {});
+       providerDefinitions = Array.isArray(data.provider_definitions) ? data.provider_definitions : providerDefinitions;
+       providerSnapshots = data.provider_captures || {};
+       renderProviderOptions(providerDefinitions);
+       renderProviderCapturePanel();
+      renderQueue(data.sync?.source_queue || []);
+      renderPendingTree(data.sync?.persistent_pending || []);
+      if (data.sync?.directory_browser) renderDirectoryBrowser(data.sync.directory_browser);
+      renderLogs(data.logs || []);
+    }
+
+    async function analyzeCurrentSource() {
+      await saveConfig();
+      const sourcePath = document.getElementById("source_path").value || currentDirectoryPath || "/";
+      const data = await call("/api/source/analyze", {
+        method: "POST",
+        body: JSON.stringify({ source_path: sourcePath, limit: 80 }),
+      });
+      renderSourceAnalyze(data);
+      setNotice("source-analyze-notice", currentLang() === "en"
+        ? `Analysis finished: ${data.summary?.total ?? 0} files scanned.`
+        : currentLang() === "mix"
+          ? `分析完成，共扫描 ${data.summary?.total ?? 0} 个文件。 / Analysis finished.`
+          : `分析完成，共扫描 ${data.summary?.total ?? 0} 个文件。`);
+    }
+
+    async function buildCurrentSourceMiaochuan() {
+      await saveConfig();
+      const sourcePath = document.getElementById("source_path").value || currentDirectoryPath || "/";
+      const data = await call("/api/source/miaochuan_preview", {
+        method: "POST",
+        body: JSON.stringify({ source_path: sourcePath }),
+      });
+      document.getElementById("miaochuan_payload").value = data.payload_text || "";
+      renderSourceAnalyze({
+        source_path: data.source_path,
+        summary: data.summary,
+        plan_total: data.plan_total,
+        removed_total: data.removed_total,
+        entries: (data.payload?.files || []).slice(0, 80).map((item) => ({
+          path: item.path,
+          provider: item.provider,
+          hashType: item.hashType,
+          size: Number(item.size || 0),
+          md5: item.etag || "",
+          gcid: item.gcid || "",
+          sourceId: item.sourceId || "",
+        })),
+        truncated: Array.isArray(data.payload?.files) && data.payload.files.length > 80,
+      });
+      activateTab("miaochuan");
+      const count = data.payload?.totalFilesCount ?? 0;
+      setNotice(
+        "miaochuan-notice",
+        currentLang() === "en"
+          ? `Generated flash-upload JSON from current source directory: ${count} files ready.`
+          : currentLang() === "mix"
+            ? `已生成当前源目录秒传 JSON，共 ${count} 个文件可直导。 / Flash-upload JSON generated.`
+            : `已生成当前源目录秒传 JSON，共 ${count} 个文件可直导。`
+      );
+      setNotice(
+        "source-analyze-notice",
+        currentLang() === "en"
+          ? `Flash-upload JSON generated: ${count} files ready.`
+          : currentLang() === "mix"
+            ? `秒传 JSON 已生成，共 ${count} 个文件。 / Flash-upload JSON generated.`
+            : `秒传 JSON 已生成，共 ${count} 个文件。`
+      );
+      await diagnoseMiaochuanPayload();
+    }
+
+    async function diagnoseMiaochuanPayload() {
+      const payloadText = String(document.getElementById("miaochuan_payload").value || "").trim();
+      if (!payloadText) {
+        renderMiaochuanDiagnosis(null);
+        throw new Error(currentLang() === "en"
+          ? "Please paste or generate flash-upload JSON first."
+          : currentLang() === "mix"
+            ? "请先粘贴或生成秒传 JSON。 / Please paste or generate flash-upload JSON first."
+            : "请先粘贴或生成秒传 JSON。");
+      }
+      const data = await call("/api/miaochuan/diagnose", {
+        method: "POST",
+        body: JSON.stringify({ miaochuan_payload: payloadText }),
+      });
+      renderMiaochuanDiagnosis(data);
+      setNotice(
+        "miaochuan-notice",
+        currentLang() === "en"
+          ? `Diagnosis finished: ${data.total ?? 0} files, ${formatBytes(data.total_size || 0)} total.`
+          : currentLang() === "mix"
+            ? `诊断完成，共 ${data.total ?? 0} 个文件，合计 ${formatBytes(data.total_size || 0)}。 / Diagnosis finished.`
+            : `诊断完成，共 ${data.total ?? 0} 个文件，合计 ${formatBytes(data.total_size || 0)}。`
+      );
+      return data;
+    }
+
+    async function runSyncMode(mode, extra = {}, noticeId = "sync-notice") {
+      await saveConfig();
+      await call("/api/sync/start", {
+        method: "POST",
+        body: JSON.stringify({ mode, ...extra }),
+      });
+      setNotice(noticeId, `已启动任务: ${mode}`);
+      await refreshStatus();
+    }
+
+    function withBusy(buttonId, message, handler) {
+      return async () => {
+        const button = document.getElementById(buttonId);
+        const oldText = button?.textContent || "";
+        if (button) {
+          button.disabled = true;
+          button.textContent = message;
+        }
+        try {
+          await handler();
+        } catch (error) {
+          setNotice("sync-notice", `失败: ${error.message}`);
+          setNotice("dir-notice", `失败: ${error.message}`);
+          setNotice("miaochuan-notice", `失败: ${error.message}`);
+        } finally {
+          if (button) {
+            button.disabled = false;
+            button.textContent = oldText;
+          }
+        }
+      };
+    }
+
+    function bindEvents() {
+      document.getElementById("toggle-logs").onclick = () => toggleDrawer();
+      document.getElementById("reload-all").onclick = withBusy("reload-all", "重载中...", async () => {
+        await loadConfig();
+        await ensureDirectoryBrowserReady(true);
+        await refreshStatus();
+        await refreshStorages();
+      });
+      document.getElementById("save-config-top").onclick = withBusy("save-config-top", "保存中...", saveConfig);
+      document.getElementById("save-config-overview").onclick = withBusy("save-config-overview", "保存中...", saveConfig);
+      document.getElementById("save-config-bottom").onclick = withBusy("save-config-bottom", "保存中...", saveConfig);
+      document.getElementById("mounted_source_select").addEventListener("change", (event) => {
+        applyRatePresetForMount(event.target.value);
+        const selected = storageRecords.find((item) => String(item.mount_path || item.mountPath || item.path || "/") === String(event.target.value || ""));
+        if (selected) applyProviderSelectionFromDriver(selected.driver || selected.driver_name || selected.driverName || "");
+      });
+      document.getElementById("provider-select").addEventListener("change", () => {
+        renderProviderCapturePanel();
+      });
+      document.getElementById("rate_limit_mode").addEventListener("change", () => {
+        const selected = document.getElementById("mounted_source_select").value || document.getElementById("source_path").value || "/";
+        applyRatePresetForMount(selected);
+      });
+      document.getElementById("use-mounted-source").onclick = withBusy("use-mounted-source", "处理中...", async () => {
+        const selected = document.getElementById("mounted_source_select").value || "/";
+        document.getElementById("source_path").value = selected;
+        await saveConfig();
+        await browseDirectory(selected);
+        setNotice("dir-notice", `已切换到挂载源目录: ${selected}`);
+      });
+
+      document.getElementById("start-runtime").onclick = withBusy("start-runtime", "启动中...", async () => {
+        const data = await call("/api/openlist/runtime/start", { method: "POST" });
+        renderRuntime(data);
+        await loadConfig();
+        setNotice("sync-notice", `OpenList runtime 已就绪: ${data.active_url || "-"}`);
+      });
+      document.getElementById("login-openlist").onclick = withBusy("login-openlist", "登录中...", async () => {
+        await call("/api/openlist/login", {
+          method: "POST",
+          body: JSON.stringify({
+            openlist_url: document.getElementById("openlist_url").value,
+            openlist_username: document.getElementById("openlist_username").value,
+            openlist_password: document.getElementById("openlist_password").value,
+            openlist_token: document.getElementById("openlist_token").value,
+          }),
+        });
+        await loadConfig();
+        await ensureDirectoryBrowserReady(true);
+        await refreshStatus();
+        await refreshStorages();
+      });
+      document.getElementById("capture-guangya").onclick = withBusy("capture-guangya", "启动抓取中...", async () => {
+        await call("/api/guangya/capture/start", { method: "POST" });
+        setNotice("sync-notice", "已打开光鸭登录抓取窗口，请在浏览器中完成登录。");
+        await refreshStatus();
+      });
+      document.getElementById("run-direct-overview").onclick = withBusy("run-direct-overview", "启动中...", () => runSyncMode("direct"));
+
+      document.getElementById("browse-root").onclick = withBusy("browse-root", "载入中...", async () => {
+        await browseDirectory("/");
+        setNotice("dir-notice", "已打开挂载根目录。");
+      });
+      document.getElementById("analyze-source").onclick = withBusy("analyze-source", "分析中...", async () => {
+        await analyzeCurrentSource();
+      });
+      document.getElementById("build-source-miaochuan").onclick = withBusy("build-source-miaochuan", "生成中...", async () => {
+        await buildCurrentSourceMiaochuan();
+      });
+      document.getElementById("browse-up").onclick = withBusy("browse-up", "返回中...", async () => {
+        await browseDirectory(currentParentPath || "/");
+        setNotice("dir-notice", `当前浏览: ${currentDirectoryPath}`);
+      });
+      document.getElementById("browse-refresh").onclick = withBusy("browse-refresh", "刷新中...", async () => {
+        await browseDirectory(currentDirectoryPath || "/");
+        setNotice("dir-notice", `已刷新: ${currentDirectoryPath}`);
+      });
+      document.getElementById("use-current-dir").onclick = withBusy("use-current-dir", "写入中...", async () => {
+        document.getElementById("source_path").value = currentDirectoryPath || "/";
+        await saveConfig();
+        setNotice("dir-notice", `已写入 source_path: ${currentDirectoryPath}`);
+      });
+
+      document.getElementById("add-current-queue").onclick = withBusy("add-current-queue", "加入中...", async () => {
+        await call("/api/queue/add", {
+          method: "POST",
+          body: JSON.stringify({ source_path: currentDirectoryPath || "/" }),
+        });
+        await refreshStatus();
+        setNotice("dir-notice", `已加入队列: ${currentDirectoryPath}`);
+      });
+      document.getElementById("add-leaf-queue").onclick = withBusy("add-leaf-queue", "扫描中...", async () => {
+        const result = await call("/api/queue/add_leaf_units", {
+          method: "POST",
+          body: JSON.stringify({ source_path: currentDirectoryPath || "/" }),
+        });
+        await refreshStatus();
+        setNotice("dir-notice", `已加入 ${result.added || 0} 个最底层目录。`);
+      });
+      document.getElementById("run-leaf-direct").onclick = withBusy("run-leaf-direct", "启动中...", async () => {
+        await saveConfig();
+        await call("/api/leaf/run_stream", {
+          method: "POST",
+          body: JSON.stringify({ source_path: currentDirectoryPath || "/" }),
+        });
+        setNotice("dir-notice", `已开始最底层目录边扫边秒传: ${currentDirectoryPath}`);
+        await refreshStatus();
+      });
+      document.getElementById("run-leaf-full").onclick = withBusy("run-leaf-full", "启动中...", async () => {
+        await saveConfig();
+        await call("/api/leaf/run_stream_full", {
+          method: "POST",
+          body: JSON.stringify({ source_path: currentDirectoryPath || "/" }),
+        });
+        setNotice("dir-notice", `已开始最底层目录边扫边同步+补传: ${currentDirectoryPath}`);
+        await refreshStatus();
+      });
+
+      document.getElementById("run-dry").onclick = withBusy("run-dry", "启动中...", () => runSyncMode("dry_run"));
+      document.getElementById("run-direct").onclick = withBusy("run-direct", "启动中...", () => runSyncMode("direct"));
+      document.getElementById("run-next-queue").onclick = withBusy("run-next-queue", "启动中...", async () => {
+        await saveConfig();
+        const result = await call("/api/queue/run_next", { method: "POST" });
+        setNotice("sync-notice", `开始执行队列目录: ${result.source_path || "-"}`);
+        await refreshStatus();
+      });
+      document.getElementById("run-all-queue").onclick = withBusy("run-all-queue", "启动中...", async () => {
+        await saveConfig();
+        await call("/api/queue/run_all", { method: "POST" });
+        setNotice("sync-notice", "已开始连续执行整个队列。");
+        await refreshStatus();
+      });
+
+      document.getElementById("pending-select-all").onclick = () => {
+        for (const item of latestPendingItems) {
+          if (item?.path) pendingSelection.add(item.path);
+        }
+        pendingSelectionTouched = true;
+        renderPendingTree(latestPendingItems);
+      };
+      document.getElementById("pending-clear-all").onclick = () => {
+        pendingSelection.clear();
+        pendingSelectionTouched = true;
+        renderPendingTree(latestPendingItems);
+      };
+      document.getElementById("pending-run-selected").onclick = withBusy("pending-run-selected", "启动中...", async () => {
+        await saveConfig();
+        await call("/api/sync/start", {
+          method: "POST",
+          body: JSON.stringify({ mode: "download_selected", selected_paths: [...pendingSelection] }),
+        });
+        setNotice("sync-notice", `已开始补传 ${pendingSelection.size} 个文件。`);
+        await refreshStatus();
+      });
+      document.getElementById("pending-run-stream").onclick = withBusy("pending-run-stream", "启动中...", async () => {
+        await saveConfig();
+        await call("/api/pending/run_selected_stream", {
+          method: "POST",
+          body: JSON.stringify({ selected_paths: [...pendingSelection] }),
+        });
+        setNotice("sync-notice", "已开始按勾选目录最底层顺序补传。");
+        await refreshStatus();
+      });
+
+      document.getElementById("diagnose-miaochuan").onclick = withBusy("diagnose-miaochuan", "诊断中...", async () => {
+        await diagnoseMiaochuanPayload();
+      });
+      document.getElementById("run-miaochuan").onclick = withBusy("run-miaochuan", "提交中...", async () => {
+        await saveConfig();
+        await call("/api/miaochuan/import", {
+          method: "POST",
+          body: JSON.stringify({
+            miaochuan_payload: document.getElementById("miaochuan_payload").value,
+            guangya_authorization: document.getElementById("guangya_authorization").value,
+          }),
+        });
+        setNotice("miaochuan-notice", "已开始执行秒传 JSON 直导。");
+        await refreshStatus();
+      });
+
+      document.getElementById("refresh-storages").onclick = withBusy("refresh-storages", "刷新中...", refreshStorages);
+      document.getElementById("refresh-drivers").onclick = withBusy("refresh-drivers", "刷新中...", loadDrivers);
+      document.getElementById("driver-select").addEventListener("change", async (event) => {
+        await loadDriverInfo(event.target.value);
+      });
+      document.getElementById("show-driver-guide").onclick = () => toggleDriverGuideDialog(true);
+      document.getElementById("close-driver-guide").onclick = () => toggleDriverGuideDialog(false);
+      document.getElementById("driver-guide-dialog").addEventListener("click", (event) => {
+        if (event.target?.id === "driver-guide-dialog") toggleDriverGuideDialog(false);
+      });
+      document.getElementById("open-driver-doc").onclick = () => {
+        if (currentDriverGuide?.docUrl) window.open(currentDriverGuide.docUrl, "_blank", "noopener,noreferrer");
+      };
+      document.getElementById("apply-driver-defaults").onclick = () => applyDriverGuideDefaults();
+      document.getElementById("apply-driver-defaults-dialog").onclick = () => applyDriverGuideDefaults();
+      document.getElementById("start-provider-capture").onclick = withBusy("start-provider-capture", "抓取中...", async () => {
+        const provider = document.getElementById("provider-select").value;
+        const loginUrl = document.getElementById("provider-login-url").value;
+        await call("/api/provider/capture/start", {
+          method: "POST",
+          body: JSON.stringify({
+            provider,
+            driver: document.getElementById("driver-select").value,
+            login_url: loginUrl,
+          }),
+        });
+        setNotice("driver-notice", currentLang() === "en"
+          ? `Opened login capture for ${provider}. Finish login in the browser window, then return here.`
+          : currentLang() === "mix"
+            ? `已打开 ${provider} 登录抓取窗口 / Finish login in the browser window, then return here.`
+            : `已打开 ${provider} 登录抓取窗口，请在浏览器里完成登录后回到这里。`);
+        await refreshStatus();
+      });
+      document.getElementById("apply-provider-fields").onclick = withBusy("apply-provider-fields", "回填中...", async () => {
+        await applyCapturedProviderFields();
+      });
+      document.getElementById("create-storage").onclick = withBusy("create-storage", "创建中...", async () => {
+        const values = {};
+        document.querySelectorAll("[data-driver-field]").forEach((el) => {
+          values[el.getAttribute("data-driver-field")] = el.value;
+        });
+        await call("/api/openlist/storage/create", {
+          method: "POST",
+          body: JSON.stringify({
+            driver: document.getElementById("driver-select").value,
+            values,
+          }),
+        });
+        await refreshStorages();
+        setNotice("driver-notice", "挂载已创建。");
+      });
+
+      document.getElementById("clear-logs").onclick = withBusy("clear-logs", "清理中...", async () => {
+        await call("/api/logs/clear", { method: "POST" });
+        await refreshStatus();
+      });
+    }
+
+    async function bootstrap() {
+      initTabs();
+      applyI18n();
+      bindEvents();
+      toggleDrawer(true);
+      await loadConfig();
+      await attemptAutoOpenListLogin();
+      await attemptAutoGuangyaCapture();
+      await loadDrivers();
+      await refreshStorages();
+      await ensureDirectoryBrowserReady(true);
+      await refreshStatus();
+      autoRefresher = setInterval(refreshStatus, 2000);
+    }
+
+    bootstrap().catch((error) => {
+      document.getElementById("logs").textContent = `初始化失败: ${error.message}`;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,573 @@
+import json
+from pathlib import Path, PurePosixPath
+
+from fastapi.testclient import TestClient
+
+from cloudpan_bridge.config import AppConfig
+from cloudpan_bridge.guangya_direct import GuangyaMiaochuanImporter
+from cloudpan_bridge.guangya import GuangyaService
+from cloudpan_bridge.models import PendingFileState, QueueItemState, SourceEntry, SyncFileState, SyncPlanItem, SyncState, normalize_posix_path
+from cloudpan_bridge.openlist_admin import OpenListDriverField, OpenListDriverInfo, build_storage_payload
+from cloudpan_bridge.openlist import OpenListClient
+from cloudpan_bridge.provider_capture import (
+    build_driver_capture_spec,
+    build_driver_prefill_values,
+    default_provider_specs,
+    derive_capture_requirements_from_fields,
+)
+from cloudpan_bridge.syncer import (
+    SyncRunner,
+    build_plan,
+    build_source_miaochuan_payload,
+    relative_target_path,
+    render_tree,
+    serialize_source_entry,
+    summarize_source_entries,
+)
+from cloudpan_bridge.webapp import (
+    build_pending_selected_execution_groups,
+    compute_rate_limit_cooldown_ms,
+    is_rate_limit_error_message,
+)
+
+
+def test_normalize_posix_path() -> None:
+    assert normalize_posix_path("abc/def.txt") == "/abc/def.txt"
+    assert normalize_posix_path("/abc/../abc/def.txt") == "/abc/def.txt"
+
+
+def test_build_plan_marks_new_and_changed_entries() -> None:
+    state = SyncState(
+        files={
+            "/root/a.txt": SyncFileState(path="/root/a.txt", md5="AAA", size=1, last_op_time="1"),
+            "/root/old.txt": SyncFileState(path="/root/old.txt", md5="OLD", size=2, last_op_time="1"),
+        }
+    )
+    entries = [
+        SourceEntry(path="/root/a.txt", md5="BBB", size=1, last_op_time="2"),
+        SourceEntry(path="/root/new.bin", md5="CCC", size=1024 * 1024, last_op_time="3"),
+    ]
+
+    plan, removed = build_plan(entries, state)
+
+    assert [item.action for item in plan] == ["update", "create"]
+    assert [item.requires_download for item in plan] == [False, False]
+    assert removed == ["/root/old.txt"]
+
+
+def test_relative_target_path_preserves_directory_structure() -> None:
+    actual = relative_target_path("/我的资源", "/我的资源/照片/1.jpg", "/天翼同步")
+    assert PurePosixPath(actual) == PurePosixPath("/天翼同步/照片/1.jpg")
+
+
+def test_relative_target_path_keeps_leaf_stream_parent_hierarchy() -> None:
+    actual = relative_target_path(
+        "/2-天翼云盘",
+        "/2-天翼云盘/我的图片/22081212C相册/0/2024年08月/1.jpg",
+        "/",
+    )
+    assert PurePosixPath(actual) == PurePosixPath("/我的图片/22081212C相册/0/2024年08月/1.jpg")
+
+
+def test_render_tree_contains_nested_indentation() -> None:
+    text = render_tree(["/根/文件1.txt", "/根/子目录/文件2.txt"])
+    assert "- 文件1.txt" in text
+    assert "    - 文件2.txt" in text
+
+
+def test_openlist_directory_helpers() -> None:
+    assert OpenListClient._normalize_dir("\\挂载1\\相册\\") == "/挂载1/相册"
+    assert OpenListClient._parent("/挂载1/相册") == "/挂载1"
+    assert OpenListClient._parent("/") is None
+
+
+def test_config_has_scan_throttle_defaults(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    cfg = AppConfig.load(path)
+    assert cfg.openlist_page_size == 200
+    assert cfg.openlist_request_interval_ms == 300
+    assert cfg.queue_interval_ms == 3000
+    assert cfg.auto_download_threshold_mb == 10
+    assert cfg.to_dict()["openlist_page_size"] == 200
+    assert cfg.to_dict()["queue_interval_ms"] == 3000
+    assert cfg.to_dict()["provider_captures"] == {}
+
+
+def test_config_roundtrip_provider_captures(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "provider_captures": {
+    "quark": {
+      "status": "captured",
+      "captured": {
+        "cookie_header": "k=v"
+      }
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    cfg = AppConfig.load(path)
+    assert cfg.provider_captures == {
+        "quark": {
+            "status": "captured",
+            "captured": {
+                "cookie_header": "k=v",
+            },
+        }
+    }
+    assert cfg.to_dict()["provider_captures"]["quark"]["captured"]["cookie_header"] == "k=v"
+
+
+def test_auto_download_threshold_zero_disables_fallback(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "auto_download_threshold_mb": 0
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    item = build_plan([SourceEntry(path="/src/a.txt", md5="ABC", size=1024, last_op_time="1")], SyncState())[0][0]
+    assert runner._should_auto_download(item) is False
+
+
+def test_auto_download_threshold_accepts_small_file(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "auto_download_threshold_mb": 10
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    item = build_plan([SourceEntry(path="/src/a.txt", md5="ABC", size=5 * 1024 * 1024, last_op_time="1")], SyncState())[0][0]
+    assert runner._should_auto_download(item) is True
+
+
+def test_state_supports_pending_and_queue_roundtrip() -> None:
+    state = SyncState(
+        pending_files={
+            "/a.txt": PendingFileState(path="/a.txt", md5="ABC", size=1, source_root="/src", reason="miss")
+        },
+        source_queue=[
+            QueueItemState(source_path="/src1", source_root_for_target="/src1"),
+            QueueItemState(source_path="/src2", source_root_for_target="/root", last_status="completed"),
+        ],
+    )
+    restored = SyncState.from_dict(state.to_dict())
+    assert "/a.txt" in restored.pending_files
+    assert restored.pending_files["/a.txt"].reason == "miss"
+    assert [item.source_path for item in restored.source_queue] == ["/src1", "/src2"]
+    assert [item.source_root_for_target for item in restored.source_queue] == ["/src1", "/root"]
+
+
+def test_guangya_upload_uses_string_parent_id(tmp_path: Path) -> None:
+    local_file = tmp_path / "demo.bin"
+    local_file.write_bytes(b"demo")
+    captured: dict[str, object] = {}
+
+    class DummyClient:
+        token = ""
+        refresh_token_value = ""
+        device_id = ""
+
+        def file_upload(self, path: str, name: str, parent_id: str | None = None) -> dict[str, str]:
+            captured["path"] = path
+            captured["name"] = name
+            captured["parent_id"] = parent_id
+            return {"ok": "1"}
+
+    service = GuangyaService()
+    service.client = DummyClient()  # type: ignore[assignment]
+
+    result = service.upload_local_file(local_file, "1902430028220756040", "demo.bin")
+
+    assert result == {"ok": "1"}
+    assert captured["name"] == "demo.bin"
+    assert captured["parent_id"] == "1902430028220756040"
+    assert isinstance(captured["parent_id"], str)
+
+
+def test_pending_selected_execution_groups_run_deepest_directories_first() -> None:
+    pending_files = {
+        "/root/a/1.txt": PendingFileState(path="/root/a/1.txt", md5="A", size=1),
+        "/root/a/b/2.txt": PendingFileState(path="/root/a/b/2.txt", md5="B", size=1),
+        "/root/a/b/c/3.txt": PendingFileState(path="/root/a/b/c/3.txt", md5="C", size=1),
+        "/root/d/4.txt": PendingFileState(path="/root/d/4.txt", md5="D", size=1),
+    }
+
+    groups = build_pending_selected_execution_groups(
+        [
+            "/root/a/1.txt",
+            "/root/a/b/2.txt",
+            "/root/a/b/c/3.txt",
+            "/root/d/4.txt",
+        ],
+        pending_files,
+    )
+
+    assert groups == [
+        ("/root/a/b/c", ["/root/a/b/c/3.txt"]),
+        ("/root/a/b", ["/root/a/b/2.txt"]),
+        ("/root/a", ["/root/a/1.txt"]),
+        ("/root/d", ["/root/d/4.txt"]),
+    ]
+
+
+def test_rate_limit_detection_and_cooldown() -> None:
+    assert is_rate_limit_error_message("429 Too Many Requests")
+    assert is_rate_limit_error_message("检测到风控，请稍后再试")
+    cfg = AppConfig.from_payload(
+        {
+            "source_path": "/baidu-root",
+            "target_path": "/dst",
+            "queue_interval_ms": 3000,
+            "rate_limit_mode": "safe",
+        }
+    )
+    assert compute_rate_limit_cooldown_ms(cfg, "/baidu-root/demo") == 270000
+
+
+def test_build_storage_payload_serializes_addition_and_types() -> None:
+    info = OpenListDriverInfo(
+        name="Demo",
+        common=[
+            OpenListDriverField(name="mount_path", required=True),
+            OpenListDriverField(name="cache_expiration", type="number", default="30"),
+        ],
+        additional=[
+            OpenListDriverField(name="cookie", required=True),
+            OpenListDriverField(name="rapid_upload", type="bool", default="true"),
+        ],
+        config={},
+    )
+
+    payload = build_storage_payload(
+        info,
+        {
+            "mount_path": "/demo",
+            "cache_expiration": "60",
+            "cookie": "abc",
+            "rapid_upload": "false",
+        },
+    )
+
+    assert payload["mount_path"] == "/demo"
+    assert payload["cache_expiration"] == 60
+    assert payload["addition"] == '{"cookie": "abc", "rapid_upload": false}'
+
+
+def test_default_provider_specs_cover_major_sources() -> None:
+    specs = default_provider_specs()
+    assert {"guangya", "quark", "123pan", "189cloud", "baidu", "thunder"} <= set(specs)
+    assert "cookie_header" in specs["quark"].required_keys
+    assert "bdstoken" in specs["baidu"].required_keys
+    assert "authorization" in specs["thunder"].required_keys
+
+
+def test_openlist_extract_hash_fields_supports_md5_and_gcid() -> None:
+    result = OpenListClient._extract_hash_fields(
+        {
+            "name": "demo.bin",
+            "hash_info": {"md5": "abc123", "gcid": "A" * 40},
+            "fileId": "123",
+            "provider": "Thunder",
+        }
+    )
+    assert result == {"md5": "ABC123", "gcid": "A" * 40, "hash_type": "md5"}
+    assert OpenListClient._extract_source_id({"fileId": 123}) == "123"
+    assert OpenListClient._extract_provider({"provider": "Thunder"}) == "Thunder"
+
+
+def test_openlist_extract_hash_fields_supports_gcid_only() -> None:
+    result = OpenListClient._extract_hash_fields(
+        {
+            "name": "demo.bin",
+            "hash_info": {"gcid": "B" * 40},
+        }
+    )
+    assert result == {"md5": "", "gcid": "B" * 40, "hash_type": "gcid"}
+
+
+def test_build_driver_prefill_values_matches_common_tokens() -> None:
+    fields = [
+        OpenListDriverField(name="cookie"),
+        OpenListDriverField(name="authorization"),
+        OpenListDriverField(name="refresh_token"),
+        OpenListDriverField(name="bdstoken"),
+        OpenListDriverField(name="device_id"),
+    ]
+    values = build_driver_prefill_values(
+        fields,
+        {
+            "cookie_header": "sid=1; token=2",
+            "authorization": "Bearer abc",
+            "refresh_token": "refresh-demo",
+            "bdstoken": "bd-demo",
+            "device_id": "dev-demo",
+        },
+        "baidu",
+    )
+    assert values == {
+        "cookie": "sid=1; token=2",
+        "authorization": "Bearer abc",
+        "refresh_token": "refresh-demo",
+        "bdstoken": "bd-demo",
+        "device_id": "dev-demo",
+    }
+
+
+def test_build_driver_capture_spec_derives_generic_requirements() -> None:
+    fields = [
+        OpenListDriverField(name="cookie"),
+        OpenListDriverField(name="refresh_token"),
+        OpenListDriverField(name="sessionKey"),
+    ]
+    derived = derive_capture_requirements_from_fields(fields)
+    assert derived["required_keys"] == ["cookie_header", "refresh_token", "session_key"]
+    spec = build_driver_capture_spec("AliyundriveOpen", fields)
+    assert spec.key == "driver::aliyundriveopen"
+    assert spec.login_url == "https://www.alipan.com/"
+    assert "cookie" in spec.description
+
+
+def test_status_restores_provider_captures_from_config(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "provider_captures": {
+    "quark": {
+      "provider": "quark",
+      "status": "captured",
+      "message": "from config",
+      "captured": {
+        "cookie_header": "sid=1; token=2"
+      }
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    app = create_app(config_path)
+    client = TestClient(app)
+    status = client.get("/api/status")
+    assert status.status_code == 200
+    body = status.json()
+    assert body["provider_captures"]["quark"]["captured"]["cookie_header"] == "sid=1; token=2"
+
+
+def test_provider_driver_blueprint_endpoint_returns_dynamic_capture_spec(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from unittest.mock import patch
+    from cloudpan_bridge.webapp import create_app
+
+    app = create_app(config_path)
+    client = TestClient(app)
+    info = OpenListDriverInfo(
+        name="AliyundriveOpen",
+        common=[OpenListDriverField(name="mount_path", required=True)],
+        additional=[OpenListDriverField(name="refresh_token"), OpenListDriverField(name="device_id")],
+        config={},
+    )
+    with patch("cloudpan_bridge.webapp.OpenListAdminClient.driver_info", return_value=info):
+        response = client.get("/api/provider/driver_blueprint", params={"driver": "AliyundriveOpen"})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["key"] == "driver::aliyundriveopen"
+    assert payload["login_url"] == "https://www.alipan.com/"
+    assert payload["required_keys"] == ["refresh_token", "device_id"]
+    assert payload["guide"]["doc_url"] == "https://doc.oplist.org/guide/drivers/aliyundrive_open"
+    assert payload["guide"]["defaults"]["root_folder_id"] == "root"
+
+
+def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from unittest.mock import patch
+    from cloudpan_bridge.webapp import create_app
+
+    fake_entries = [
+        SourceEntry(path="/src/a.bin", md5="ABC", size=10, provider="openlist", hash_type="md5"),
+        SourceEntry(path="/src/b.bin", md5="", size=20, provider="Thunder", hash_type="gcid", gcid="D" * 40),
+    ]
+    fake_plan = [SyncPlanItem(source=fake_entries[0], action="create", reason="新增文件")]
+    app = create_app(config_path)
+    client = TestClient(app)
+    with patch("cloudpan_bridge.webapp.SyncRunner.analyze", return_value=(fake_entries, fake_plan, ["/src/c.bin"])):
+        response = client.post("/api/source/analyze", json={"source_path": "/src", "limit": 1})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["gcid_ready"] == 1
+    assert payload["plan_total"] == 1
+    assert payload["removed_total"] == 1
+    assert payload["truncated"] is True
+
+
+def test_source_miaochuan_preview_endpoint_returns_payload(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from unittest.mock import patch
+    from cloudpan_bridge.webapp import create_app
+
+    fake_entries = [
+        SourceEntry(path="/src/a.bin", md5="ABCDEF0123456789ABCDEF0123456789", size=10, provider="openlist", hash_type="md5"),
+        SourceEntry(path="/src/b.bin", md5="", size=20, provider="Thunder", hash_type="gcid", gcid="F" * 40),
+    ]
+    app = create_app(config_path)
+    client = TestClient(app)
+    with patch("cloudpan_bridge.webapp.SyncRunner.analyze", return_value=(fake_entries, [], [])):
+        response = client.post("/api/source/miaochuan_preview", json={"source_path": "/src"})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["payload"]["totalFilesCount"] == 2
+    assert payload["payload"]["files"][0]["path"] == "/a.bin"
+    assert "\"gcid\": \"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\"" in payload["payload_text"]
+
+
+def test_miaochuan_diagnose_payload_summary() -> None:
+    diagnosis = GuangyaMiaochuanImporter.diagnose_payload(
+        {
+            "files": [
+                {
+                    "path": "/a.bin",
+                    "size": "10",
+                    "etag": "ABCDEF0123456789ABCDEF0123456789",
+                    "provider": "quark",
+                    "hashType": "md5",
+                },
+                {
+                    "path": "/b.bin",
+                    "size": "20",
+                    "gcid": "F" * 40,
+                    "provider": "thunder",
+                    "hashType": "gcid",
+                },
+            ]
+        }
+    )
+    assert diagnosis["total"] == 2
+    assert diagnosis["total_size"] == 30
+    assert diagnosis["md5_count"] == 1
+    assert diagnosis["gcid_count"] == 1
+    assert diagnosis["provider_counts"] == {"quark": 1, "thunder": 1}
+    assert diagnosis["sample"][1]["gcid"] == "F" * 40
+
+
+def test_miaochuan_diagnose_endpoint_returns_summary(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    app = create_app(config_path)
+    client = TestClient(app)
+    response = client.post(
+        "/api/miaochuan/diagnose",
+        json={
+            "miaochuan_payload": json.dumps(
+                {
+                    "files": [
+                        {
+                            "path": "/demo.zip",
+                            "size": "123",
+                            "etag": "ABCDEF0123456789ABCDEF0123456789",
+                            "provider": "189cloud",
+                            "hashType": "md5",
+                        }
+                    ]
+                }
+            )
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert payload["md5_count"] == 1
+    assert payload["provider_counts"] == {"189cloud": 1}
+
+
+def test_serialize_and_summarize_source_entries() -> None:
+    entries = [
+        SourceEntry(path="/a.bin", md5="abc", size=10, provider="openlist", hash_type="md5"),
+        SourceEntry(path="/b.bin", md5="", size=20, provider="Thunder", hash_type="gcid", gcid="C" * 40),
+    ]
+    assert serialize_source_entry(entries[1])["gcid"] == "C" * 40
+    summary = summarize_source_entries(entries)
+    assert summary["total"] == 2
+    assert summary["gcid_ready"] == 1
+    assert summary["missing_md5"] == 1
+    assert summary["provider_counts"]["Thunder"] == 1
+
+
+def test_build_source_miaochuan_payload_uses_relative_paths() -> None:
+    entries = [
+        SourceEntry(path="/root/a.bin", md5="ABCDEF0123456789ABCDEF0123456789", size=10, provider="openlist", hash_type="md5"),
+        SourceEntry(path="/root/sub/b.bin", md5="", size=20, provider="Thunder", hash_type="gcid", gcid="E" * 40),
+    ]
+    payload = build_source_miaochuan_payload(entries, "/root")
+    assert payload["totalFilesCount"] == 2
+    assert payload["files"][0]["path"] == "/a.bin"
+    assert payload["files"][1]["path"] == "/sub/b.bin"
+    assert payload["files"][0]["etag"] == "abcdef0123456789abcdef0123456789"
+    assert payload["files"][1]["gcid"] == "E" * 40

@@ -1,0 +1,12 @@
+.venv/
+.pytest_cache/
+.state/
+.work/
+.runtime/
+
+__pycache__/
+*.py[cod]
+*.pyo
+
+src/*.egg-info/
+src/**/*.egg-info/
