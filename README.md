@@ -42,6 +42,9 @@
   - `迅雷云盘`：`Authorization / x-device-id / x-captcha-token / x-client-id`
 - 支持按当前 OpenList 驱动字段生成“通用网页登录抓取模板”
 - 支持复杂驱动的“接入流程说明 / 官方文档链接 / 推荐默认值”
+- 支持源驱动到 Guangya 的基础能力矩阵提示
+  - 区分 `fast_upload_partial / download_upload_only / unsupported` 等等级
+  - 页面会给出诚实降级后的建议路径，而不是默认宣称都能秒传
 - 支持本地状态续跑
 
 ## 推荐使用顺序
@@ -110,6 +113,15 @@
 - `配置`
 
 其中 `源目录` Tab 现在多了一个“源端元数据分析”面板，可以在正式同步前先做一次源端体检。
+
+`总览` Tab 现在还会显示一个“能力矩阵与建议”面板：
+
+- 根据当前驱动和目标端 Guangya，提示当前组合更接近：
+  - `fast_upload_partial`
+  - `download_upload_only`
+  - `unsupported`
+- 如果你已经跑过“源端元数据分析”，它还会把当前目录里的 `MD5 / GCID / 可快传指纹数量` 一起展示出来
+- 这样可以更早判断当前应该优先走秒传、分目录补传，还是先停下来检查挂载与驱动兼容性
 
 页面右上角支持语言切换：
 
@@ -346,6 +358,12 @@
 - 先保证光鸭 `Authorization / access_token / refresh_token / device_id` 完整
 - 再补抓源网盘的 Cookie / Token / Header
 - 最后再跑大目录或补传流
+
+如果你主要关心“当前这组网盘到底适不适合秒传”：
+
+- 先看 `总览 -> 能力矩阵与建议`
+- 再跑一次 `源目录 -> 分析当前源目录`
+- 如果提示 `download_upload_only`，就不要把当前组合当成稳定秒传链路来规划
 
 启动脚本行为：
 

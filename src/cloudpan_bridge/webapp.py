@@ -23,7 +23,14 @@ from .provider_capture import (
     build_driver_prefill_values,
     normalize_provider_capture_entry,
 )
-from .provider_registry import get_driver_guide, list_driver_guides
+from .provider_registry import (
+    build_driver_capability_matrix,
+    build_driver_target_capability,
+    get_driver_guide,
+    list_driver_guides,
+    list_source_profiles,
+    list_target_profiles,
+)
 from .syncer import (
     SyncRunner,
     build_source_miaochuan_payload,
@@ -941,7 +948,16 @@ def create_app(config_path: Path) -> FastAPI:
     def get_provider_registry() -> dict[str, Any]:
         return {
             "guides": list_driver_guides(),
+            "source_profiles": list_source_profiles(),
+            "target_profiles": list_target_profiles(),
+            "driver_matrix": build_driver_capability_matrix(target="guangya"),
         }
+
+    @app.get("/api/provider/capability")
+    def get_provider_capability(driver: str, target: str = "guangya") -> dict[str, Any]:
+        if not driver.strip():
+            raise HTTPException(status_code=400, detail="缺少 driver")
+        return build_driver_target_capability(driver, target=target)
 
     @app.get("/api/openlist/storages")
     def get_openlist_storages(page: int = 1, per_page: int = 200) -> dict[str, Any]:

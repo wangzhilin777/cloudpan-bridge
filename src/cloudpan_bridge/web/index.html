@@ -412,6 +412,12 @@
           </div>
 
           <div class="panel">
+            <h2 data-i18n="panel.capability">能力矩阵与建议</h2>
+            <div class="subtle" data-i18n="desc.capability">根据当前选择的源驱动和现有目标端 Guangya，给出诚实降级后的推荐路径。这里不会把“只能补传”的组合误导成可秒传。</div>
+            <div class="notice" id="capability-summary">等待驱动信息...</div>
+          </div>
+
+          <div class="panel">
             <h2 data-i18n="panel.current_task">当前任务</h2>
             <div class="panel-grid">
               <div>
@@ -758,6 +764,7 @@
         "tab.mounts": "挂载",
         "tab.config": "配置",
         "panel.overview": "运行概览",
+        "panel.capability": "能力矩阵与建议",
         "panel.current_task": "当前任务",
         "panel.source_browser": "目录浏览",
         "panel.source_analyze": "源端元数据分析",
@@ -851,6 +858,7 @@
         "desc.pending_tree": "这里按真实目录树展示，父目录勾选会联动所有子目录和文件。",
         "desc.miaochuan": "支持直接粘贴油猴或插件导出的 JSON。若你已自动抓取到光鸭 Authorization，会优先使用它。",
         "desc.provider_capture": "如果还没有挂载，或想直接从网页登录态抓取 Cookie / Token / Header，可以先在这里选网盘类型，打开登录页抓取，再一键写入当前挂载表单。",
+        "desc.capability": "根据当前选择的源驱动和现有目标端 Guangya，给出诚实降级后的推荐路径。这里不会把“只能补传”的组合误导成可秒传。",
         "desc.logs": "这里会自动滚动到最新日志。同步、队列、挂载和光鸭抓取状态都可以从这里看。",
         "option.openlist_mode.external": "外部模式",
         "option.openlist_mode.managed": "托管模式",
@@ -868,6 +876,7 @@
         "tab.mounts": "Mounts",
         "tab.config": "Config",
         "panel.overview": "Runtime Overview",
+        "panel.capability": "Capability and Recommendation",
         "panel.current_task": "Current Task",
         "panel.source_browser": "Directory Browser",
         "panel.source_analyze": "Source Metadata Analysis",
@@ -961,6 +970,7 @@
         "desc.pending_tree": "This tree follows the real directory hierarchy. Parent selection cascades to children and files.",
         "desc.miaochuan": "Paste JSON exported by your userscript or plugin. If Guangya Authorization has been captured, it will be used first.",
         "desc.provider_capture": "If you do not have a mount yet, or want to capture Cookie / Token / Header directly from a web login session, choose the provider here, start login capture, then apply the result to the current mount form.",
+        "desc.capability": "Show the honest recommendation for the current source driver to Guangya, including fallback behavior instead of overpromising fast upload.",
         "desc.logs": "Logs auto-scroll to the newest line. Sync, queue, mount, and capture activity all appear here.",
         "option.openlist_mode.external": "External",
         "option.openlist_mode.managed": "Managed",
@@ -1015,6 +1025,7 @@
       "extract_front,extract_back": { zh: "可选: 文件夹前置、文件夹后置", en: "Options: extract to front, extract to back" },
     };
     let driverGuideRegistry = {};
+    let providerRegistryPayload = { guides: {}, source_profiles: {}, target_profiles: {}, driver_matrix: {} };
     const currentLang = () => localStorage.getItem(UI_LANGUAGE_KEY) || "zh";
     let configCache = {};
     let currentDirectoryPath = "/";
@@ -1206,7 +1217,92 @@
 
     async function loadProviderRegistry() {
       const data = await call("/api/provider/registry");
+      providerRegistryPayload = data || providerRegistryPayload;
       driverGuideRegistry = data?.guides || {};
+      renderCapabilitySummary();
+    }
+
+    function currentDriverContext() {
+      const selectedMount = document.getElementById("mounted_source_select")?.value || "";
+      const selectedStorage = storageRecords.find((item) => String(item.mount_path || item.mountPath || item.path || "/") === String(selectedMount));
+      const mountedDriver = selectedStorage?.driver || selectedStorage?.driver_name || selectedStorage?.driverName || "";
+      const driver = mountedDriver || document.getElementById("driver-select")?.value || "";
+      return {
+        driver,
+        mountPath: selectedMount || document.getElementById("source_path")?.value || "/",
+      };
+    }
+
+    function capabilityLevelText(level) {
+      const normalized = String(level || "").toLowerCase();
+      const mapping = {
+        fast_upload_supported: {
+          zh: "可稳定秒传",
+          en: "Stable fast upload",
+        },
+        fast_upload_partial: {
+          zh: "部分可秒传",
+          en: "Partial fast upload",
+        },
+        relay_supported: {
+          zh: "可中转流传输",
+          en: "Relay streaming supported",
+        },
+        download_upload_only: {
+          zh: "仅补传/下载上传",
+          en: "Download-upload only",
+        },
+        unsupported: {
+          zh: "暂不支持",
+          en: "Unsupported",
+        },
+      };
+      const text = mapping[normalized] || mapping.unsupported;
+      return currentLang() === "en" ? text.en : currentLang() === "mix" ? `${text.zh} / ${text.en}` : text.zh;
+    }
+
+    function renderCapabilitySummary() {
+      const root = document.getElementById("capability-summary");
+      if (!root) return;
+      const context = currentDriverContext();
+      const normalized = normalizeDriverKey(context.driver || "");
+      const matrix = providerRegistryPayload?.driver_matrix || {};
+      const capability = matrix[normalized] || null;
+      if (!capability) {
+        root.innerHTML = currentLang() === "en"
+          ? "No capability matrix matched for the current driver yet. Treat it conservatively and verify hash availability first."
+          : currentLang() === "mix"
+            ? "当前驱动暂未命中内置能力矩阵，建议按保守模式处理，先验证哈希可用性。 / Treat it conservatively first."
+            : "当前驱动暂未命中内置能力矩阵，建议按保守模式处理，先验证哈希可用性。";
+        return;
+      }
+      const sourceProfile = capability.sourceProfile || {};
+      const targetProfile = capability.targetProfile || {};
+      const notes = capability.notes || {};
+      const likelyHashes = Array.isArray(sourceProfile.likelyHashes) ? sourceProfile.likelyHashes : [];
+      const analysisSummary = sourceAnalyzeCache?.summary || {};
+      const analysisLine = sourceAnalyzeCache
+        ? `${currentLang() === "en" ? "Current analysis" : currentLang() === "mix" ? "当前分析 / Current analysis" : "当前分析"}: MD5=${analysisSummary.md5_ready ?? 0}, GCID=${analysisSummary.gcid_ready ?? 0}, ${currentLang() === "en" ? "Fast fingerprints" : currentLang() === "mix" ? "可快传指纹 / Fast fingerprints" : "可快传指纹"}=${analysisSummary.fast_upload_ready ?? 0}/${analysisSummary.total ?? 0}`
+        : `${currentLang() === "en" ? "Current analysis" : currentLang() === "mix" ? "当前分析 / Current analysis" : "当前分析"}: ${currentLang() === "en" ? "not run yet" : currentLang() === "mix" ? "尚未运行 / not run yet" : "尚未运行"}`;
+      const recommendedFlow = currentLang() === "en"
+        ? (capability.recommendedFlowEn || capability.recommendedFlow || "")
+        : currentLang() === "mix"
+          ? `${capability.recommendedFlow || ""} / ${capability.recommendedFlowEn || ""}`.trim()
+          : (capability.recommendedFlow || "");
+      const notesText = currentLang() === "en"
+        ? (notes.en || "")
+        : currentLang() === "mix"
+          ? `${notes.zh || ""} / ${notes.en || ""}`.trim()
+          : (notes.zh || "");
+      root.innerHTML = `
+        <div><strong>${escapeHtml(context.driver || "-")}</strong> -> <strong>${escapeHtml(targetProfile.labelZh || targetProfile.label || "Guangya")}</strong></div>
+        <div class="mono">${currentLang() === "en" ? "Capability level" : currentLang() === "mix" ? "能力等级 / Capability level" : "能力等级"}: ${escapeHtml(capabilityLevelText(capability.level))}</div>
+        <div class="mono">${currentLang() === "en" ? "Likely hashes" : currentLang() === "mix" ? "常见哈希 / Likely hashes" : "常见哈希"}: ${escapeHtml(likelyHashes.join(", ") || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Recommended rate profile" : currentLang() === "mix" ? "推荐频率 / Recommended rate profile" : "推荐频率"}: ${escapeHtml(sourceProfile.recommendedRateProfile || "-")}</div>
+        <div class="mono">${escapeHtml(analysisLine)}</div>
+        <div class="mono">${currentLang() === "en" ? "Suggested path" : currentLang() === "mix" ? "建议路径 / Suggested path" : "建议路径"}: ${escapeHtml(recommendedFlow || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Notes" : currentLang() === "mix" ? "说明 / Notes" : "说明"}: ${escapeHtml(notesText || "-")}</div>
+      `;
     }
 
     function getDriverGuide(driver) {
@@ -1404,6 +1500,7 @@
         select.value = provider;
         renderProviderCapturePanel();
       }
+      renderCapabilitySummary();
     }
 
     async function applyCapturedProviderFields() {
@@ -1898,6 +1995,7 @@
       if (selectedStorage) applyProviderSelectionFromDriver(selectedStorage.driver || selectedStorage.driver_name || selectedStorage.driverName || "");
       if (!list.length) {
         root.textContent = currentLang() === "en" ? "No mounts" : currentLang() === "mix" ? "暂无挂载 / No mounts" : "暂无挂载";
+        renderCapabilitySummary();
         return;
       }
       root.innerHTML = list.map((item) => {
@@ -1912,6 +2010,7 @@
           </div>
         `;
       }).join("");
+      renderCapabilitySummary();
     }
 
     async function loadDrivers() {
@@ -1963,6 +2062,7 @@
       }).join("");
       renderDriverGuide(info?.name || "");
       renderProviderCapturePanel();
+      renderCapabilitySummary();
     }
 
     async function loadDriverInfo(driver) {
@@ -1977,6 +2077,7 @@
       renderDriverGuide(info?.name || "");
       renderProviderOptions(providerDefinitions);
       applyProviderSelectionFromDriver(driver);
+      renderCapabilitySummary();
     }
 
     async function refreshStorages() {
@@ -2057,6 +2158,7 @@
         body: JSON.stringify({ source_path: sourcePath, limit: 80 }),
       });
       renderSourceAnalyze(data);
+      renderCapabilitySummary();
       setNotice("source-analyze-notice", currentLang() === "en"
         ? `Analysis finished: ${data.summary?.total ?? 0} files scanned.`
         : currentLang() === "mix"

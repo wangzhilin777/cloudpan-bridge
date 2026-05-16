@@ -216,6 +216,225 @@ DRIVER_GUIDES: dict[str, dict[str, Any]] = {
     },
 }
 
+TARGET_PROFILES: dict[str, dict[str, Any]] = {
+    "guangya": {
+        "key": "guangya",
+        "label": "Guangya",
+        "label_zh": "光鸭云盘",
+        "fast_upload_hashes": ["md5", "gcid"],
+        "fallback_modes": ["stream_upload", "download_upload"],
+        "description": {
+            "zh": "当前首个正式目标端。优先尝试 MD5 / GCID 元数据秒传，未命中再降级到补传。",
+            "en": "Current primary target adapter. It tries MD5 / GCID metadata-based fast upload first, then falls back to reupload.",
+        },
+    }
+}
+
+SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
+    "generic": {
+        "key": "generic",
+        "label": "Generic OpenList Source",
+        "label_zh": "通用 OpenList 源",
+        "driver_aliases": [],
+        "likely_hashes": [],
+        "recommended_rate_profile": "safe",
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先分析目录，再决定是否下载补传。",
+                "recommended_flow_en": "Analyze first, then decide whether to use download-upload fallback.",
+                "notes": {
+                    "zh": "未知驱动默认按最保守方式处理。只有在确认可提供 MD5 / GCID 后，才建议强化秒传路径。",
+                    "en": "Unknown drivers are treated conservatively. Only switch to fast upload after confirming MD5 / GCID is available.",
+                },
+            }
+        },
+    },
+    "189cloud": {
+        "key": "189cloud",
+        "label": "189Cloud",
+        "label_zh": "天翼云盘",
+        "driver_aliases": ["189cloud", "189cloudpc", "189cloudtv"],
+        "likely_hashes": ["md5"],
+        "recommended_rate_profile": "safe",
+        "capability_to_targets": {
+            "guangya": {
+                "level": "fast_upload_partial",
+                "recommended_flow": "优先元数据秒传，未命中时按目录小批量补传。",
+                "recommended_flow_en": "Try metadata fast upload first, then reupload small batches by directory.",
+                "notes": {
+                    "zh": "常见场景下可从 OpenList 拿到 MD5，但整盘扫描时要控制频率。",
+                    "en": "MD5 is often available through OpenList, but whole-drive scans should be throttled.",
+                },
+            }
+        },
+    },
+    "quark": {
+        "key": "quark",
+        "label": "Quark",
+        "label_zh": "夸克网盘",
+        "driver_aliases": ["quark", "quarkopen", "quarktv"],
+        "likely_hashes": ["md5"],
+        "recommended_rate_profile": "safe",
+        "capability_to_targets": {
+            "guangya": {
+                "level": "fast_upload_partial",
+                "recommended_flow": "先验证当前挂载是否稳定返回哈希，再决定是否跑边扫边同步。",
+                "recommended_flow_en": "Verify hash availability first, then decide whether to use streaming leaf sync.",
+                "notes": {
+                    "zh": "夸克更容易受代理和风控影响，不建议一开始就跑大范围自动补传。",
+                    "en": "Quark is more sensitive to proxy and rate control, so avoid aggressive fallback at the beginning.",
+                },
+            }
+        },
+    },
+    "123pan": {
+        "key": "123pan",
+        "label": "123Pan",
+        "label_zh": "123 网盘",
+        "driver_aliases": ["123pan", "123open"],
+        "likely_hashes": ["md5"],
+        "recommended_rate_profile": "balanced",
+        "capability_to_targets": {
+            "guangya": {
+                "level": "fast_upload_partial",
+                "recommended_flow": "优先秒传，失败后保留待补传树，按目录分批补。",
+                "recommended_flow_en": "Prefer fast upload first, then keep a pending tree and reupload by directory.",
+                "notes": {
+                    "zh": "123 的哈希可用性受具体驱动和开放参数影响，建议先用小目录验证。",
+                    "en": "Hash availability depends on the exact 123 driver and open-platform parameters. Start with small directories.",
+                },
+            }
+        },
+    },
+    "baidu": {
+        "key": "baidu",
+        "label": "Baidu",
+        "label_zh": "百度网盘",
+        "driver_aliases": ["baidunetdisk", "baiduphoto", "baidu"],
+        "likely_hashes": ["md5"],
+        "recommended_rate_profile": "safe",
+        "capability_to_targets": {
+            "guangya": {
+                "level": "fast_upload_partial",
+                "recommended_flow": "先跑元数据同步，命中不足时优先留待补传，不要直接大批量下载补传。",
+                "recommended_flow_en": "Start with metadata sync. If hit rate is low, keep pending items instead of aggressive reupload.",
+                "notes": {
+                    "zh": "百度大目录更容易碰到风控、UA 和代理要求，适合慢速、分目录推进。",
+                    "en": "Large Baidu directories are more likely to hit rate control, UA, and proxy requirements. Move slowly by directory.",
+                },
+            }
+        },
+    },
+    "thunder": {
+        "key": "thunder",
+        "label": "Thunder",
+        "label_zh": "迅雷云盘",
+        "driver_aliases": ["thunder", "thunderx", "thunderexpert", "xunlei"],
+        "likely_hashes": ["gcid"],
+        "recommended_rate_profile": "safe",
+        "capability_to_targets": {
+            "guangya": {
+                "level": "fast_upload_partial",
+                "recommended_flow": "优先 GCID 路径，未命中时严格限制补传规模。",
+                "recommended_flow_en": "Prefer the GCID path first, then strictly limit fallback reupload batches.",
+                "notes": {
+                    "zh": "迅雷更常见的是 GCID 而不是 MD5，适合先看元数据分析结果再决定是否继续。",
+                    "en": "Thunder more commonly provides GCID instead of MD5. Check the analysis result before scaling up.",
+                },
+            }
+        },
+    },
+    "aliyundriveopen": {
+        "key": "aliyundriveopen",
+        "label": "AliyunDrive Open",
+        "label_zh": "阿里云盘 Open",
+        "driver_aliases": ["aliyundriveopen", "aliyundrive", "alipan", "aliyun"],
+        "likely_hashes": ["sha1"],
+        "recommended_rate_profile": "balanced",
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先稳定挂载和目录浏览，再评估是否需要补充外部秒传 JSON。",
+                "recommended_flow_en": "Stabilize mounting and browsing first, then decide whether an external fast-upload JSON flow is needed.",
+                "notes": {
+                    "zh": "阿里云盘更常见的是 SHA1 方向，若缺少 MD5 / GCID，则对 Guangya 通常只能补传。",
+                    "en": "AliyunDrive more commonly exposes SHA1-like fingerprints. Without MD5 / GCID, Guangya usually needs reupload fallback.",
+                },
+            }
+        },
+    },
+    "onedrive": {
+        "key": "onedrive",
+        "label": "OneDrive",
+        "label_zh": "OneDrive",
+        "driver_aliases": ["onedrive"],
+        "likely_hashes": [],
+        "recommended_rate_profile": "balanced",
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "以目录浏览和中转上传为主，不默认承诺秒传。",
+                "recommended_flow_en": "Treat it primarily as browse plus relay/upload. Do not promise fast upload by default.",
+                "notes": {
+                    "zh": "若 OpenList 当前不能稳定提供 MD5 / GCID，就不应把 OneDrive 组合宣传成可秒传。",
+                    "en": "If OpenList cannot stably provide MD5 / GCID, the OneDrive combination should not be presented as fast-upload capable.",
+                },
+            }
+        },
+    },
+    "pikpak": {
+        "key": "pikpak",
+        "label": "PikPak",
+        "label_zh": "PikPak",
+        "driver_aliases": ["pikpak"],
+        "likely_hashes": [],
+        "recommended_rate_profile": "balanced",
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "优先先验证浏览稳定性，再按需小规模补传。",
+                "recommended_flow_en": "Verify browsing stability first, then do small fallback batches only when needed.",
+                "notes": {
+                    "zh": "PikPak 的实际快传能力依赖更多平台细节，当前对 Guangya 应按保守策略提示。",
+                    "en": "PikPak fast-upload behavior depends on more platform-specific details, so Guangya should treat it conservatively for now.",
+                },
+            }
+        },
+    },
+    "139yun": {
+        "key": "139yun",
+        "label": "139Yun",
+        "label_zh": "139 云盘",
+        "driver_aliases": ["139yun", "139"],
+        "likely_hashes": [],
+        "recommended_rate_profile": "safe",
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先完成授权参数校验，再谨慎分析哈希情况，不要直接跑整盘。",
+                "recommended_flow_en": "Validate auth parameters first, then analyze hashes carefully. Avoid whole-drive runs immediately.",
+                "notes": {
+                    "zh": "139 更偏浏览器抓参与代理调优型驱动，默认不应承诺对 Guangya 秒传。",
+                    "en": "139Yun is more of a browser-capture and proxy-tuning driver, so it should not promise Guangya fast upload by default.",
+                },
+            }
+        },
+    },
+}
+
+CAPABILITY_LEVEL_ORDER = [
+    "fast_upload_supported",
+    "fast_upload_partial",
+    "relay_supported",
+    "download_upload_only",
+    "unsupported",
+]
+
+
+def _normalize_key(value: str) -> str:
+    return "".join(ch.lower() for ch in str(value or "") if ch.isalnum())
+
 
 def _serialize_driver_guide(guide: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -230,7 +449,7 @@ def _serialize_driver_guide(guide: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_driver_guide(driver: str) -> dict[str, Any] | None:
-    key = "".join(ch.lower() for ch in str(driver or "") if ch.isalnum())
+    key = _normalize_key(driver)
     guide = DRIVER_GUIDES.get(key)
     if guide is None:
         return None
@@ -242,3 +461,85 @@ def list_driver_guides() -> dict[str, dict[str, Any]]:
         key: _serialize_driver_guide(value)
         for key, value in DRIVER_GUIDES.items()
     }
+
+
+def _serialize_target_profile(profile: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "key": str(profile.get("key") or ""),
+        "label": str(profile.get("label") or ""),
+        "labelZh": str(profile.get("label_zh") or ""),
+        "fastUploadHashes": list(profile.get("fast_upload_hashes") or []),
+        "fallbackModes": list(profile.get("fallback_modes") or []),
+        "description": dict(profile.get("description") or {}),
+    }
+
+
+def _serialize_source_profile(profile: dict[str, Any]) -> dict[str, Any]:
+    capability_to_targets = {
+        str(target): {
+            "level": str(value.get("level") or "unsupported"),
+            "recommendedFlow": str(value.get("recommended_flow") or ""),
+            "recommendedFlowEn": str(value.get("recommended_flow_en") or ""),
+            "notes": dict(value.get("notes") or {}),
+        }
+        for target, value in dict(profile.get("capability_to_targets") or {}).items()
+    }
+    return {
+        "key": str(profile.get("key") or ""),
+        "label": str(profile.get("label") or ""),
+        "labelZh": str(profile.get("label_zh") or ""),
+        "driverAliases": list(profile.get("driver_aliases") or []),
+        "likelyHashes": list(profile.get("likely_hashes") or []),
+        "recommendedRateProfile": str(profile.get("recommended_rate_profile") or "safe"),
+        "capabilityToTargets": capability_to_targets,
+    }
+
+
+def list_target_profiles() -> dict[str, dict[str, Any]]:
+    return {
+        key: _serialize_target_profile(value)
+        for key, value in TARGET_PROFILES.items()
+    }
+
+
+def list_source_profiles() -> dict[str, dict[str, Any]]:
+    return {
+        key: _serialize_source_profile(value)
+        for key, value in SOURCE_PROVIDER_PROFILES.items()
+    }
+
+
+def get_source_profile_by_driver(driver: str) -> dict[str, Any]:
+    normalized = _normalize_key(driver)
+    for profile in SOURCE_PROVIDER_PROFILES.values():
+        aliases = [_normalize_key(item) for item in list(profile.get("driver_aliases") or [])]
+        if normalized and normalized in aliases:
+            return _serialize_source_profile(profile)
+    return _serialize_source_profile(SOURCE_PROVIDER_PROFILES["generic"])
+
+
+def build_driver_target_capability(driver: str, target: str = "guangya") -> dict[str, Any]:
+    source_profile = get_source_profile_by_driver(driver)
+    target_key = str(target or "guangya").strip().lower() or "guangya"
+    target_profile = _serialize_target_profile(TARGET_PROFILES.get(target_key, TARGET_PROFILES["guangya"]))
+    target_capability = dict(source_profile.get("capabilityToTargets") or {}).get(target_key, {})
+    level = str(target_capability.get("level") or "unsupported")
+    if level not in CAPABILITY_LEVEL_ORDER:
+        level = "unsupported"
+    return {
+        "driver": str(driver or ""),
+        "sourceProfile": source_profile,
+        "targetProfile": target_profile,
+        "level": level,
+        "recommendedFlow": str(target_capability.get("recommendedFlow") or ""),
+        "recommendedFlowEn": str(target_capability.get("recommendedFlowEn") or ""),
+        "notes": dict(target_capability.get("notes") or {}),
+    }
+
+
+def build_driver_capability_matrix(target: str = "guangya") -> dict[str, dict[str, Any]]:
+    matrix: dict[str, dict[str, Any]] = {}
+    for profile in SOURCE_PROVIDER_PROFILES.values():
+        for alias in list(profile.get("driver_aliases") or []):
+            matrix[_normalize_key(alias)] = build_driver_target_capability(alias, target=target)
+    return matrix

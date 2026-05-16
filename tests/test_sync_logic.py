@@ -493,6 +493,32 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     payload = response.json()
     assert payload["guides"]["aliyundriveopen"]["docUrl"] == "https://doc.oplist.org/guide/drivers/aliyundrive_open"
     assert payload["guides"]["quark"]["defaults"]["web_proxy"] == "true"
+    assert payload["source_profiles"]["189cloud"]["recommendedRateProfile"] == "safe"
+    assert payload["target_profiles"]["guangya"]["fastUploadHashes"] == ["md5", "gcid"]
+    assert payload["driver_matrix"]["thunder"]["level"] == "fast_upload_partial"
+
+
+def test_provider_capability_endpoint_returns_driver_to_guangya_matrix(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/provider/capability", params={"driver": "AliyundriveOpen"})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["driver"] == "AliyundriveOpen"
+    assert payload["sourceProfile"]["key"] == "aliyundriveopen"
+    assert payload["targetProfile"]["key"] == "guangya"
+    assert payload["level"] == "download_upload_only"
 
 
 def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
