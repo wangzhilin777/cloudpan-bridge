@@ -24,6 +24,7 @@ from cloudpan_bridge.syncer import (
     serialize_source_entry,
     summarize_source_entries,
 )
+from cloudpan_bridge.target_adapter import GuangyaTargetAdapter
 from cloudpan_bridge.webapp import (
     build_pending_selected_execution_groups,
     compute_rate_limit_cooldown_ms,
@@ -182,6 +183,25 @@ def test_auto_download_threshold_accepts_small_file_without_md5(tmp_path) -> Non
     runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
     item = build_plan([SourceEntry(path="/src/a.txt", md5="", size=5 * 1024 * 1024, last_op_time="1", hash_type="none")], SyncState())[0][0]
     assert runner._should_auto_download(item) is True
+
+
+def test_sync_runner_builds_guangya_target_adapter(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "guangya_phone": "+86 13800138000"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    adapter = runner._build_target_adapter(SyncState())
+    assert isinstance(adapter, GuangyaTargetAdapter)
+    assert adapter.phone_number == "+86 13800138000"
+    adapter.close()
 
 
 def test_state_supports_pending_and_queue_roundtrip() -> None:

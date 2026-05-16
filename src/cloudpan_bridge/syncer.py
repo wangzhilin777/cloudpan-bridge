@@ -7,9 +7,10 @@ from pathlib import Path, PurePosixPath
 from typing import Callable
 
 from .config import AppConfig
-from .guangya import GuangyaService, extract_access_token
+from .guangya import extract_access_token
 from .models import PendingFileState, QueueItemState, SourceEntry, SyncFileState, SyncPlanItem, SyncState, normalize_posix_path
 from .openlist import OpenListClient
+from .target_adapter import GuangyaTargetAdapter, TargetAdapter
 
 LogFn = Callable[[str], None]
 
@@ -210,10 +211,18 @@ class SyncRunner:
             or extract_access_token(getattr(self.config, "guangya_authorization", ""))
         )
 
+    def _build_target_adapter(self, state: SyncState) -> TargetAdapter:
+        return GuangyaTargetAdapter(
+            access_token=self._guangya_access_token(state),
+            refresh_token=state.guangya_tokens.get("refresh_token", "") or self.config.guangya_refresh_token,
+            device_id=state.guangya_tokens.get("device_id", "") or self.config.guangya_device_id,
+            phone_number=self.config.guangya_phone,
+        )
+
     def run(self, allow_download_upload: bool | None = None, dry_run: bool = False) -> SyncSummary:
         self.config.ensure_parent_dirs()
         state = load_state(self.config.state_file)
-        guangya: GuangyaService | None = None
+        target: TargetAdapter | None = None
 
         try:
             self.source.ensure_login()
@@ -251,17 +260,13 @@ class SyncRunner:
                 self.log("dry-run 模式，不执行实际同步。")
                 return summary
 
-            guangya = GuangyaService(
-                access_token=self._guangya_access_token(state),
-                refresh_token=state.guangya_tokens.get("refresh_token", "") or self.config.guangya_refresh_token,
-                device_id=state.guangya_tokens.get("device_id", "") or self.config.guangya_device_id,
-            )
-            guangya.login_if_needed(self.config.guangya_phone)
-            state.guangya_tokens = guangya.export_tokens()
+            target = self._build_target_adapter(state)
+            target.ensure_auth()
+            state.guangya_tokens = target.export_state()
 
             need_download: list[SyncPlanItem] = []
             for item in plan:
-                if self._try_direct_metadata_sync(item, guangya, state):
+                if self._try_direct_metadata_sync(item, target, state):
                     summary.direct_success += 1
                 elif self._should_auto_download(item):
                     try:
@@ -269,7 +274,7 @@ class SyncRunner:
                             f"[自动补传] {item.source.path} 命中小文件阈值 "
                             f"({self.config.auto_download_threshold_mb} MB)，改走下载后上传"
                         )
-                        self._sync_download_then_upload(item, guangya, state)
+                        self._sync_download_then_upload(item, target, state)
                         summary.downloaded_success += 1
                     except Exception as exc:  # noqa: BLE001
                         summary.failed += 1
@@ -286,7 +291,7 @@ class SyncRunner:
                 if allow_download_upload:
                     for item in need_download:
                         try:
-                            self._sync_download_then_upload(item, guangya, state)
+                            self._sync_download_then_upload(item, target, state)
                             summary.downloaded_success += 1
                         except Exception as exc:  # noqa: BLE001
                             summary.failed += 1
@@ -303,8 +308,8 @@ class SyncRunner:
             self.log(f"同步完成: {summary.to_dict()}")
             return summary
         finally:
-            if guangya is not None:
-                guangya.close()
+            if target is not None:
+                target.close()
             self.source.close()
 
     def analyze(self) -> tuple[list[SourceEntry], list[SyncPlanItem], list[str]]:
@@ -330,7 +335,7 @@ class SyncRunner:
     def run_direct_phase(self) -> SyncSummary:
         self.config.ensure_parent_dirs()
         state = load_state(self.config.state_file)
-        guangya: GuangyaService | None = None
+        target: TargetAdapter | None = None
         try:
             entries, plan, removed_paths = self.analyze()
             summary = SyncSummary(total=len(plan), pending_downloads=[])
@@ -342,17 +347,13 @@ class SyncRunner:
                 self.log("没有检测到需要同步的变更。")
                 return summary
 
-            guangya = GuangyaService(
-                access_token=self._guangya_access_token(state),
-                refresh_token=state.guangya_tokens.get("refresh_token", "") or self.config.guangya_refresh_token,
-                device_id=state.guangya_tokens.get("device_id", "") or self.config.guangya_device_id,
-            )
-            guangya.login_if_needed(self.config.guangya_phone)
-            state.guangya_tokens = guangya.export_tokens()
+            target = self._build_target_adapter(state)
+            target.ensure_auth()
+            state.guangya_tokens = target.export_state()
 
             pending: list[str] = []
             for item in plan:
-                if self._try_direct_metadata_sync(item, guangya, state):
+                if self._try_direct_metadata_sync(item, target, state):
                     summary.direct_success += 1
                 elif self._should_auto_download(item):
                     try:
@@ -360,7 +361,7 @@ class SyncRunner:
                             f"[自动补传] {item.source.path} 命中小文件阈值 "
                             f"({self.config.auto_download_threshold_mb} MB)，改走下载后上传"
                         )
-                        self._sync_download_then_upload(item, guangya, state)
+                        self._sync_download_then_upload(item, target, state)
                         summary.downloaded_success += 1
                     except Exception as exc:  # noqa: BLE001
                         summary.failed += 1
@@ -385,22 +386,18 @@ class SyncRunner:
                 self.log(render_tree(pending))
             return summary
         finally:
-            if guangya is not None:
-                guangya.close()
+            if target is not None:
+                target.close()
             self.source.close()
 
     def run_selected_downloads(self, selected_paths: list[str]) -> SyncSummary:
         self.config.ensure_parent_dirs()
         state = load_state(self.config.state_file)
-        guangya: GuangyaService | None = None
+        target: TargetAdapter | None = None
         try:
-            guangya = GuangyaService(
-                access_token=self._guangya_access_token(state),
-                refresh_token=state.guangya_tokens.get("refresh_token", "") or self.config.guangya_refresh_token,
-                device_id=state.guangya_tokens.get("device_id", "") or self.config.guangya_device_id,
-            )
-            guangya.login_if_needed(self.config.guangya_phone)
-            state.guangya_tokens = guangya.export_tokens()
+            target = self._build_target_adapter(state)
+            target.ensure_auth()
+            state.guangya_tokens = target.export_state()
             self.source.ensure_login()
 
             summary = SyncSummary(source_path=self.config.source_path, total=len(selected_paths), pending_downloads=[])
@@ -423,7 +420,7 @@ class SyncRunner:
                 )
                 item = SyncPlanItem(source=entry, action="update", reason="手动补传")
                 try:
-                    self._sync_download_then_upload(item, guangya, state, source_root_override=pending.source_root or self.source_root_for_target)
+                    self._sync_download_then_upload(item, target, state, source_root_override=pending.source_root or self.source_root_for_target)
                     summary.downloaded_success += 1
                     state.pending_files.pop(path, None)
                 except Exception as exc:  # noqa: BLE001
@@ -442,23 +439,23 @@ class SyncRunner:
             self.log(f"补传阶段完成: {summary.to_dict()}")
             return summary
         finally:
-            if guangya is not None:
-                guangya.close()
+            if target is not None:
+                target.close()
             self.source.close()
 
     def _resolve_target_path(self, source_path: str, source_root_override: str | None = None) -> str:
         return relative_target_path(source_root_override or self.source_root_for_target, source_path, self.config.target_path)
 
-    def _try_direct_metadata_sync(self, item: SyncPlanItem, guangya: GuangyaService, state: SyncState) -> bool:
+    def _try_direct_metadata_sync(self, item: SyncPlanItem, target: TargetAdapter, state: SyncState) -> bool:
         if not item.source.has_fast_upload_fingerprint:
             self.log(f"[无秒传指纹] {item.source.path}: 缺少 MD5/GCID，改走降级路径。")
             return False
         target_path = self._resolve_target_path(item.source.path)
         target_parent = str(PurePosixPath(target_path).parent)
-        target_parent_id = guangya.ensure_directory(target_parent)
-        guangya.delete_if_exists(target_parent_id, item.source.name)
+        target_parent_id = target.ensure_target_dir(target_parent)
+        target.delete_if_exists(target_parent_id, item.source.name)
 
-        result = guangya.try_metadata_import(
+        result = target.try_fast_upload(
             file_name=item.source.name,
             file_size=item.source.size,
             parent_id=target_parent_id,
@@ -475,22 +472,22 @@ class SyncRunner:
     def _sync_download_then_upload(
         self,
         item: SyncPlanItem,
-        guangya: GuangyaService,
+        target: TargetAdapter,
         state: SyncState,
         source_root_override: str | None = None,
     ) -> None:
         target_path = self._resolve_target_path(item.source.path, source_root_override)
         target_parent = str(PurePosixPath(target_path).parent)
-        target_parent_id = guangya.ensure_directory(target_parent)
-        guangya.delete_if_exists(target_parent_id, item.source.name)
+        target_parent_id = target.ensure_target_dir(target_parent)
+        target.delete_if_exists(target_parent_id, item.source.name)
 
         local_path = self.source.download_file(item.source.path, self.config.temp_dir)
         if item.source.md5:
-            guangya.verify_local_md5(local_path, item.source.md5)
+            target.verify_local_md5(local_path, item.source.md5)
         else:
             self.log(f"[跳过 MD5 校验] {item.source.path}: 源端未提供 MD5，仅保留 GCID/其它元数据。")
         self.log(f"[下载补传] {item.source.path} -> {target_path}")
-        guangya.upload_local_file(local_path, target_parent_id, item.source.name)
+        target.upload_local_file(local_path, target_parent_id, item.source.name)
         try:
             local_path.unlink(missing_ok=True)
             self.log(f"[清理临时文件] {local_path}")
