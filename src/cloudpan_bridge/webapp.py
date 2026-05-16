@@ -23,7 +23,7 @@ from .provider_capture import (
     build_driver_prefill_values,
     normalize_provider_capture_entry,
 )
-from .provider_registry import get_driver_guide
+from .provider_registry import get_driver_guide, list_driver_guides
 from .syncer import (
     SyncRunner,
     build_source_miaochuan_payload,
@@ -935,6 +935,12 @@ def create_app(config_path: Path) -> FastAPI:
             "description": spec.description,
             "driver": driver,
             "guide": guide,
+        }
+
+    @app.get("/api/provider/registry")
+    def get_provider_registry() -> dict[str, Any]:
+        return {
+            "guides": list_driver_guides(),
         }
 
     @app.get("/api/openlist/storages")

@@ -217,17 +217,28 @@ DRIVER_GUIDES: dict[str, dict[str, Any]] = {
 }
 
 
-def get_driver_guide(driver: str) -> dict[str, Any] | None:
-    key = "".join(ch.lower() for ch in str(driver or "") if ch.isalnum())
-    guide = DRIVER_GUIDES.get(key)
-    if guide is None:
-        return None
+def _serialize_driver_guide(guide: dict[str, Any]) -> dict[str, Any]:
     return {
-        "doc_url": str(guide.get("doc_url") or ""),
+        "docUrl": str(guide.get("doc_url") or ""),
         "summary": dict(guide.get("summary") or {}),
         "steps": {
             "zh": list((guide.get("steps") or {}).get("zh") or []),
             "en": list((guide.get("steps") or {}).get("en") or []),
         },
         "defaults": dict(guide.get("defaults") or {}),
+    }
+
+
+def get_driver_guide(driver: str) -> dict[str, Any] | None:
+    key = "".join(ch.lower() for ch in str(driver or "") if ch.isalnum())
+    guide = DRIVER_GUIDES.get(key)
+    if guide is None:
+        return None
+    return _serialize_driver_guide(guide)
+
+
+def list_driver_guides() -> dict[str, dict[str, Any]]:
+    return {
+        key: _serialize_driver_guide(value)
+        for key, value in DRIVER_GUIDES.items()
     }
