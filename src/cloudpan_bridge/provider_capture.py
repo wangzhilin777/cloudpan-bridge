@@ -483,6 +483,39 @@ def build_capture_supported_driver_aliases(
     return aliases
 
 
+def build_capture_alias_to_spec_key_map(
+    specs: dict[str, ProviderCaptureSpec] | None = None,
+) -> dict[str, str]:
+    capture_specs = specs or default_provider_specs()
+    alias_map: dict[str, str] = {}
+    for spec_key, spec in capture_specs.items():
+        candidates = [spec_key, spec.key, *(list(spec.recommended_drivers or []))]
+        for item in candidates:
+            normalized = normalize_provider_alias(item)
+            if normalized and normalized not in alias_map:
+                alias_map[normalized] = spec_key
+    return alias_map
+
+
+def resolve_capture_spec_for_driver(
+    driver: str,
+    specs: dict[str, ProviderCaptureSpec] | None = None,
+) -> dict[str, str]:
+    capture_specs = specs or default_provider_specs()
+    alias_map = build_capture_alias_to_spec_key_map(capture_specs)
+    normalized = normalize_provider_alias(driver)
+    spec_key = alias_map.get(normalized, "")
+    spec = capture_specs.get(spec_key) if spec_key else None
+    return {
+        "driver": str(driver or ""),
+        "normalized": normalized,
+        "specKey": spec_key,
+        "matchedAlias": normalized if spec_key else "",
+        "label": str(spec.label) if spec else "",
+        "loginUrl": str(spec.login_url) if spec else "",
+    }
+
+
 class ProviderCaptureManager:
     def __init__(self, base_dir: Path, specs: dict[str, ProviderCaptureSpec] | None = None):
         self.base_dir = base_dir

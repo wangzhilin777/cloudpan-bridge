@@ -12,10 +12,13 @@ from cloudpan_bridge.models import PendingFileState, QueueItemState, SourceEntry
 from cloudpan_bridge.openlist_admin import OpenListDriverField, OpenListDriverInfo, build_storage_payload
 from cloudpan_bridge.openlist import OpenListClient
 from cloudpan_bridge.provider_capture import (
+    build_capture_alias_to_spec_key_map,
+    build_capture_supported_driver_aliases,
     build_driver_capture_spec,
     build_driver_prefill_values,
     default_provider_specs,
     derive_capture_requirements_from_fields,
+    resolve_capture_spec_for_driver,
 )
 from cloudpan_bridge.syncer import (
     SyncRunner,
@@ -331,6 +334,24 @@ def test_default_provider_specs_cover_major_sources() -> None:
     assert "authorization" in specs["139yun"].required_keys
 
 
+def test_capture_alias_registry_resolves_real_spec_keys() -> None:
+    alias_map = build_capture_alias_to_spec_key_map()
+    supported = build_capture_supported_driver_aliases()
+    assert alias_map["aliyundriveopen"] == "aliyundriveopen"
+    assert alias_map["alipan"] == "aliyundriveopen"
+    assert alias_map["baidunetdisk"] == "baidu"
+    assert "quarkopen" in supported
+
+    resolved = resolve_capture_spec_for_driver("AliyunDriveOpen")
+    assert resolved["specKey"] == "aliyundriveopen"
+    assert resolved["matchedAlias"] == "aliyundriveopen"
+    assert resolved["loginUrl"].startswith("https://")
+
+    missing = resolve_capture_spec_for_driver("UnknownDrive")
+    assert missing["specKey"] == ""
+    assert missing["matchedAlias"] == ""
+
+
 def test_openlist_extract_hash_fields_supports_md5_and_gcid() -> None:
     result = OpenListClient._extract_hash_fields(
         {
@@ -593,12 +614,18 @@ def test_provider_coverage_audit_endpoint_reports_registry_and_capture_coverage(
     assert rows["aliyundriveopen"]["hasProfile"] is True
     assert rows["aliyundriveopen"]["hasGuide"] is True
     assert rows["aliyundriveopen"]["hasCapture"] is True
+    assert rows["aliyundriveopen"]["guideDocUrl"].endswith("/aliyundrive_open")
+    assert rows["aliyundriveopen"]["captureSpecKey"] == "aliyundriveopen"
+    assert rows["aliyundriveopen"]["captureMatchedAlias"] == "aliyundriveopen"
+    assert rows["aliyundriveopen"]["captureLoginUrl"].startswith("https://")
     assert rows["aliyundriveopen"]["capabilityLevel"] == "download_upload_only"
     assert rows["aliyundriveopen"]["nextAction"] == "covered"
     assert rows["thunder"]["hasCapability"] is True
+    assert rows["thunder"]["captureSpecKey"] == "thunder"
     assert rows["unknowndrive"]["hasProfile"] is False
     assert rows["unknowndrive"]["hasGuide"] is False
     assert rows["unknowndrive"]["hasCapture"] is False
+    assert rows["unknowndrive"]["captureSpecKey"] == ""
     assert rows["unknowndrive"]["missingItems"] == ["profile", "guide", "capture", "capability"]
     assert rows["unknowndrive"]["nextAction"] == "add_profile_first"
     assert rows["unknowndrive"]["priorityRank"] == 1
@@ -632,6 +659,7 @@ def test_provider_coverage_audit_uses_real_capture_specs_instead_of_profile_alia
     assert row["hasProfile"] is True
     assert row["hasGuide"] is False
     assert row["hasCapture"] is False
+    assert row["captureSpecKey"] == ""
     assert row["hasCapability"] is True
     assert row["missingItems"] == ["guide", "capture"]
     assert row["nextAction"] == "add_guide"
@@ -697,7 +725,7 @@ def test_provider_coverage_audit_markdown_endpoint_renders_backlog_report(tmp_pa
     text = response.text
     assert "# CloudPan Bridge 驱动覆盖审计" in text
     assert "`UnknownDrive` | P1 | add_profile_first" in text
-    assert "| `AliyundriveOpen` | yes | yes | yes | yes | `download_upload_only` |" in text
+    assert "| `AliyundriveOpen` | yes | yes | yes | yes | `download_upload_only` | 4/4 | `covered` | `aliyundriveopen` | - |" in text
 
 
 def test_provider_coverage_audit_markdown_endpoint_renders_filtered_view(tmp_path: Path) -> None:

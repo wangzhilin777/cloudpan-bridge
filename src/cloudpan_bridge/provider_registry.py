@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .provider_capture import build_capture_supported_driver_aliases
+from .provider_capture import build_capture_supported_driver_aliases, resolve_capture_spec_for_driver
 
 
 DRIVER_GUIDES: dict[str, dict[str, Any]] = {
@@ -737,7 +737,8 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
         has_profile = str(profile.get("key") or "") != "generic"
         guide = get_driver_guide(driver)
         has_guide = guide is not None
-        has_capture = normalized in capture_supported_aliases
+        capture_match = resolve_capture_spec_for_driver(driver)
+        has_capture = bool(capture_match.get("specKey")) and normalized in capture_supported_aliases
         capability = matrix.get(normalized)
         capability_level = str((capability or {}).get("level") or "")
         has_capability = bool(capability_level and capability_level != "unsupported")
@@ -778,7 +779,12 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
             "profileKey": str(profile.get("key") or "generic"),
             "hasProfile": has_profile,
             "hasGuide": has_guide,
+            "guideDocUrl": str((guide or {}).get("docUrl") or ""),
             "hasCapture": has_capture,
+            "captureSpecKey": str(capture_match.get("specKey") or ""),
+            "captureMatchedAlias": str(capture_match.get("matchedAlias") or ""),
+            "captureLoginUrl": str(capture_match.get("loginUrl") or ""),
+            "captureLabel": str(capture_match.get("label") or ""),
             "hasCapability": has_capability,
             "capabilityLevel": capability_level or "unsupported",
             "coverageScore": coverage_score,
@@ -914,8 +920,8 @@ def render_driver_coverage_audit_markdown(audit: dict[str, Any]) -> str:
 
     lines.extend(["", "## 全量明细", ""])
     if rows:
-        lines.append("| Driver | Profile | Guide | Capture | Capability | Level | Score | Next | Missing |")
-        lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+        lines.append("| Driver | Profile | Guide | Capture | Capability | Level | Score | Next | Capture Spec | Missing |")
+        lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
         for item in rows:
             lines.append(
                 f"| `{item.get('driver', '-')}` | "
@@ -926,6 +932,7 @@ def render_driver_coverage_audit_markdown(audit: dict[str, Any]) -> str:
                 f"`{item.get('capabilityLevel', 'unsupported')}` | "
                 f"{item.get('coverageScore', 0)}/4 | "
                 f"`{item.get('nextAction', '-')}` | "
+                f"`{item.get('captureSpecKey', '-') or '-'}` | "
                 f"{', '.join(item.get('missingItems') or []) or '-'} |"
             )
     else:
