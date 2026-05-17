@@ -40,6 +40,10 @@
   - `天翼云盘`：Cookie + sessionKey 类字段
   - `百度网盘`：Cookie + `bdstoken`
   - `迅雷云盘`：`Authorization / x-device-id / x-captcha-token / x-client-id`
+  - `阿里云盘 Open`：优先抓 `refresh_token`
+  - `OneDrive`：优先抓 `refresh_token / access_token`
+  - `PikPak`：优先抓 `refresh_token / access_token`
+  - `139 云盘`：优先抓 `Authorization`
 - 支持按当前 OpenList 驱动字段生成“通用网页登录抓取模板”
 - 支持复杂驱动的“接入流程说明 / 官方文档链接 / 推荐默认值”
 - 支持源驱动到 Guangya 的基础能力矩阵提示

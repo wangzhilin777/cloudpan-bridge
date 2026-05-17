@@ -319,10 +319,14 @@ def test_build_storage_payload_serializes_addition_and_types() -> None:
 
 def test_default_provider_specs_cover_major_sources() -> None:
     specs = default_provider_specs()
-    assert {"guangya", "quark", "123pan", "189cloud", "baidu", "thunder"} <= set(specs)
+    assert {"guangya", "quark", "123pan", "189cloud", "baidu", "thunder", "aliyundriveopen", "onedrive", "pikpak", "139yun"} <= set(specs)
     assert "cookie_header" in specs["quark"].required_keys
     assert "bdstoken" in specs["baidu"].required_keys
     assert "authorization" in specs["thunder"].required_keys
+    assert "refresh_token" in specs["aliyundriveopen"].required_keys
+    assert "refresh_token" in specs["onedrive"].required_keys
+    assert "refresh_token" in specs["pikpak"].required_keys
+    assert "authorization" in specs["139yun"].required_keys
 
 
 def test_openlist_extract_hash_fields_supports_md5_and_gcid() -> None:
@@ -501,6 +505,30 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["target_profiles"]["guangya"]["authMode"] == "authorization + access_token + refresh_token + device_id"
     assert payload["target_profiles"]["guangya"]["autoCreateDir"] is True
     assert payload["driver_matrix"]["thunder"]["level"] == "fast_upload_partial"
+
+
+def test_provider_captures_endpoint_includes_complex_driver_specs(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/provider/captures")
+    assert response.status_code == 200
+    payload = response.json()
+    providers = {item["key"]: item for item in payload["providers"]}
+    assert providers["aliyundriveopen"]["recommended_drivers"] == ["AliyundriveOpen", "AliyunDrive", "Alipan"]
+    assert providers["onedrive"]["required_keys"] == ["refresh_token"]
+    assert providers["pikpak"]["login_url"] == "https://mypikpak.com/drive/all"
+    assert providers["139yun"]["required_keys"] == ["authorization"]
 
 
 def test_provider_capability_endpoint_returns_driver_to_guangya_matrix(tmp_path: Path) -> None:

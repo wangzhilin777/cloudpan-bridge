@@ -377,6 +377,85 @@ def default_provider_specs() -> dict[str, ProviderCaptureSpec]:
             """,
             description="抓取迅雷 Authorization、x-device-id、x-captcha-token、x-client-id。",
         ),
+        "aliyundriveopen": ProviderCaptureSpec(
+            key="aliyundriveopen",
+            label="阿里云盘 Open",
+            login_url="https://www.alipan.com/",
+            session_dir="aliyundriveopen",
+            recommended_drivers=["AliyundriveOpen", "AliyunDrive", "Alipan"],
+            domains=["alipan.com", "aliyundrive.com", "api.oplist.org"],
+            required_keys=["refresh_token"],
+            header_aliases=["authorization", "cookie"],
+            storage_aliases=["refresh_token", "access_token", "token", "authorization", "device_id"],
+            page_probe="""
+            return {
+              href: location.href,
+              cookie: document.cookie || "",
+              access_token: window.localStorage.getItem("access_token") || window.sessionStorage.getItem("access_token") || "",
+              refresh_token: window.localStorage.getItem("refresh_token") || window.sessionStorage.getItem("refresh_token") || ""
+            };
+            """,
+            description="优先抓取阿里云盘 Open 的 Refresh Token；如后续仍需在线 API 或开放平台参数，请结合驱动接入说明填写。",
+        ),
+        "onedrive": ProviderCaptureSpec(
+            key="onedrive",
+            label="OneDrive",
+            login_url="https://onedrive.live.com/",
+            session_dir="onedrive",
+            recommended_drivers=["OneDrive"],
+            domains=["onedrive.live.com", "login.live.com", "microsoft.com", "graph.microsoft.com"],
+            required_keys=["refresh_token"],
+            header_aliases=["authorization", "cookie"],
+            storage_aliases=["refresh_token", "access_token", "token", "authorization"],
+            page_probe="""
+            return {
+              href: location.href,
+              cookie: document.cookie || "",
+              access_token: window.localStorage.getItem("access_token") || window.sessionStorage.getItem("access_token") || "",
+              refresh_token: window.localStorage.getItem("refresh_token") || window.sessionStorage.getItem("refresh_token") || ""
+            };
+            """,
+            description="优先抓取 OneDrive 登录态里的 refresh_token / access_token；如果最终仍需 Azure 应用参数，请按驱动说明补齐。",
+        ),
+        "pikpak": ProviderCaptureSpec(
+            key="pikpak",
+            label="PikPak",
+            login_url="https://mypikpak.com/drive/all",
+            session_dir="pikpak",
+            recommended_drivers=["PikPak"],
+            domains=["mypikpak.com", "user.mypikpak.com", "drive.mypikpak.com"],
+            required_keys=["refresh_token"],
+            header_aliases=["authorization", "cookie"],
+            storage_aliases=["refresh_token", "access_token", "token", "authorization", "device_id"],
+            page_probe="""
+            return {
+              href: location.href,
+              cookie: document.cookie || "",
+              access_token: window.localStorage.getItem("access_token") || window.sessionStorage.getItem("access_token") || "",
+              refresh_token: window.localStorage.getItem("refresh_token") || window.sessionStorage.getItem("refresh_token") || ""
+            };
+            """,
+            description="优先抓取 PikPak refresh_token / access_token；若平台差异导致后续异常，再按驱动说明改用对应端来源。",
+        ),
+        "139yun": ProviderCaptureSpec(
+            key="139yun",
+            label="139 云盘",
+            login_url="https://yun.139.com/",
+            session_dir="139yun",
+            recommended_drivers=["139Yun", "139"],
+            domains=["yun.139.com"],
+            required_keys=["authorization"],
+            header_aliases=["authorization", "cookie"],
+            storage_aliases=["authorization", "access_token", "token", "refresh_token"],
+            page_probe="""
+            return {
+              href: location.href,
+              cookie: document.cookie || "",
+              authorization: window.localStorage.getItem("authorization") || window.sessionStorage.getItem("authorization") || ""
+            };
+            """,
+            description="优先抓取 139 云盘 Authorization；目录 ID、代理与更多参数仍建议按驱动接入说明补齐。",
+        ),
     }
 
 

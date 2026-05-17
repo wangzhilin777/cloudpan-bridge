@@ -1681,12 +1681,21 @@
 
     function inferProviderFromDriver(driver) {
       const text = String(driver || "").toLowerCase();
+      const fromDefinitions = (providerDefinitions || []).find((item) => {
+        const list = Array.isArray(item?.recommended_drivers) ? item.recommended_drivers : [];
+        return list.some((name) => String(name || "").toLowerCase() === text);
+      });
+      if (fromDefinitions?.key) return fromDefinitions.key;
       if (!text) return "189cloud";
       if (text.includes("quark")) return "quark";
       if (text.includes("123")) return "123pan";
       if (text.includes("baidu")) return "baidu";
       if (text.includes("thunder") || text.includes("xunlei")) return "thunder";
       if (text.includes("189")) return "189cloud";
+      if (text.includes("aliyun") || text.includes("alipan")) return "aliyundriveopen";
+      if (text.includes("onedrive")) return "onedrive";
+      if (text.includes("pikpak")) return "pikpak";
+      if (text.includes("139")) return "139yun";
       if (text.includes("guangya")) return "guangya";
       if (driverCaptureBlueprint?.key) return driverCaptureBlueprint.key;
       return "189cloud";
