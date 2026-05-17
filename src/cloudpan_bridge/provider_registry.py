@@ -743,6 +743,7 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
         "missingCapability": 0,
         "fullyCovered": 0,
     }
+    backlog: list[dict[str, Any]] = []
     for driver in sorted({str(item or "").strip() for item in drivers if str(item or "").strip()}, key=lambda item: item.lower()):
         normalized = _normalize_key(driver)
         profile = get_source_profile_by_driver(driver)
@@ -774,14 +775,19 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
             gap_buckets["fullyCovered"] += 1
         if not has_profile:
             next_action = "add_profile_first"
+            priority_rank = 1
         elif not has_guide:
             next_action = "add_guide"
+            priority_rank = 2
         elif not has_capture:
             next_action = "add_capture_spec"
+            priority_rank = 3
         elif not has_capability:
             next_action = "assess_target_capability"
+            priority_rank = 4
         else:
             next_action = "covered"
+            priority_rank = 99
         row = {
             "driver": driver,
             "normalized": normalized,
@@ -795,18 +801,32 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
             "docLinks": list(profile.get("docLinks") or []),
             "missingItems": missing_items,
             "nextAction": next_action,
+            "priorityRank": priority_rank,
         }
         rows.append(row)
+        if missing_items:
+            backlog.append(
+                {
+                    "driver": driver,
+                    "normalized": normalized,
+                    "missingItems": missing_items,
+                    "nextAction": next_action,
+                    "priorityRank": priority_rank,
+                    "coverageScore": coverage_score,
+                }
+            )
         totals["total"] += 1
         totals["profile"] += int(has_profile)
         totals["guide"] += int(has_guide)
         totals["capture"] += int(has_capture)
         totals["capability"] += int(has_capability)
+    backlog.sort(key=lambda item: (int(item["priorityRank"]), int(item["coverageScore"]), str(item["driver"]).lower()))
     return {
         "target": target,
         "rows": rows,
         "totals": totals,
         "gapBuckets": gap_buckets,
+        "backlog": backlog,
     }
 
 

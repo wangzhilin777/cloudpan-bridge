@@ -583,8 +583,11 @@ def test_provider_coverage_audit_endpoint_reports_registry_and_capture_coverage(
     assert response.status_code == 200
     payload = response.json()
     rows = {item["normalized"]: item for item in payload["rows"]}
+    backlog = payload["backlog"]
     assert payload["totals"]["total"] == 4
     assert payload["gapBuckets"]["fullyCovered"] >= 1
+    assert backlog[0]["normalized"] == "unknowndrive"
+    assert backlog[0]["priorityRank"] == 1
     assert rows["aliyundriveopen"]["hasProfile"] is True
     assert rows["aliyundriveopen"]["hasGuide"] is True
     assert rows["aliyundriveopen"]["hasCapture"] is True
@@ -596,6 +599,7 @@ def test_provider_coverage_audit_endpoint_reports_registry_and_capture_coverage(
     assert rows["unknowndrive"]["hasCapture"] is False
     assert rows["unknowndrive"]["missingItems"] == ["profile", "guide", "capture", "capability"]
     assert rows["unknowndrive"]["nextAction"] == "add_profile_first"
+    assert rows["unknowndrive"]["priorityRank"] == 1
 
 
 def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Path) -> None:
