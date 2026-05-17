@@ -442,6 +442,31 @@ Guangya 是当前已完成最多的目标端，必须继续保留并增强。
   - 是否优先待补传树
   - 推荐频率节奏与当前目录的动作顺序
 
+## 13.5 当前进展快照
+
+截至 2026-05-17，以下主线已经有可运行落点：
+
+- `Phase 1`
+  - 新仓库、命名、主计划文档已经切到 `CloudPan Bridge`
+- `Phase 2`
+  - `provider_registry.py` 已承载复杂驱动说明、默认值、登录入口、风险提示
+- `Phase 3`
+  - 已有统一指纹模型与 OpenList 哈希字段标准化入口
+- `Phase 4`
+  - Guangya 已抽出目标端适配器基础结构
+- `Phase 5`
+  - 页面已具备驱动覆盖审计、按缺口过滤、导出 JSON/Markdown、优先级 backlog
+  - 覆盖审计已修正为按真实 capture spec 判断，不再把 source profile 误当作已具备抓取支持
+  - 审计结果现在还能追踪 `guideDocUrl / captureSpecKey / captureMatchedAlias / captureLoginUrl`
+- `Phase 6`
+  - 已有静态能力矩阵与基于目录分析结果的动态策略建议
+
+仍未完成的重点：
+
+- OpenList 全驱动 profile / guide / capture / capability 逐项补齐
+- Guangya 之外的目标端适配器继续扩展
+- 更完整的 README 场景建议与最终验收清单收口
+
 ## 14. 验收标准
 
 主计划落地后，每个阶段至少满足：
