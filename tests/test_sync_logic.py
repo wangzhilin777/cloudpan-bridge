@@ -494,7 +494,12 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["guides"]["aliyundriveopen"]["docUrl"] == "https://doc.oplist.org/guide/drivers/aliyundrive_open"
     assert payload["guides"]["quark"]["defaults"]["web_proxy"] == "true"
     assert payload["source_profiles"]["189cloud"]["recommendedRateProfile"] == "safe"
+    assert payload["source_profiles"]["189cloud"]["loginMode"] == "cookie + sessionKey style fields"
+    assert payload["source_profiles"]["quark"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/quark.html"
+    assert payload["source_profiles"]["thunder"]["hashFieldsSupported"] == ["gcid"]
     assert payload["target_profiles"]["guangya"]["fastUploadHashes"] == ["md5", "gcid"]
+    assert payload["target_profiles"]["guangya"]["authMode"] == "authorization + access_token + refresh_token + device_id"
+    assert payload["target_profiles"]["guangya"]["autoCreateDir"] is True
     assert payload["driver_matrix"]["thunder"]["level"] == "fast_upload_partial"
 
 

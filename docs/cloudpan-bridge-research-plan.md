@@ -170,6 +170,16 @@ Guangya 已有基础实现，但还需要继续调研：
 
 - 主计划文档里已经写入了“全 OpenList 驱动 + Guangya”的总方向
 - 复杂驱动说明 registry 已开始落代码
-- 但完整的“前期调研矩阵”还没有逐驱动填实
+- 前期调研产出字段已经开始结构化落地到 `provider_registry.py`
+  - 已覆盖基础字段：
+    - `login_mode`
+    - `hash_fields_supported`
+    - `download_link_supported`
+    - `doc_links`
+    - `capture_strategy`
+    - `default_mount_values`
+    - `risk_notes`
+- 页面 `关于` Tab 也已开始直接可视化这些 registry 数据
+- 但完整的“前期调研矩阵”仍没有对所有 OpenList 驱动逐项填实
 
 所以本文档从现在开始作为独立入口，承接后续所有调研细化工作。

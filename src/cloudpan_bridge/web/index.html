@@ -1376,8 +1376,15 @@
             <div>
               <div>${escapeHtml(item.labelZh || item.label || item.key || "-")}</div>
               <div class="mono">key=${escapeHtml(item.key || "-")} | ${currentLang() === "en" ? "rate" : currentLang() === "mix" ? "频率 / rate" : "频率"}=${escapeHtml(item.recommendedRateProfile || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "login mode" : currentLang() === "mix" ? "登录模式 / login mode" : "登录模式"}=${escapeHtml(item.loginMode || "-")}</div>
               <div class="mono">${currentLang() === "en" ? "hashes" : currentLang() === "mix" ? "哈希 / hashes" : "哈希"}=${escapeHtml((item.likelyHashes || []).join(", ") || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "supported hash fields" : currentLang() === "mix" ? "支持哈希字段 / supported hash fields" : "支持哈希字段"}=${escapeHtml((item.hashFieldsSupported || []).join(", ") || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "download links" : currentLang() === "mix" ? "下载链路 / download links" : "下载链路"}=${escapeHtml(item.downloadLinkSupported || "-")}</div>
               <div class="mono">${currentLang() === "en" ? "aliases" : currentLang() === "mix" ? "驱动别名 / aliases" : "驱动别名"}=${escapeHtml((item.driverAliases || []).join(", ") || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "capture strategy" : currentLang() === "mix" ? "抓取策略 / capture strategy" : "抓取策略"}=${escapeHtml((currentLang() === "en" ? item.captureStrategyEn : currentLang() === "mix" ? `${item.captureStrategy || ""} / ${item.captureStrategyEn || ""}`.trim() : item.captureStrategy) || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "default mount values" : currentLang() === "mix" ? "默认挂载值 / default mount values" : "默认挂载值"}=${escapeHtml(JSON.stringify(item.defaultMountValues || {}))}</div>
+              <div class="mono">${currentLang() === "en" ? "doc links" : currentLang() === "mix" ? "文档链接 / doc links" : "文档链接"}=${escapeHtml((item.docLinks || []).join(", ") || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "risk notes" : currentLang() === "mix" ? "风险说明 / risk notes" : "风险说明"}=${escapeHtml((currentLang() === "en" ? item.riskNotes?.en : currentLang() === "mix" ? `${item.riskNotes?.zh || ""} / ${item.riskNotes?.en || ""}`.trim() : item.riskNotes?.zh) || "-")}</div>
             </div>
           </div>
         `).join("");
@@ -1391,8 +1398,12 @@
             <div>
               <div>${escapeHtml(item.labelZh || item.label || item.key || "-")}</div>
               <div class="mono">key=${escapeHtml(item.key || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "auth mode" : currentLang() === "mix" ? "鉴权模式 / auth mode" : "鉴权模式"}=${escapeHtml(item.authMode || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "token refresh" : currentLang() === "mix" ? "刷新方式 / token refresh" : "刷新方式"}=${escapeHtml(item.tokenRefresh || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "auto create dir" : currentLang() === "mix" ? "自动建目录 / auto create dir" : "自动建目录"}=${item.autoCreateDir ? "true" : "false"}</div>
               <div class="mono">${currentLang() === "en" ? "fast hashes" : currentLang() === "mix" ? "快传指纹 / fast hashes" : "快传指纹"}=${escapeHtml((item.fastUploadHashes || []).join(", ") || "-")}</div>
               <div class="mono">${currentLang() === "en" ? "fallback" : currentLang() === "mix" ? "降级方式 / fallback" : "降级方式"}=${escapeHtml((item.fallbackModes || []).join(", ") || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "research notes" : currentLang() === "mix" ? "调研备注 / research notes" : "调研备注"}=${escapeHtml((currentLang() === "en" ? item.researchNotes?.en : currentLang() === "mix" ? `${item.researchNotes?.zh || ""} / ${item.researchNotes?.en || ""}`.trim() : item.researchNotes?.zh) || "-")}</div>
             </div>
           </div>
         `).join("");

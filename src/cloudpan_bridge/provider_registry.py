@@ -221,11 +221,18 @@ TARGET_PROFILES: dict[str, dict[str, Any]] = {
         "key": "guangya",
         "label": "Guangya",
         "label_zh": "光鸭云盘",
+        "auth_mode": "authorization + access_token + refresh_token + device_id",
+        "token_refresh": "refresh_token rotating",
+        "auto_create_dir": True,
         "fast_upload_hashes": ["md5", "gcid"],
         "fallback_modes": ["stream_upload", "download_upload"],
         "description": {
             "zh": "当前首个正式目标端。优先尝试 MD5 / GCID 元数据秒传，未命中再降级到补传。",
             "en": "Current primary target adapter. It tries MD5 / GCID metadata-based fast upload first, then falls back to reupload.",
+        },
+        "research_notes": {
+            "zh": "已验证 token 写回、目录自动创建、下载补传与元数据秒传基础链路。后续仍需继续补强 token 刷新时机与更细的接口兼容性矩阵。",
+            "en": "Token persistence, auto directory creation, reupload fallback, and metadata-based fast upload are already wired. More token-refresh timing and API compatibility details still need expansion.",
         },
     }
 }
@@ -236,8 +243,19 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
         "label": "Generic OpenList Source",
         "label_zh": "通用 OpenList 源",
         "driver_aliases": [],
+        "login_mode": "dynamic form or generic web capture",
         "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "unknown",
+        "capture_strategy": "先用当前 OpenList driver 字段生成通用抓取模板，再人工验证。",
+        "capture_strategy_en": "Generate a generic capture template from current OpenList driver fields, then validate manually.",
+        "doc_links": [],
+        "default_mount_values": {},
         "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "未知驱动一律按保守模式处理，不能默认承诺秒传。",
+            "en": "Unknown drivers are always treated conservatively and should never promise fast upload by default.",
+        },
         "capability_to_targets": {
             "guangya": {
                 "level": "download_upload_only",
@@ -255,8 +273,19 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
         "label": "189Cloud",
         "label_zh": "天翼云盘",
         "driver_aliases": ["189cloud", "189cloudpc", "189cloudtv"],
+        "login_mode": "cookie + sessionKey style fields",
         "likely_hashes": ["md5"],
+        "hash_fields_supported": ["md5"],
+        "download_link_supported": "stable",
+        "capture_strategy": "优先抓 Cookie 与 sessionKey，再回填挂载表单。",
+        "capture_strategy_en": "Capture Cookie and sessionKey first, then prefill mount fields.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/189cloud"],
+        "default_mount_values": {},
         "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "整盘和相册类目录扫描要控制频率，建议先从具体业务目录开始。",
+            "en": "Whole-drive and album-like scans should be throttled. Start from concrete working directories first.",
+        },
         "capability_to_targets": {
             "guangya": {
                 "level": "fast_upload_partial",
@@ -274,8 +303,23 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
         "label": "Quark",
         "label_zh": "夸克网盘",
         "driver_aliases": ["quark", "quarkopen", "quarktv"],
+        "login_mode": "cookie focused",
         "likely_hashes": ["md5"],
+        "hash_fields_supported": ["md5"],
+        "download_link_supported": "proxy_sensitive",
+        "capture_strategy": "网页端抓 Cookie，必要时补齐请求头，并优先启用本机代理策略。",
+        "capture_strategy_en": "Capture Cookie from the web session, add missing headers if needed, and prefer native/local proxy policy.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/quark.html"],
+        "default_mount_values": {
+            "web_proxy": "true",
+            "webdav_policy": "native_proxy",
+            "proxy_range": "true",
+        },
         "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "夸克对代理与风控更敏感，不适合一开始就跑高并发补传。",
+            "en": "Quark is more sensitive to proxy and rate-control issues, so avoid aggressive fallback concurrency.",
+        },
         "capability_to_targets": {
             "guangya": {
                 "level": "fast_upload_partial",
@@ -293,8 +337,21 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
         "label": "123Pan",
         "label_zh": "123 网盘",
         "driver_aliases": ["123pan", "123open"],
+        "login_mode": "developer credentials or cookie capture fallback",
         "likely_hashes": ["md5"],
+        "hash_fields_supported": ["md5"],
+        "download_link_supported": "conditional",
+        "capture_strategy": "Open 驱动优先走开发者参数；普通场景可先抓 Cookie 与常见 token 字段。",
+        "capture_strategy_en": "Prefer developer credentials for Open drivers; otherwise capture Cookie and common token fields first.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/123_open"],
+        "default_mount_values": {
+            "root_folder_id": "0",
+        },
         "recommended_rate_profile": "balanced",
+        "risk_notes": {
+            "zh": "哈希可用性受开放平台参数影响，建议先小目录验证。",
+            "en": "Hash availability depends on open-platform parameters, so verify with a small directory first.",
+        },
         "capability_to_targets": {
             "guangya": {
                 "level": "fast_upload_partial",
@@ -312,8 +369,23 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
         "label": "Baidu",
         "label_zh": "百度网盘",
         "driver_aliases": ["baidunetdisk", "baiduphoto", "baidu"],
+        "login_mode": "refresh token / online api / cookie helpers",
         "likely_hashes": ["md5"],
+        "hash_fields_supported": ["md5"],
+        "download_link_supported": "ua_or_proxy_sensitive",
+        "capture_strategy": "优先官方 token 工具或在线 API 方案，Cookie 抓取只作为补充。",
+        "capture_strategy_en": "Prefer official token tool or online API flow. Treat Cookie capture only as a supplement.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/baidu"],
+        "default_mount_values": {
+            "use_online_api": "true",
+            "root_folder_path": "/",
+            "web_proxy": "true",
+        },
         "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "百度大文件和大目录更容易碰到 UA、代理和风控要求。",
+            "en": "Large Baidu files and directories are more likely to hit UA, proxy, and rate-control constraints.",
+        },
         "capability_to_targets": {
             "guangya": {
                 "level": "fast_upload_partial",
@@ -331,8 +403,21 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
         "label": "Thunder",
         "label_zh": "迅雷云盘",
         "driver_aliases": ["thunder", "thunderx", "thunderexpert", "xunlei"],
+        "login_mode": "authorization + device/client headers",
         "likely_hashes": ["gcid"],
+        "hash_fields_supported": ["gcid"],
+        "download_link_supported": "header_sensitive",
+        "capture_strategy": "优先抓 Authorization、x-device-id、x-client-id、x-captcha-token 等完整头信息。",
+        "capture_strategy_en": "Capture full Authorization, x-device-id, x-client-id, x-captcha-token, and similar headers first.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/thunder"],
+        "default_mount_values": {
+            "proxy_range": "true",
+        },
         "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "更常见的是 GCID，不是 MD5；逆向驱动对参数完整性更敏感。",
+            "en": "GCID is more common than MD5 here, and reverse-engineered drivers are more sensitive to missing parameters.",
+        },
         "capability_to_targets": {
             "guangya": {
                 "level": "fast_upload_partial",
@@ -350,8 +435,23 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
         "label": "AliyunDrive Open",
         "label_zh": "阿里云盘 Open",
         "driver_aliases": ["aliyundriveopen", "aliyundrive", "alipan", "aliyun"],
+        "login_mode": "refresh token + online api or own open platform app",
         "likely_hashes": ["sha1"],
+        "hash_fields_supported": ["sha1"],
+        "download_link_supported": "stable",
+        "capture_strategy": "优先走 OpenList 官方文档推荐的刷新令牌 / 在线 API 流程。",
+        "capture_strategy_en": "Prefer the refresh-token / online-API flow recommended by the OpenList documentation.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/aliyundrive_open"],
+        "default_mount_values": {
+            "root_folder_id": "root",
+            "use_online_api": "true",
+            "api_url": "https://api.oplist.org/alicloud/renewapi",
+        },
         "recommended_rate_profile": "balanced",
+        "risk_notes": {
+            "zh": "当前更偏 SHA1 指纹链路，若无 MD5 / GCID，对 Guangya 默认按补传处理。",
+            "en": "This profile is currently more SHA1-oriented. Without MD5 or GCID, Guangya should default to fallback reupload.",
+        },
         "capability_to_targets": {
             "guangya": {
                 "level": "download_upload_only",
@@ -369,8 +469,22 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
         "label": "OneDrive",
         "label_zh": "OneDrive",
         "driver_aliases": ["onedrive"],
+        "login_mode": "online api or own Azure app",
         "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "stable",
+        "capture_strategy": "优先使用在线 API 或 Azure 应用配置，网页登录抓取不是主路径。",
+        "capture_strategy_en": "Prefer online API or Azure application configuration. Web capture is not the primary path.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/onedrive"],
+        "default_mount_values": {
+            "use_online_api": "true",
+            "chunk_size": "5",
+        },
         "recommended_rate_profile": "balanced",
+        "risk_notes": {
+            "zh": "若当前驱动不能稳定提供 MD5 / GCID，就不应宣传成对 Guangya 可秒传。",
+            "en": "If the current driver cannot provide MD5 or GCID stably, it must not be presented as Guangya fast-upload capable.",
+        },
         "capability_to_targets": {
             "guangya": {
                 "level": "download_upload_only",
@@ -388,8 +502,21 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
         "label": "PikPak",
         "label_zh": "PikPak",
         "driver_aliases": ["pikpak"],
+        "login_mode": "account password or refresh token",
         "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "conditional",
+        "capture_strategy": "先尝试账号密码，再按官方方案补充平台对应的 refresh token。",
+        "capture_strategy_en": "Try account-password first, then add a platform-matching refresh token if needed.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/pikpak.html"],
+        "default_mount_values": {
+            "root_folder_id": "root",
+        },
         "recommended_rate_profile": "balanced",
+        "risk_notes": {
+            "zh": "实际快传能力受平台细节影响更大，当前应按保守策略处理。",
+            "en": "Actual fast-upload behavior depends more on platform-specific details, so treat it conservatively for now.",
+        },
         "capability_to_targets": {
             "guangya": {
                 "level": "download_upload_only",
@@ -407,8 +534,21 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
         "label": "139Yun",
         "label_zh": "139 云盘",
         "driver_aliases": ["139yun", "139"],
+        "login_mode": "browser devtools capture",
         "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "proxy_sensitive",
+        "capture_strategy": "通过浏览器开发者工具抓 Authorization、目录 ID 和代理相关参数。",
+        "capture_strategy_en": "Use browser DevTools to capture Authorization, folder IDs, and proxy-related parameters.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/139.html"],
+        "default_mount_values": {
+            "proxy_range": "true",
+        },
         "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "偏浏览器抓参与代理调优型驱动，默认不应承诺对 Guangya 秒传。",
+            "en": "This is more of a browser-capture and proxy-tuning driver, so it should not promise Guangya fast upload by default.",
+        },
         "capability_to_targets": {
             "guangya": {
                 "level": "download_upload_only",
@@ -468,9 +608,13 @@ def _serialize_target_profile(profile: dict[str, Any]) -> dict[str, Any]:
         "key": str(profile.get("key") or ""),
         "label": str(profile.get("label") or ""),
         "labelZh": str(profile.get("label_zh") or ""),
+        "authMode": str(profile.get("auth_mode") or ""),
+        "tokenRefresh": str(profile.get("token_refresh") or ""),
+        "autoCreateDir": bool(profile.get("auto_create_dir", False)),
         "fastUploadHashes": list(profile.get("fast_upload_hashes") or []),
         "fallbackModes": list(profile.get("fallback_modes") or []),
         "description": dict(profile.get("description") or {}),
+        "researchNotes": dict(profile.get("research_notes") or {}),
     }
 
 
@@ -489,8 +633,16 @@ def _serialize_source_profile(profile: dict[str, Any]) -> dict[str, Any]:
         "label": str(profile.get("label") or ""),
         "labelZh": str(profile.get("label_zh") or ""),
         "driverAliases": list(profile.get("driver_aliases") or []),
+        "loginMode": str(profile.get("login_mode") or ""),
         "likelyHashes": list(profile.get("likely_hashes") or []),
+        "hashFieldsSupported": list(profile.get("hash_fields_supported") or []),
+        "downloadLinkSupported": str(profile.get("download_link_supported") or ""),
+        "captureStrategy": str(profile.get("capture_strategy") or ""),
+        "captureStrategyEn": str(profile.get("capture_strategy_en") or ""),
+        "docLinks": list(profile.get("doc_links") or []),
+        "defaultMountValues": dict(profile.get("default_mount_values") or {}),
         "recommendedRateProfile": str(profile.get("recommended_rate_profile") or "safe"),
+        "riskNotes": dict(profile.get("risk_notes") or {}),
         "capabilityToTargets": capability_to_targets,
     }
 
