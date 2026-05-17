@@ -670,6 +670,18 @@ def get_source_profile_by_driver(driver: str) -> dict[str, Any]:
     return _serialize_source_profile(SOURCE_PROVIDER_PROFILES["generic"])
 
 
+def get_source_profile_by_key_or_alias(value: str) -> dict[str, Any]:
+    normalized = _normalize_key(value)
+    if not normalized:
+        return _serialize_source_profile(SOURCE_PROVIDER_PROFILES["generic"])
+    for profile in SOURCE_PROVIDER_PROFILES.values():
+        profile_key = _normalize_key(profile.get("key") or "")
+        aliases = [_normalize_key(item) for item in list(profile.get("driver_aliases") or [])]
+        if normalized == profile_key or normalized in aliases:
+            return _serialize_source_profile(profile)
+    return _serialize_source_profile(SOURCE_PROVIDER_PROFILES["generic"])
+
+
 def build_driver_target_capability(driver: str, target: str = "guangya") -> dict[str, Any]:
     source_profile = get_source_profile_by_driver(driver)
     target_key = str(target or "guangya").strip().lower() or "guangya"

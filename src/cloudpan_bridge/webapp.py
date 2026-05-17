@@ -28,6 +28,7 @@ from .provider_registry import (
     build_driver_capability_matrix,
     build_driver_target_capability,
     get_driver_guide,
+    get_source_profile_by_key_or_alias,
     list_driver_guides,
     list_source_profiles,
     list_target_profiles,
@@ -1077,8 +1078,17 @@ def create_app(config_path: Path) -> FastAPI:
     @app.get("/api/provider/captures")
     def get_provider_captures() -> dict[str, Any]:
         persist_provider_captures_to_config()
+        providers = []
+        for item in provider_capture.definitions_payload():
+            profile = get_source_profile_by_key_or_alias(str(item.get("key") or ""))
+            providers.append(
+                {
+                    **item,
+                    "source_profile": profile,
+                }
+            )
         return {
-            "providers": provider_capture.definitions_payload(),
+            "providers": providers,
             "snapshots": merged_provider_capture_snapshots(),
         }
 

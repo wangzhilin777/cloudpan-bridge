@@ -1763,6 +1763,15 @@
       const recommended = Array.isArray(definition?.recommended_drivers) && definition.recommended_drivers.length
         ? definition.recommended_drivers
         : (PROVIDER_DRIVER_HINTS[provider] || []);
+      const profile = definition?.source_profile || {};
+      const loginModeText = currentLang() === "en"
+        ? (profile.loginMode || "")
+        : currentLang() === "mix"
+          ? `${profile.loginMode || ""} / ${profile.loginMode || ""}`.trim()
+          : (profile.loginMode || "");
+      const hashText = Array.isArray(profile.hashFieldsSupported) ? profile.hashFieldsSupported.join(", ") : "";
+      const docLinks = Array.isArray(profile.docLinks) ? profile.docLinks : [];
+      const rateText = profile.recommendedRateProfile || "";
       const lines = requiredKeys.length
         ? requiredKeys.map((key) => `<div class="mono">${escapeHtml(key)}: ${fieldStatus(captured[key])}${captured[key] ? ` | ${escapeHtml(maskValue(captured[key]))}` : ""}</div>`).join("")
         : `<div class="mono">${currentLang() === "en" ? "No required fields declared." : currentLang() === "mix" ? "未声明必需字段 / No required fields declared." : "未声明必需字段。"}</div>`;
@@ -1770,6 +1779,10 @@
         <div>${escapeHtml(definition?.description || "")}</div>
         <div class="mono">${currentLang() === "en" ? "Login URL" : currentLang() === "mix" ? "登录地址 / Login URL" : "登录地址"}: ${escapeHtml(definition?.login_url || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Recommended drivers" : currentLang() === "mix" ? "建议驱动 / Recommended drivers" : "建议驱动"}: ${escapeHtml(recommended.join(", ") || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Login mode" : currentLang() === "mix" ? "登录模式 / Login mode" : "登录模式"}: ${escapeHtml(loginModeText || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Recommended rate" : currentLang() === "mix" ? "推荐频率 / Recommended rate" : "推荐频率"}: ${escapeHtml(rateText || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Hash fields" : currentLang() === "mix" ? "哈希字段 / Hash fields" : "哈希字段"}: ${escapeHtml(hashText || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Docs" : currentLang() === "mix" ? "文档 / Docs" : "文档"}: ${docLinks.length ? docLinks.map((link) => `<a href="${escapeHtml(link)}" target="_blank" rel="noreferrer">${escapeHtml(link)}</a>`).join("<br>") : "-"}</div>
       `;
       const loginUrlInput = document.getElementById("provider-login-url");
       if (loginUrlInput) {
