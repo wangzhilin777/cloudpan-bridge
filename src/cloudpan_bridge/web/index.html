@@ -732,6 +732,15 @@
             <h2 data-i18n="panel.coverage_audit">驱动覆盖审计</h2>
             <div class="subtle" data-i18n="desc.coverage_audit">这里会把当前 OpenList 实际驱动列表和内置 registry 对比，直接看出哪些驱动已经具备 profile、guide、capture、capability，方便后续继续补全。</div>
             <div class="actions">
+              <label class="checkbox-inline"><input type="checkbox" id="coverage-only-gaps"> 只看有缺口</label>
+              <select id="coverage-next-action-filter" style="width:auto;min-width:220px;">
+                <option value="">全部下一步</option>
+                <option value="add_profile_first">先补 source profile</option>
+                <option value="add_guide">补接入流程说明</option>
+                <option value="add_capture_spec">补登录抓取定义</option>
+                <option value="assess_target_capability">补目标能力判断</option>
+                <option value="covered">当前已覆盖</option>
+              </select>
               <button class="secondary" id="export-coverage-json" data-i18n="btn.export_coverage_json">导出覆盖审计 JSON</button>
               <button class="secondary" id="export-coverage-md" data-i18n="btn.export_coverage_md">导出覆盖审计 Markdown</button>
             </div>
@@ -1112,6 +1121,13 @@
     let currentDriverGuide = null;
     let currentProviderGuide = null;
     let coverageAuditCache = null;
+
+    function currentCoverageFilters() {
+      return {
+        onlyGaps: Boolean(document.getElementById("coverage-only-gaps")?.checked),
+        nextAction: String(document.getElementById("coverage-next-action-filter")?.value || ""),
+      };
+    }
     const PROVIDER_DRIVER_HINTS = {
       "189cloud": ["189Cloud", "189CloudPC", "189CloudTV"],
       "quark": ["Quark", "QuarkOpen", "QuarkTV"],
@@ -1660,6 +1676,17 @@
       const auditTotals = coverageAuditCache?.totals || {};
       const gapBuckets = coverageAuditCache?.gapBuckets || {};
       const backlog = Array.isArray(coverageAuditCache?.backlog) ? coverageAuditCache.backlog : [];
+      const filters = currentCoverageFilters();
+      const filteredAuditRows = auditRows.filter((item) => {
+        if (filters.onlyGaps && (!Array.isArray(item.missingItems) || !item.missingItems.length)) return false;
+        if (filters.nextAction && String(item.nextAction || "") !== filters.nextAction) return false;
+        return true;
+      });
+      const filteredBacklog = backlog.filter((item) => {
+        if (filters.onlyGaps && (!Array.isArray(item.missingItems) || !item.missingItems.length)) return false;
+        if (filters.nextAction && String(item.nextAction || "") !== filters.nextAction) return false;
+        return true;
+      });
       if (!auditRows.length) {
         coverageBacklogRoot.textContent = currentLang() === "en"
           ? "The prioritized backlog will appear after the OpenList driver list is loaded."
@@ -1672,15 +1699,15 @@
             ? "驱动列表载入后，这里会显示覆盖审计结果。 / Coverage audit will appear after drivers are loaded."
             : "驱动列表载入后，这里会显示覆盖审计结果。";
       } else {
-        coverageBacklogRoot.innerHTML = backlog.length
-          ? backlog.slice(0, 12).map((item, index) => `
+        coverageBacklogRoot.innerHTML = filteredBacklog.length
+          ? filteredBacklog.slice(0, 12).map((item, index) => `
               <div class="mono">${index + 1}. ${escapeHtml(item.driver || "-")} | P${item.priorityRank ?? "-"} | ${escapeHtml(coverageNextActionText(item.nextAction || ""))} | ${escapeHtml((item.missingItems || []).join(", ") || "-")}</div>
             `).join("")
           : (currentLang() === "en"
-            ? "All currently loaded OpenList drivers are fully covered."
+            ? "No backlog items match the current filter."
             : currentLang() === "mix"
-              ? "当前已加载驱动都已覆盖。 / All currently loaded drivers are fully covered."
-              : "当前已加载驱动都已覆盖。");
+              ? "当前筛选条件下没有 backlog 项。 / No backlog items match the current filter."
+              : "当前筛选条件下没有 backlog 项。");
         coverageRoot.innerHTML = `
           <div class="subtle" style="margin-bottom:10px;">
             ${currentLang() === "en"
@@ -1696,7 +1723,14 @@
                 ? `完全覆盖 / fully covered=${gapBuckets.fullyCovered ?? 0}, 缺 profile / missing profile=${gapBuckets.missingProfile ?? 0}, 缺 guide / missing guide=${gapBuckets.missingGuide ?? 0}, 缺 capture / missing capture=${gapBuckets.missingCapture ?? 0}, 缺 capability / missing capability=${gapBuckets.missingCapability ?? 0}`
                 : `完全覆盖=${gapBuckets.fullyCovered ?? 0}，缺 profile=${gapBuckets.missingProfile ?? 0}，缺 guide=${gapBuckets.missingGuide ?? 0}，缺 capture=${gapBuckets.missingCapture ?? 0}，缺 capability=${gapBuckets.missingCapability ?? 0}`}
           </div>
-          ${auditRows.map((item) => `
+          <div class="subtle" style="margin-bottom:10px;">
+            ${currentLang() === "en"
+              ? `Visible rows=${filteredAuditRows.length}`
+              : currentLang() === "mix"
+                ? `当前可见条目 / Visible rows=${filteredAuditRows.length}`
+                : `当前可见条目=${filteredAuditRows.length}`}
+          </div>
+          ${filteredAuditRows.map((item) => `
             <div class="row-item">
               <div>
                 <div>${escapeHtml(item.driver || "-")}</div>
@@ -2938,6 +2972,8 @@
       document.getElementById("driver-guide-dialog").addEventListener("click", (event) => {
         if (event.target?.id === "driver-guide-dialog") toggleDriverGuideDialog(false);
       });
+      document.getElementById("coverage-only-gaps").addEventListener("change", () => renderAboutRegistry());
+      document.getElementById("coverage-next-action-filter").addEventListener("change", () => renderAboutRegistry());
       document.getElementById("export-coverage-json").onclick = async () => {
         if (!coverageAuditCache) {
           await refreshCoverageAudit();
