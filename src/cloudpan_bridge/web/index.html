@@ -1084,6 +1084,7 @@
     let sourceAnalyzeCache = null;
     let providerDefinitions = [];
     let providerSnapshots = {};
+    let capabilityAssessmentCache = null;
     let driverCaptureBlueprint = null;
     let currentDriverGuide = null;
     const PROVIDER_DRIVER_HINTS = {
@@ -1265,6 +1266,29 @@
       driverGuideRegistry = data?.guides || {};
       renderCapabilitySummary();
       renderAboutRegistry();
+      await refreshCapabilityAssessment();
+    }
+
+    async function refreshCapabilityAssessment() {
+      const context = currentDriverContext();
+      if (!context.driver) {
+        capabilityAssessmentCache = null;
+        renderCapabilitySummary();
+        return;
+      }
+      try {
+        capabilityAssessmentCache = await call("/api/provider/capability_assess", {
+          method: "POST",
+          body: JSON.stringify({
+            driver: context.driver,
+            target: "guangya",
+            analysis_summary: sourceAnalyzeCache?.summary || {},
+          }),
+        });
+      } catch (_error) {
+        capabilityAssessmentCache = null;
+      }
+      renderCapabilitySummary();
     }
 
     function currentDriverContext() {
@@ -1313,6 +1337,9 @@
       const normalized = normalizeDriverKey(context.driver || "");
       const matrix = providerRegistryPayload?.driver_matrix || {};
       const capability = matrix[normalized] || null;
+      const assessment = capabilityAssessmentCache && normalizeDriverKey(capabilityAssessmentCache.driver || "") === normalized
+        ? capabilityAssessmentCache
+        : null;
       if (!capability) {
         root.innerHTML = currentLang() === "en"
           ? "No capability matrix matched for the current driver yet. Treat it conservatively and verify hash availability first."
@@ -1324,6 +1351,8 @@
       const sourceProfile = capability.sourceProfile || {};
       const targetProfile = capability.targetProfile || {};
       const notes = capability.notes || {};
+      const assessedLevel = assessment?.assessedLevel || capability.level;
+      const rationale = assessment?.rationale || {};
       const likelyHashes = Array.isArray(sourceProfile.likelyHashes) ? sourceProfile.likelyHashes : [];
       const analysisSummary = sourceAnalyzeCache?.summary || {};
       const analysisLine = sourceAnalyzeCache
@@ -1339,13 +1368,20 @@
         : currentLang() === "mix"
           ? `${notes.zh || ""} / ${notes.en || ""}`.trim()
           : (notes.zh || "");
+      const rationaleText = currentLang() === "en"
+        ? (rationale.en || "")
+        : currentLang() === "mix"
+          ? `${rationale.zh || ""} / ${rationale.en || ""}`.trim()
+          : (rationale.zh || "");
       root.innerHTML = `
         <div><strong>${escapeHtml(context.driver || "-")}</strong> -> <strong>${escapeHtml(targetProfile.labelZh || targetProfile.label || "Guangya")}</strong></div>
-        <div class="mono">${currentLang() === "en" ? "Capability level" : currentLang() === "mix" ? "能力等级 / Capability level" : "能力等级"}: ${escapeHtml(capabilityLevelText(capability.level))}</div>
+        <div class="mono">${currentLang() === "en" ? "Capability level" : currentLang() === "mix" ? "静态等级 / Capability level" : "静态等级"}: ${escapeHtml(capabilityLevelText(capability.level))}</div>
+        <div class="mono">${currentLang() === "en" ? "Runtime assessment" : currentLang() === "mix" ? "动态判断 / Runtime assessment" : "动态判断"}: ${escapeHtml(capabilityLevelText(assessedLevel))}</div>
         <div class="mono">${currentLang() === "en" ? "Likely hashes" : currentLang() === "mix" ? "常见哈希 / Likely hashes" : "常见哈希"}: ${escapeHtml(likelyHashes.join(", ") || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Recommended rate profile" : currentLang() === "mix" ? "推荐频率 / Recommended rate profile" : "推荐频率"}: ${escapeHtml(sourceProfile.recommendedRateProfile || "-")}</div>
         <div class="mono">${escapeHtml(analysisLine)}</div>
         <div class="mono">${currentLang() === "en" ? "Suggested path" : currentLang() === "mix" ? "建议路径 / Suggested path" : "建议路径"}: ${escapeHtml(recommendedFlow || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Runtime rationale" : currentLang() === "mix" ? "动态理由 / Runtime rationale" : "动态理由"}: ${escapeHtml(rationaleText || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Notes" : currentLang() === "mix" ? "说明 / Notes" : "说明"}: ${escapeHtml(notesText || "-")}</div>
       `;
     }
@@ -2207,6 +2243,7 @@
       renderProviderOptions(providerDefinitions);
       applyProviderSelectionFromDriver(driver);
       renderCapabilitySummary();
+      await refreshCapabilityAssessment();
     }
 
     async function refreshStorages() {
@@ -2288,6 +2325,7 @@
       });
       renderSourceAnalyze(data);
       renderCapabilitySummary();
+      await refreshCapabilityAssessment();
       setNotice("source-analyze-notice", currentLang() === "en"
         ? `Analysis finished: ${data.summary?.total ?? 0} files scanned.`
         : currentLang() === "mix"

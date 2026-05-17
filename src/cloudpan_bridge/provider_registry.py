@@ -695,3 +695,66 @@ def build_driver_capability_matrix(target: str = "guangya") -> dict[str, dict[st
         for alias in list(profile.get("driver_aliases") or []):
             matrix[_normalize_key(alias)] = build_driver_target_capability(alias, target=target)
     return matrix
+
+
+def assess_driver_target_capability(
+    driver: str,
+    analysis_summary: dict[str, Any] | None = None,
+    target: str = "guangya",
+) -> dict[str, Any]:
+    capability = build_driver_target_capability(driver, target=target)
+    summary = dict(analysis_summary or {})
+    total = int(summary.get("total") or 0)
+    fast_ready = int(summary.get("fast_upload_ready") or 0)
+    md5_ready = int(summary.get("md5_ready") or 0)
+    gcid_ready = int(summary.get("gcid_ready") or 0)
+    missing_fast = int(summary.get("missing_fast_upload") or 0)
+    base_level = str(capability.get("level") or "unsupported")
+    assessed_level = base_level
+    rationale_zh = "当前未提供目录分析结果，先按静态矩阵建议处理。"
+    rationale_en = "No source analysis summary has been provided yet. Fall back to the static matrix."
+
+    if total > 0:
+        if base_level == "fast_upload_partial":
+            if fast_ready == 0:
+                assessed_level = "download_upload_only"
+                rationale_zh = "当前目录没有可直接快传的指纹，虽然驱动理论部分支持秒传，但本目录更适合按补传链路处理。"
+                rationale_en = "This directory currently has no fast-upload-ready fingerprints. Even though the driver is partially capable in theory, this directory should be treated as fallback upload."
+            elif fast_ready == total:
+                assessed_level = "fast_upload_supported"
+                rationale_zh = "当前目录全部文件都具备可快传指纹，适合优先走秒传/元数据导入。"
+                rationale_en = "All files in this directory have fast-upload-ready fingerprints, so metadata-first upload is strongly preferred."
+            else:
+                assessed_level = "fast_upload_partial"
+                rationale_zh = "当前目录只有部分文件具备可快传指纹，建议先秒传再补传。"
+                rationale_en = "Only part of this directory is fast-upload ready, so use metadata-first sync and then fallback reupload."
+        elif base_level == "download_upload_only":
+            if fast_ready > 0 and (md5_ready > 0 or gcid_ready > 0):
+                rationale_zh = "当前目录虽然出现了部分快传指纹，但该驱动对 Guangya 默认仍按保守补传策略处理。"
+                rationale_en = "Fast-upload fingerprints do exist in this directory, but this driver is still treated conservatively for Guangya."
+            else:
+                rationale_zh = "当前目录缺少稳定快传指纹，应按下载补传或待补传链路处理。"
+                rationale_en = "This directory lacks stable fast-upload fingerprints, so it should follow the fallback upload path."
+        elif base_level == "unsupported":
+            rationale_zh = "当前组合仍不在支持范围内，不建议继续自动执行。"
+            rationale_en = "This combination is still unsupported and should not proceed automatically."
+        else:
+            rationale_zh = "当前目录分析与静态矩阵基本一致。"
+            rationale_en = "The runtime analysis is broadly consistent with the static matrix."
+
+    return {
+        **capability,
+        "analysisSummary": summary,
+        "assessedLevel": assessed_level,
+        "rationale": {
+            "zh": rationale_zh,
+            "en": rationale_en,
+        },
+        "score": {
+            "total": total,
+            "fastReady": fast_ready,
+            "md5Ready": md5_ready,
+            "gcidReady": gcid_ready,
+            "missingFast": missing_fast,
+        },
+    }

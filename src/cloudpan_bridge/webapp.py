@@ -24,6 +24,7 @@ from .provider_capture import (
     normalize_provider_capture_entry,
 )
 from .provider_registry import (
+    assess_driver_target_capability,
     build_driver_capability_matrix,
     build_driver_target_capability,
     get_driver_guide,
@@ -958,6 +959,16 @@ def create_app(config_path: Path) -> FastAPI:
         if not driver.strip():
             raise HTTPException(status_code=400, detail="缺少 driver")
         return build_driver_target_capability(driver, target=target)
+
+    @app.post("/api/provider/capability_assess")
+    def post_provider_capability_assess(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload = payload or {}
+        driver = str(payload.get("driver") or "").strip()
+        target = str(payload.get("target") or "guangya").strip() or "guangya"
+        if not driver:
+            raise HTTPException(status_code=400, detail="缺少 driver")
+        summary = payload.get("analysis_summary") if isinstance(payload.get("analysis_summary"), dict) else {}
+        return assess_driver_target_capability(driver, analysis_summary=summary, target=target)
 
     @app.get("/api/openlist/storages")
     def get_openlist_storages(page: int = 1, per_page: int = 200) -> dict[str, Any]:

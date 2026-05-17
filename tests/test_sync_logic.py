@@ -526,6 +526,40 @@ def test_provider_capability_endpoint_returns_driver_to_guangya_matrix(tmp_path:
     assert payload["level"] == "download_upload_only"
 
 
+def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/capability_assess",
+        json={
+            "driver": "189Cloud",
+            "analysis_summary": {
+                "total": 3,
+                "fast_upload_ready": 3,
+                "md5_ready": 3,
+                "gcid_ready": 0,
+                "missing_fast_upload": 0,
+            },
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["level"] == "fast_upload_partial"
+    assert payload["assessedLevel"] == "fast_upload_supported"
+    assert payload["score"]["fastReady"] == 3
+
+
 def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
