@@ -745,6 +745,7 @@
               <button class="secondary" id="export-coverage-md" data-i18n="btn.export_coverage_md">导出覆盖审计 Markdown</button>
             </div>
             <div class="notice" id="about-coverage-backlog">等待载入...</div>
+            <div class="notice" id="about-coverage-action-stats">等待载入...</div>
             <div class="mount-list" id="about-coverage-audit">等待载入...</div>
           </div>
         </section>
@@ -790,6 +791,7 @@
     const PANEL_STATE_KEY = "cloud2guangya-tabs";
     const UI_LANGUAGE_KEY = "cloud2guangya-ui-language";
     const AUTO_GUANGYA_CAPTURE_KEY = "cloud2guangya-auto-guangya-capture";
+    const COVERAGE_FILTERS_KEY = "cloudpan-bridge-coverage-filters";
     const RATE_PRESETS = {
       default: { openlist_page_size: 100, openlist_request_interval_ms: 800, queue_interval_ms: 3000 },
       safe: { openlist_page_size: 80, openlist_request_interval_ms: 1200, queue_interval_ms: 5000 },
@@ -1122,11 +1124,31 @@
     let currentProviderGuide = null;
     let coverageAuditCache = null;
 
+    function getCoverageFilterState() {
+      try {
+        return JSON.parse(localStorage.getItem(COVERAGE_FILTERS_KEY) || "{}");
+      } catch {
+        return {};
+      }
+    }
+
+    function setCoverageFilterState(nextState) {
+      localStorage.setItem(COVERAGE_FILTERS_KEY, JSON.stringify(nextState));
+    }
+
     function currentCoverageFilters() {
       return {
         onlyGaps: Boolean(document.getElementById("coverage-only-gaps")?.checked),
         nextAction: String(document.getElementById("coverage-next-action-filter")?.value || ""),
       };
+    }
+
+    function applySavedCoverageFilters() {
+      const state = getCoverageFilterState();
+      const onlyGaps = document.getElementById("coverage-only-gaps");
+      const nextAction = document.getElementById("coverage-next-action-filter");
+      if (onlyGaps) onlyGaps.checked = Boolean(state.onlyGaps);
+      if (nextAction && typeof state.nextAction === "string") nextAction.value = state.nextAction;
     }
     const PROVIDER_DRIVER_HINTS = {
       "189cloud": ["189Cloud", "189CloudPC", "189CloudTV"],
@@ -1242,6 +1264,7 @@
         tab.addEventListener("click", () => activateTab(tab.dataset.tab));
       });
       activateTab(getPanelState().activeTab || "overview");
+      applySavedCoverageFilters();
       const langSelect = document.getElementById("ui_language");
       langSelect.value = currentLang();
       langSelect.addEventListener("change", () => {
@@ -1594,7 +1617,8 @@
       const matrixRoot = document.getElementById("about-driver-matrix");
       const coverageRoot = document.getElementById("about-coverage-audit");
       const coverageBacklogRoot = document.getElementById("about-coverage-backlog");
-      if (!summaryRoot || !sourceRoot || !targetRoot || !matrixRoot || !coverageRoot || !coverageBacklogRoot) return;
+      const coverageActionStatsRoot = document.getElementById("about-coverage-action-stats");
+      if (!summaryRoot || !sourceRoot || !targetRoot || !matrixRoot || !coverageRoot || !coverageBacklogRoot || !coverageActionStatsRoot) return;
       const sourceProfiles = Object.values(providerRegistryPayload?.source_profiles || {});
       const targetProfiles = Object.values(providerRegistryPayload?.target_profiles || {});
       const driverMatrix = Object.values(providerRegistryPayload?.driver_matrix || {});
@@ -1693,12 +1717,22 @@
           : currentLang() === "mix"
             ? "驱动列表载入后，这里会显示优先级 backlog。 / The prioritized backlog will appear after drivers are loaded."
             : "驱动列表载入后，这里会显示优先级 backlog。";
+        coverageActionStatsRoot.textContent = currentLang() === "en"
+          ? "The next-action stats will appear after the OpenList driver list is loaded."
+          : currentLang() === "mix"
+            ? "驱动列表载入后，这里会显示下一步动作统计。 / The next-action stats will appear after drivers are loaded."
+            : "驱动列表载入后，这里会显示下一步动作统计。";
         coverageRoot.textContent = currentLang() === "en"
           ? "Coverage audit will appear after the OpenList driver list is loaded."
           : currentLang() === "mix"
             ? "驱动列表载入后，这里会显示覆盖审计结果。 / Coverage audit will appear after drivers are loaded."
             : "驱动列表载入后，这里会显示覆盖审计结果。";
       } else {
+        const actionCounts = filteredAuditRows.reduce((acc, item) => {
+          const key = String(item.nextAction || "unknown");
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {});
         coverageBacklogRoot.innerHTML = filteredBacklog.length
           ? filteredBacklog.slice(0, 12).map((item, index) => `
               <div class="mono">${index + 1}. ${escapeHtml(item.driver || "-")} | P${item.priorityRank ?? "-"} | ${escapeHtml(coverageNextActionText(item.nextAction || ""))} | ${escapeHtml((item.missingItems || []).join(", ") || "-")}</div>
@@ -1708,6 +1742,15 @@
             : currentLang() === "mix"
               ? "当前筛选条件下没有 backlog 项。 / No backlog items match the current filter."
               : "当前筛选条件下没有 backlog 项。");
+        coverageActionStatsRoot.innerHTML = Object.keys(actionCounts).length
+          ? Object.entries(actionCounts).map(([key, count]) => (
+              `<div class="mono">${escapeHtml(coverageNextActionText(key))}: ${count}</div>`
+            )).join("")
+          : (currentLang() === "en"
+            ? "No next-action stats match the current filter."
+            : currentLang() === "mix"
+              ? "当前筛选条件下没有下一步动作统计。 / No next-action stats match the current filter."
+              : "当前筛选条件下没有下一步动作统计。");
         coverageRoot.innerHTML = `
           <div class="subtle" style="margin-bottom:10px;">
             ${currentLang() === "en"
@@ -2972,8 +3015,14 @@
       document.getElementById("driver-guide-dialog").addEventListener("click", (event) => {
         if (event.target?.id === "driver-guide-dialog") toggleDriverGuideDialog(false);
       });
-      document.getElementById("coverage-only-gaps").addEventListener("change", () => renderAboutRegistry());
-      document.getElementById("coverage-next-action-filter").addEventListener("change", () => renderAboutRegistry());
+      document.getElementById("coverage-only-gaps").addEventListener("change", () => {
+        setCoverageFilterState(currentCoverageFilters());
+        renderAboutRegistry();
+      });
+      document.getElementById("coverage-next-action-filter").addEventListener("change", () => {
+        setCoverageFilterState(currentCoverageFilters());
+        renderAboutRegistry();
+      });
       document.getElementById("export-coverage-json").onclick = async () => {
         if (!coverageAuditCache) {
           await refreshCoverageAudit();
