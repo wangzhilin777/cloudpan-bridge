@@ -384,6 +384,7 @@
           <button class="tab" data-tab="miaochuan" data-i18n="tab.miaochuan">秒传</button>
           <button class="tab" data-tab="mounts" data-i18n="tab.mounts">挂载</button>
           <button class="tab" data-tab="config" data-i18n="tab.config">配置</button>
+          <button class="tab" data-tab="about" data-i18n="tab.about">关于</button>
         </div>
 
         <section class="tab-panel active" data-panel="overview">
@@ -700,6 +701,31 @@
             </div>
           </div>
         </section>
+
+        <section class="tab-panel" data-panel="about">
+          <div class="panel">
+            <h2 data-i18n="panel.about">关于与计划</h2>
+            <div class="notice" id="about-summary">等待载入...</div>
+          </div>
+
+          <div class="panel">
+            <h2 data-i18n="panel.source_profiles">源端 Profiles</h2>
+            <div class="subtle" data-i18n="desc.source_profiles">这里列出当前内置的 OpenList 源端 profile、常见哈希和推荐频率。后续继续扩全驱动时，就往这层补。</div>
+            <div class="mount-list" id="about-source-profiles">等待载入...</div>
+          </div>
+
+          <div class="panel">
+            <h2 data-i18n="panel.target_profiles">目标端 Profiles</h2>
+            <div class="subtle" data-i18n="desc.target_profiles">这里列出当前目标端适配器支持的快传指纹和降级方式。现在正式内置目标端仍是 Guangya。</div>
+            <div class="mount-list" id="about-target-profiles">等待载入...</div>
+          </div>
+
+          <div class="panel">
+            <h2 data-i18n="panel.driver_matrix">Driver 能力矩阵</h2>
+            <div class="subtle" data-i18n="desc.driver_matrix">这是当前内置的“源驱动 -> Guangya”能力矩阵，只表示当前项目的真实支持判断，不等于所有跨网盘都能秒传。</div>
+            <div class="mount-list" id="about-driver-matrix">等待载入...</div>
+          </div>
+        </section>
       </div>
 
       <aside class="drawer" id="log-drawer">
@@ -763,6 +789,7 @@
         "tab.miaochuan": "秒传",
         "tab.mounts": "挂载",
         "tab.config": "配置",
+        "tab.about": "关于",
         "panel.overview": "运行概览",
         "panel.capability": "能力矩阵与建议",
         "panel.current_task": "当前任务",
@@ -779,6 +806,10 @@
         "panel.config": "基础配置",
         "panel.guangya_auth": "光鸭登录信息",
         "panel.logs": "实时日志",
+        "panel.about": "关于与计划",
+        "panel.source_profiles": "源端 Profiles",
+        "panel.target_profiles": "目标端 Profiles",
+        "panel.driver_matrix": "Driver 能力矩阵",
         "card.runtime": "OpenList Runtime",
         "card.sync": "同步状态",
         "card.capture": "光鸭抓取",
@@ -860,6 +891,9 @@
         "desc.provider_capture": "如果还没有挂载，或想直接从网页登录态抓取 Cookie / Token / Header，可以先在这里选网盘类型，打开登录页抓取，再一键写入当前挂载表单。",
         "desc.capability": "根据当前选择的源驱动和现有目标端 Guangya，给出诚实降级后的推荐路径。这里不会把“只能补传”的组合误导成可秒传。",
         "desc.logs": "这里会自动滚动到最新日志。同步、队列、挂载和光鸭抓取状态都可以从这里看。",
+        "desc.source_profiles": "这里列出当前内置的 OpenList 源端 profile、常见哈希和推荐频率。后续继续扩全驱动时，就往这层补。",
+        "desc.target_profiles": "这里列出当前目标端适配器支持的快传指纹和降级方式。现在正式内置目标端仍是 Guangya。",
+        "desc.driver_matrix": "这是当前内置的“源驱动 -> Guangya”能力矩阵，只表示当前项目的真实支持判断，不等于所有跨网盘都能秒传。",
         "option.openlist_mode.external": "外部模式",
         "option.openlist_mode.managed": "托管模式",
         "option.rate_limit_mode.safe": "稳妥",
@@ -875,6 +909,7 @@
         "tab.miaochuan": "Flash Upload",
         "tab.mounts": "Mounts",
         "tab.config": "Config",
+        "tab.about": "About",
         "panel.overview": "Runtime Overview",
         "panel.capability": "Capability and Recommendation",
         "panel.current_task": "Current Task",
@@ -891,6 +926,10 @@
         "panel.config": "Base Config",
         "panel.guangya_auth": "Guangya Auth",
         "panel.logs": "Live Logs",
+        "panel.about": "About and Plan",
+        "panel.source_profiles": "Source Profiles",
+        "panel.target_profiles": "Target Profiles",
+        "panel.driver_matrix": "Driver Capability Matrix",
         "card.runtime": "OpenList Runtime",
         "card.sync": "Sync Status",
         "card.capture": "Guangya Capture",
@@ -972,6 +1011,9 @@
         "desc.provider_capture": "If you do not have a mount yet, or want to capture Cookie / Token / Header directly from a web login session, choose the provider here, start login capture, then apply the result to the current mount form.",
         "desc.capability": "Show the honest recommendation for the current source driver to Guangya, including fallback behavior instead of overpromising fast upload.",
         "desc.logs": "Logs auto-scroll to the newest line. Sync, queue, mount, and capture activity all appear here.",
+        "desc.source_profiles": "This lists the built-in OpenList source profiles, likely hashes, and recommended rate presets. Keep extending this layer as more drivers are covered.",
+        "desc.target_profiles": "This lists the current target adapters, their fast-upload hashes, and fallback modes. Guangya is still the primary built-in target.",
+        "desc.driver_matrix": "This is the current built-in source-driver to Guangya matrix. It reflects this project's real support judgment, not a promise that all cross-cloud copies can fast upload.",
         "option.openlist_mode.external": "External",
         "option.openlist_mode.managed": "Managed",
         "option.rate_limit_mode.safe": "Safe",
@@ -1149,6 +1191,8 @@
         renderProviderOptions(providerDefinitions);
         renderProviderCapturePanel();
       }
+      renderCapabilitySummary();
+      renderAboutRegistry();
     }
 
     function initTabs() {
@@ -1220,6 +1264,7 @@
       providerRegistryPayload = data || providerRegistryPayload;
       driverGuideRegistry = data?.guides || {};
       renderCapabilitySummary();
+      renderAboutRegistry();
     }
 
     function currentDriverContext() {
@@ -1303,6 +1348,79 @@
         <div class="mono">${currentLang() === "en" ? "Suggested path" : currentLang() === "mix" ? "建议路径 / Suggested path" : "建议路径"}: ${escapeHtml(recommendedFlow || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Notes" : currentLang() === "mix" ? "说明 / Notes" : "说明"}: ${escapeHtml(notesText || "-")}</div>
       `;
+    }
+
+    function renderAboutRegistry() {
+      const summaryRoot = document.getElementById("about-summary");
+      const sourceRoot = document.getElementById("about-source-profiles");
+      const targetRoot = document.getElementById("about-target-profiles");
+      const matrixRoot = document.getElementById("about-driver-matrix");
+      if (!summaryRoot || !sourceRoot || !targetRoot || !matrixRoot) return;
+      const sourceProfiles = Object.values(providerRegistryPayload?.source_profiles || {});
+      const targetProfiles = Object.values(providerRegistryPayload?.target_profiles || {});
+      const driverMatrix = Object.values(providerRegistryPayload?.driver_matrix || {});
+      summaryRoot.innerHTML = `
+        <div><strong>CloudPan Bridge</strong></div>
+        <div class="mono">${currentLang() === "en" ? "Master plan" : currentLang() === "mix" ? "主计划 / Master plan" : "主计划"}: docs/cloudpan-bridge-master-plan.md</div>
+        <div class="mono">${currentLang() === "en" ? "Research plan" : currentLang() === "mix" ? "调研计划 / Research plan" : "调研计划"}: docs/cloudpan-bridge-research-plan.md</div>
+        <div class="mono">${currentLang() === "en" ? "Source profiles" : currentLang() === "mix" ? "源端 profiles / Source profiles" : "源端 profiles"}: ${sourceProfiles.length}</div>
+        <div class="mono">${currentLang() === "en" ? "Target profiles" : currentLang() === "mix" ? "目标端 profiles / Target profiles" : "目标端 profiles"}: ${targetProfiles.length}</div>
+        <div class="mono">${currentLang() === "en" ? "Driver matrix rows" : currentLang() === "mix" ? "矩阵条目 / Driver matrix rows" : "矩阵条目"}: ${driverMatrix.length}</div>
+      `;
+
+      if (!sourceProfiles.length) {
+        sourceRoot.textContent = currentLang() === "en" ? "No source profiles loaded." : currentLang() === "mix" ? "暂无源端 profiles / No source profiles loaded." : "暂无源端 profiles";
+      } else {
+        sourceRoot.innerHTML = sourceProfiles.map((item) => `
+          <div class="row-item">
+            <div>
+              <div>${escapeHtml(item.labelZh || item.label || item.key || "-")}</div>
+              <div class="mono">key=${escapeHtml(item.key || "-")} | ${currentLang() === "en" ? "rate" : currentLang() === "mix" ? "频率 / rate" : "频率"}=${escapeHtml(item.recommendedRateProfile || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "hashes" : currentLang() === "mix" ? "哈希 / hashes" : "哈希"}=${escapeHtml((item.likelyHashes || []).join(", ") || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "aliases" : currentLang() === "mix" ? "驱动别名 / aliases" : "驱动别名"}=${escapeHtml((item.driverAliases || []).join(", ") || "-")}</div>
+            </div>
+          </div>
+        `).join("");
+      }
+
+      if (!targetProfiles.length) {
+        targetRoot.textContent = currentLang() === "en" ? "No target profiles loaded." : currentLang() === "mix" ? "暂无目标端 profiles / No target profiles loaded." : "暂无目标端 profiles";
+      } else {
+        targetRoot.innerHTML = targetProfiles.map((item) => `
+          <div class="row-item">
+            <div>
+              <div>${escapeHtml(item.labelZh || item.label || item.key || "-")}</div>
+              <div class="mono">key=${escapeHtml(item.key || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "fast hashes" : currentLang() === "mix" ? "快传指纹 / fast hashes" : "快传指纹"}=${escapeHtml((item.fastUploadHashes || []).join(", ") || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "fallback" : currentLang() === "mix" ? "降级方式 / fallback" : "降级方式"}=${escapeHtml((item.fallbackModes || []).join(", ") || "-")}</div>
+            </div>
+          </div>
+        `).join("");
+      }
+
+      if (!driverMatrix.length) {
+        matrixRoot.textContent = currentLang() === "en" ? "No matrix rows loaded." : currentLang() === "mix" ? "暂无矩阵条目 / No matrix rows loaded." : "暂无矩阵条目";
+      } else {
+        matrixRoot.innerHTML = driverMatrix
+          .sort((a, b) => String(a.driver || "").localeCompare(String(b.driver || ""), "zh-CN"))
+          .map((item) => {
+            const sourceProfile = item.sourceProfile || {};
+            const flow = currentLang() === "en"
+              ? (item.recommendedFlowEn || item.recommendedFlow || "")
+              : currentLang() === "mix"
+                ? `${item.recommendedFlow || ""} / ${item.recommendedFlowEn || ""}`.trim()
+                : (item.recommendedFlow || "");
+            return `
+              <div class="row-item">
+                <div>
+                  <div>${escapeHtml(item.driver || "-")}</div>
+                  <div class="mono">${currentLang() === "en" ? "profile" : currentLang() === "mix" ? "profile / 档案" : "档案"}=${escapeHtml(sourceProfile.key || "-")} | ${currentLang() === "en" ? "level" : currentLang() === "mix" ? "等级 / level" : "等级"}=${escapeHtml(capabilityLevelText(item.level))}</div>
+                  <div class="mono">${currentLang() === "en" ? "suggested path" : currentLang() === "mix" ? "建议路径 / suggested path" : "建议路径"}=${escapeHtml(flow || "-")}</div>
+                </div>
+              </div>
+            `;
+          }).join("");
+      }
     }
 
     function getDriverGuide(driver) {
