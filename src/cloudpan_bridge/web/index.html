@@ -568,6 +568,7 @@
             </div>
             <div class="actions">
               <button class="secondary" id="start-provider-capture" data-i18n="btn.start_provider_capture">打开网页登录并抓取</button>
+              <button class="secondary" id="show-provider-guide" data-i18n="btn.show_provider_guide">查看该网盘接入流程</button>
               <button class="accent" id="apply-provider-fields" data-i18n="btn.apply_provider_fields">写入当前挂载表单</button>
             </div>
           </div>
@@ -841,6 +842,7 @@
         "btn.refresh_storages": "刷新挂载列表",
         "btn.refresh_drivers": "刷新驱动列表",
         "btn.start_provider_capture": "打开网页登录并抓取",
+        "btn.show_provider_guide": "查看该网盘接入流程",
         "btn.apply_provider_fields": "写入当前挂载表单",
         "btn.create_storage": "创建挂载",
         "btn.show_driver_guide": "查看接入流程",
@@ -961,6 +963,7 @@
         "btn.refresh_storages": "Refresh Mount List",
         "btn.refresh_drivers": "Refresh Driver List",
         "btn.start_provider_capture": "Open Login Capture",
+        "btn.show_provider_guide": "View Provider Guide",
         "btn.apply_provider_fields": "Apply to Mount Form",
         "btn.create_storage": "Create Mount",
         "btn.show_driver_guide": "View Setup Guide",
@@ -1088,6 +1091,7 @@
     let capabilityAssessmentCache = null;
     let driverCaptureBlueprint = null;
     let currentDriverGuide = null;
+    let currentProviderGuide = null;
     const PROVIDER_DRIVER_HINTS = {
       "189cloud": ["189Cloud", "189CloudPC", "189CloudTV"],
       "quark": ["Quark", "QuarkOpen", "QuarkTV"],
@@ -1595,36 +1599,40 @@
       return driverGuideRegistry[normalized] || null;
     }
 
-    function renderDriverGuide(driver) {
-      const guide = getDriverGuide(driver);
+    function getGuideForProviderDefinition(definition) {
+      if (definition?.guide) return definition.guide;
+      const sourceProfile = definition?.source_profile || {};
+      const aliases = Array.isArray(sourceProfile.driverAliases) ? sourceProfile.driverAliases : [];
+      const recommendedDrivers = Array.isArray(definition?.recommended_drivers) ? definition.recommended_drivers : [];
+      const candidates = [...recommendedDrivers, ...aliases, sourceProfile.key || "", definition?.key || ""];
+      for (const item of candidates) {
+        const guide = getDriverGuide(item);
+        if (guide) return guide;
+      }
+      return null;
+    }
+
+    function renderGuideIntoDialog(guide, titleText) {
       currentDriverGuide = guide;
-      const inline = document.getElementById("driver-guide-inline");
       const summary = document.getElementById("driver-guide-summary");
       const stepsRoot = document.getElementById("driver-guide-steps");
       const title = document.getElementById("driver-guide-title");
       const openDocButton = document.getElementById("open-driver-doc");
       if (!guide) {
         const empty = currentLang() === "en"
-          ? "This driver currently has no built-in special guide. You can still use the dynamic fields below or check the OpenList docs manually."
+          ? "This provider currently has no built-in special guide. You can still use the captured fields and the official docs manually."
           : currentLang() === "mix"
-            ? "当前驱动暂时没有内置专属流程说明，可先用下方动态字段，也可以手动查 OpenList 文档。 / No built-in special guide yet."
-            : "当前驱动暂时没有内置专属流程说明，可先用下方动态字段，也可以手动查 OpenList 文档。";
-        if (inline) inline.textContent = empty;
+            ? "当前 provider 暂无内置专属流程说明，可先用抓取结果与动态字段，再手动参考官方文档。 / No built-in special guide yet."
+            : "当前 provider 暂无内置专属流程说明，可先用抓取结果与动态字段，再手动参考官方文档。";
         if (summary) summary.textContent = empty;
         if (stepsRoot) stepsRoot.innerHTML = "";
-        if (title) title.textContent = currentLang() === "en" ? "Driver Access Guide" : currentLang() === "mix" ? "驱动接入流程 / Driver Access Guide" : "驱动接入流程";
+        if (title) title.textContent = titleText || (currentLang() === "en" ? "Provider Access Guide" : currentLang() === "mix" ? "网盘接入流程 / Provider Access Guide" : "网盘接入流程");
         if (openDocButton) openDocButton.disabled = true;
         return;
       }
       const summaryText = guideTextPair(guide.summary);
-      if (inline) {
-        inline.innerHTML = `
-          <div>${escapeHtml(summaryText)}</div>
-          <div class="mono">${currentLang() === "en" ? "Official doc" : currentLang() === "mix" ? "官方文档 / Official doc" : "官方文档"}: ${escapeHtml(guide.docUrl || "")}</div>
-        `;
-      }
       if (summary) summary.textContent = summaryText;
-      if (title) title.textContent = `${driver} ${currentLang() === "en" ? "Guide" : currentLang() === "mix" ? "接入流程 / Guide" : "接入流程"}`;
+      if (title) title.textContent = titleText || (currentLang() === "en" ? "Provider Access Guide" : currentLang() === "mix" ? "网盘接入流程 / Provider Access Guide" : "网盘接入流程");
       const zhSteps = Array.isArray(guide.steps?.zh) ? guide.steps.zh : [];
       const enSteps = Array.isArray(guide.steps?.en) ? guide.steps.en : [];
       const steps = currentLang() === "en" ? enSteps : currentLang() === "mix" ? zhSteps.map((item, index) => `${item}\n\n${enSteps[index] || ""}`) : zhSteps;
@@ -1636,6 +1644,30 @@
         `).join("");
       }
       if (openDocButton) openDocButton.disabled = !(guide.docUrl || "");
+    }
+
+    function renderDriverGuide(driver) {
+      const guide = getDriverGuide(driver);
+      currentDriverGuide = guide;
+      const inline = document.getElementById("driver-guide-inline");
+      if (!guide) {
+        const empty = currentLang() === "en"
+          ? "This driver currently has no built-in special guide. You can still use the dynamic fields below or check the OpenList docs manually."
+          : currentLang() === "mix"
+            ? "当前驱动暂时没有内置专属流程说明，可先用下方动态字段，也可以手动查 OpenList 文档。 / No built-in special guide yet."
+            : "当前驱动暂时没有内置专属流程说明，可先用下方动态字段，也可以手动查 OpenList 文档。";
+        if (inline) inline.textContent = empty;
+        renderGuideIntoDialog(null, currentLang() === "en" ? "Driver Access Guide" : currentLang() === "mix" ? "驱动接入流程 / Driver Access Guide" : "驱动接入流程");
+        return;
+      }
+      const summaryText = guideTextPair(guide.summary);
+      if (inline) {
+        inline.innerHTML = `
+          <div>${escapeHtml(summaryText)}</div>
+          <div class="mono">${currentLang() === "en" ? "Official doc" : currentLang() === "mix" ? "官方文档 / Official doc" : "官方文档"}: ${escapeHtml(guide.docUrl || "")}</div>
+        `;
+      }
+      renderGuideIntoDialog(guide, `${driver} ${currentLang() === "en" ? "Guide" : currentLang() === "mix" ? "接入流程 / Guide" : "接入流程"}`);
     }
 
     function applyDriverGuideDefaults() {
@@ -1757,6 +1789,7 @@
       }
       const provider = select.value || items[0]?.key || "189cloud";
       const definition = items.find((item) => item.key === provider);
+      currentProviderGuide = getGuideForProviderDefinition(definition);
       const snapshot = providerSnapshots?.[provider] || {};
       const captured = snapshot.captured || {};
       const requiredKeys = Array.isArray(definition?.required_keys) ? definition.required_keys : [];
@@ -1783,6 +1816,7 @@
         <div class="mono">${currentLang() === "en" ? "Recommended rate" : currentLang() === "mix" ? "推荐频率 / Recommended rate" : "推荐频率"}: ${escapeHtml(rateText || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Hash fields" : currentLang() === "mix" ? "哈希字段 / Hash fields" : "哈希字段"}: ${escapeHtml(hashText || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Docs" : currentLang() === "mix" ? "文档 / Docs" : "文档"}: ${docLinks.length ? docLinks.map((link) => `<a href="${escapeHtml(link)}" target="_blank" rel="noreferrer">${escapeHtml(link)}</a>`).join("<br>") : "-"}</div>
+        <div class="mono">${currentLang() === "en" ? "Built-in guide" : currentLang() === "mix" ? "内置流程说明 / Built-in guide" : "内置流程说明"}: ${currentProviderGuide ? (currentLang() === "en" ? "available" : currentLang() === "mix" ? "可查看 / available" : "可查看") : (currentLang() === "en" ? "not available" : currentLang() === "mix" ? "暂无 / not available" : "暂无")}</div>
       `;
       const loginUrlInput = document.getElementById("provider-login-url");
       if (loginUrlInput) {
@@ -2767,6 +2801,17 @@
         await loadDriverInfo(event.target.value);
       });
       document.getElementById("show-driver-guide").onclick = () => toggleDriverGuideDialog(true);
+      document.getElementById("show-provider-guide").onclick = () => {
+        const select = document.getElementById("provider-select");
+        const definition = [...providerDefinitions, ...(driverCaptureBlueprint ? [driverCaptureBlueprint] : [])]
+          .find((item) => item.key === select?.value);
+        currentProviderGuide = getGuideForProviderDefinition(definition);
+        const title = definition?.label
+          ? `${definition.label} ${currentLang() === "en" ? "Guide" : currentLang() === "mix" ? "接入流程 / Guide" : "接入流程"}`
+          : (currentLang() === "en" ? "Provider Access Guide" : currentLang() === "mix" ? "网盘接入流程 / Provider Access Guide" : "网盘接入流程");
+        renderGuideIntoDialog(currentProviderGuide, title);
+        toggleDriverGuideDialog(true);
+      };
       document.getElementById("close-driver-guide").onclick = () => toggleDriverGuideDialog(false);
       document.getElementById("driver-guide-dialog").addEventListener("click", (event) => {
         if (event.target?.id === "driver-guide-dialog") toggleDriverGuideDialog(false);

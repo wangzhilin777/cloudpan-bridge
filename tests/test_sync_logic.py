@@ -532,6 +532,8 @@ def test_provider_captures_endpoint_includes_complex_driver_specs(tmp_path: Path
     assert providers["aliyundriveopen"]["source_profile"]["key"] == "aliyundriveopen"
     assert providers["onedrive"]["source_profile"]["recommendedRateProfile"] == "balanced"
     assert providers["139yun"]["source_profile"]["docLinks"] == ["https://doc.oplist.org/guide/drivers/139.html"]
+    assert providers["aliyundriveopen"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/aliyundrive_open"
+    assert providers["139yun"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/139.html"
 
 
 def test_provider_capability_endpoint_returns_driver_to_guangya_matrix(tmp_path: Path) -> None:

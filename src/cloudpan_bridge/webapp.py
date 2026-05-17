@@ -359,6 +359,30 @@ def create_app(config_path: Path) -> FastAPI:
             "matched_fields": sorted(values.keys()),
         }
 
+    def build_provider_capture_definition_payload() -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for item in provider_capture.definitions_payload():
+            profile = get_source_profile_by_key_or_alias(str(item.get("key") or ""))
+            candidates = [
+                *(item.get("recommended_drivers") or []),
+                *(profile.get("driverAliases") or []),
+                profile.get("key") or "",
+                item.get("key") or "",
+            ]
+            guide = None
+            for candidate in candidates:
+                guide = get_driver_guide(str(candidate or ""))
+                if guide:
+                    break
+            items.append(
+                {
+                    **item,
+                    "source_profile": profile,
+                    "guide": guide,
+                }
+            )
+        return items
+
     def current_state_payload() -> dict[str, Any]:
         state = load_state(config.state_file)
         pending_items = [
@@ -1078,17 +1102,8 @@ def create_app(config_path: Path) -> FastAPI:
     @app.get("/api/provider/captures")
     def get_provider_captures() -> dict[str, Any]:
         persist_provider_captures_to_config()
-        providers = []
-        for item in provider_capture.definitions_payload():
-            profile = get_source_profile_by_key_or_alias(str(item.get("key") or ""))
-            providers.append(
-                {
-                    **item,
-                    "source_profile": profile,
-                }
-            )
         return {
-            "providers": providers,
+            "providers": build_provider_capture_definition_payload(),
             "snapshots": merged_provider_capture_snapshots(),
         }
 
