@@ -584,14 +584,18 @@ def test_provider_coverage_audit_endpoint_reports_registry_and_capture_coverage(
     payload = response.json()
     rows = {item["normalized"]: item for item in payload["rows"]}
     assert payload["totals"]["total"] == 4
+    assert payload["gapBuckets"]["fullyCovered"] >= 1
     assert rows["aliyundriveopen"]["hasProfile"] is True
     assert rows["aliyundriveopen"]["hasGuide"] is True
     assert rows["aliyundriveopen"]["hasCapture"] is True
     assert rows["aliyundriveopen"]["capabilityLevel"] == "download_upload_only"
+    assert rows["aliyundriveopen"]["nextAction"] == "covered"
     assert rows["thunder"]["hasCapability"] is True
     assert rows["unknowndrive"]["hasProfile"] is False
     assert rows["unknowndrive"]["hasGuide"] is False
     assert rows["unknowndrive"]["hasCapture"] is False
+    assert rows["unknowndrive"]["missingItems"] == ["profile", "guide", "capture", "capability"]
+    assert rows["unknowndrive"]["nextAction"] == "add_profile_first"
 
 
 def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Path) -> None:

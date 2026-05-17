@@ -1397,6 +1397,18 @@
       return currentLang() === "en" ? text.en : currentLang() === "mix" ? `${text.zh} / ${text.en}` : text.zh;
     }
 
+    function coverageNextActionText(action) {
+      const mapping = {
+        add_profile_first: { zh: "先补 source profile", en: "Add source profile first" },
+        add_guide: { zh: "补接入流程说明", en: "Add setup guide" },
+        add_capture_spec: { zh: "补登录抓取定义", en: "Add capture spec" },
+        assess_target_capability: { zh: "补目标能力判断", en: "Assess target capability" },
+        covered: { zh: "当前已覆盖", en: "Already covered" },
+      };
+      const text = mapping[String(action || "").toLowerCase()] || mapping.add_profile_first;
+      return currentLang() === "en" ? text.en : currentLang() === "mix" ? `${text.zh} / ${text.en}` : text.zh;
+    }
+
     function strategyQuickActions(mode, strategy) {
       const actions = [];
       const push = (key, labelZh, labelEn) => actions.push({
@@ -1624,6 +1636,7 @@
 
       const auditRows = Array.isArray(coverageAuditCache?.rows) ? coverageAuditCache.rows : [];
       const auditTotals = coverageAuditCache?.totals || {};
+      const gapBuckets = coverageAuditCache?.gapBuckets || {};
       if (!auditRows.length) {
         coverageRoot.textContent = currentLang() === "en"
           ? "Coverage audit will appear after the OpenList driver list is loaded."
@@ -1639,6 +1652,13 @@
                 ? `总数 / Total=${auditTotals.total ?? 0}, profile=${auditTotals.profile ?? 0}, guide=${auditTotals.guide ?? 0}, capture=${auditTotals.capture ?? 0}, capability=${auditTotals.capability ?? 0}`
                 : `总数=${auditTotals.total ?? 0}，profile=${auditTotals.profile ?? 0}，guide=${auditTotals.guide ?? 0}，capture=${auditTotals.capture ?? 0}，capability=${auditTotals.capability ?? 0}`}
           </div>
+          <div class="subtle" style="margin-bottom:10px;">
+            ${currentLang() === "en"
+              ? `fully covered=${gapBuckets.fullyCovered ?? 0}, missing profile=${gapBuckets.missingProfile ?? 0}, missing guide=${gapBuckets.missingGuide ?? 0}, missing capture=${gapBuckets.missingCapture ?? 0}, missing capability=${gapBuckets.missingCapability ?? 0}`
+              : currentLang() === "mix"
+                ? `完全覆盖 / fully covered=${gapBuckets.fullyCovered ?? 0}, 缺 profile / missing profile=${gapBuckets.missingProfile ?? 0}, 缺 guide / missing guide=${gapBuckets.missingGuide ?? 0}, 缺 capture / missing capture=${gapBuckets.missingCapture ?? 0}, 缺 capability / missing capability=${gapBuckets.missingCapability ?? 0}`
+                : `完全覆盖=${gapBuckets.fullyCovered ?? 0}，缺 profile=${gapBuckets.missingProfile ?? 0}，缺 guide=${gapBuckets.missingGuide ?? 0}，缺 capture=${gapBuckets.missingCapture ?? 0}，缺 capability=${gapBuckets.missingCapability ?? 0}`}
+          </div>
           ${auditRows.map((item) => `
             <div class="row-item">
               <div>
@@ -1646,6 +1666,8 @@
                 <div class="mono">profile=${item.hasProfile ? "yes" : "no"} | guide=${item.hasGuide ? "yes" : "no"} | capture=${item.hasCapture ? "yes" : "no"} | capability=${item.hasCapability ? "yes" : "no"}</div>
                 <div class="mono">${currentLang() === "en" ? "level" : currentLang() === "mix" ? "等级 / level" : "等级"}=${escapeHtml(capabilityLevelText(item.capabilityLevel || "unsupported"))} | score=${item.coverageScore ?? 0}/4</div>
                 <div class="mono">profileKey=${escapeHtml(item.profileKey || "generic")}</div>
+                <div class="mono">${currentLang() === "en" ? "missing items" : currentLang() === "mix" ? "缺口 / missing items" : "缺口"}=${escapeHtml((item.missingItems || []).join(", ") || "-")}</div>
+                <div class="mono">${currentLang() === "en" ? "next step" : currentLang() === "mix" ? "下一步 / next step" : "下一步"}=${escapeHtml(coverageNextActionText(item.nextAction || ""))}</div>
               </div>
             </div>
           `).join("")}

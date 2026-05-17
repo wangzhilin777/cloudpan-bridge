@@ -736,6 +736,13 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
         "capture": 0,
         "capability": 0,
     }
+    gap_buckets = {
+        "missingProfile": 0,
+        "missingGuide": 0,
+        "missingCapture": 0,
+        "missingCapability": 0,
+        "fullyCovered": 0,
+    }
     for driver in sorted({str(item or "").strip() for item in drivers if str(item or "").strip()}, key=lambda item: item.lower()):
         normalized = _normalize_key(driver)
         profile = get_source_profile_by_driver(driver)
@@ -750,6 +757,31 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
         capability_level = str((capability or {}).get("level") or "")
         has_capability = bool(capability_level and capability_level != "unsupported")
         coverage_score = int(has_profile) + int(has_guide) + int(has_capture) + int(has_capability)
+        missing_items: list[str] = []
+        if not has_profile:
+            missing_items.append("profile")
+            gap_buckets["missingProfile"] += 1
+        if not has_guide:
+            missing_items.append("guide")
+            gap_buckets["missingGuide"] += 1
+        if not has_capture:
+            missing_items.append("capture")
+            gap_buckets["missingCapture"] += 1
+        if not has_capability:
+            missing_items.append("capability")
+            gap_buckets["missingCapability"] += 1
+        if not missing_items:
+            gap_buckets["fullyCovered"] += 1
+        if not has_profile:
+            next_action = "add_profile_first"
+        elif not has_guide:
+            next_action = "add_guide"
+        elif not has_capture:
+            next_action = "add_capture_spec"
+        elif not has_capability:
+            next_action = "assess_target_capability"
+        else:
+            next_action = "covered"
         row = {
             "driver": driver,
             "normalized": normalized,
@@ -761,6 +793,8 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
             "capabilityLevel": capability_level or "unsupported",
             "coverageScore": coverage_score,
             "docLinks": list(profile.get("docLinks") or []),
+            "missingItems": missing_items,
+            "nextAction": next_action,
         }
         rows.append(row)
         totals["total"] += 1
@@ -772,6 +806,7 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
         "target": target,
         "rows": rows,
         "totals": totals,
+        "gapBuckets": gap_buckets,
     }
 
 

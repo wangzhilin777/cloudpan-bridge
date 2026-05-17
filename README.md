@@ -151,6 +151,7 @@
 - 当前 driver 到 Guangya 的能力矩阵条目
 - 当前 OpenList 驱动覆盖审计
   - 直接显示哪些驱动已经具备 `profile / guide / capture / capability`
+  - 并给出当前驱动的缺口项和建议下一步
   - 方便后续按缺口继续补 OpenList 全驱动
 - 各源端的登录模式、哈希能力、下载链路、抓取策略、默认挂载值、风控备注
 
