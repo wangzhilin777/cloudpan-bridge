@@ -1001,6 +1001,8 @@ def create_app(config_path: Path) -> FastAPI:
             only_gaps=bool(payload.get("only_gaps")),
             next_action=str(payload.get("next_action") or ""),
             missing_item=str(payload.get("missing_item") or ""),
+            capability_level=str(payload.get("capability_level") or ""),
+            profile_key=str(payload.get("profile_key") or ""),
         )
 
     @app.post("/api/provider/coverage_audit_markdown")
@@ -1016,6 +1018,8 @@ def create_app(config_path: Path) -> FastAPI:
             only_gaps=bool(payload.get("only_gaps")),
             next_action=str(payload.get("next_action") or ""),
             missing_item=str(payload.get("missing_item") or ""),
+            capability_level=str(payload.get("capability_level") or ""),
+            profile_key=str(payload.get("profile_key") or ""),
         )
         markdown = render_driver_coverage_audit_markdown(audit)
         return PlainTextResponse(markdown, media_type="text/markdown; charset=utf-8")

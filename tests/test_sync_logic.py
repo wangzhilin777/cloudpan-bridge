@@ -700,6 +700,39 @@ def test_provider_coverage_audit_endpoint_supports_filtered_view_export(tmp_path
     assert payload["backlog"][0]["normalized"] == "unknowndrive"
 
 
+def test_provider_coverage_audit_endpoint_supports_capability_and_profile_filters(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_audit",
+        json={
+            "drivers": ["AliyundriveOpen", "OneDrive", "UnknownDrive", "Thunder"],
+            "target": "guangya",
+            "capability_level": "download_upload_only",
+            "profile_key": "aliyundriveopen",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["filters"]["capabilityLevel"] == "download_upload_only"
+    assert payload["filters"]["profileKey"] == "aliyundriveopen"
+    assert payload["totals"]["total"] == 1
+    assert payload["rows"][0]["normalized"] == "aliyundriveopen"
+    assert payload["rows"][0]["profileKey"] == "aliyundriveopen"
+    assert payload["rows"][0]["capabilityLevel"] == "download_upload_only"
+
+
 def test_provider_coverage_audit_markdown_endpoint_renders_backlog_report(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
@@ -757,8 +790,41 @@ def test_provider_coverage_audit_markdown_endpoint_renders_filtered_view(tmp_pat
     assert "- 只看缺口: `True`" in text
     assert "- 下一步动作: `add_profile_first`" in text
     assert "- 缺口类型: `profile`" in text
+    assert "- 能力等级: `-`" in text
+    assert "- Profile Key: `-`" in text
     assert "`UnknownDrive` | P1 | add_profile_first" in text
     assert "`AliyundriveOpen` | P99" not in text
+
+
+def test_provider_coverage_audit_markdown_endpoint_renders_capability_and_profile_filters(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_audit_markdown",
+        json={
+            "drivers": ["UnknownDrive", "AliyundriveOpen", "Thunder"],
+            "target": "guangya",
+            "capability_level": "download_upload_only",
+            "profile_key": "aliyundriveopen",
+        },
+    )
+    assert response.status_code == 200
+    text = response.text
+    assert "- 能力等级: `download_upload_only`" in text
+    assert "- Profile Key: `aliyundriveopen`" in text
+    assert "| `AliyundriveOpen` | yes | yes | yes | yes | `download_upload_only` | 4/4 | `covered` | `aliyundriveopen` | - |" in text
+    assert "| `Thunder` |" not in text
 
 
 def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Path) -> None:

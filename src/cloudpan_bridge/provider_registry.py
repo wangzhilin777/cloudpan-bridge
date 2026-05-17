@@ -826,9 +826,13 @@ def filter_driver_coverage_audit(
     only_gaps: bool = False,
     next_action: str = "",
     missing_item: str = "",
+    capability_level: str = "",
+    profile_key: str = "",
 ) -> dict[str, Any]:
     normalized_next_action = str(next_action or "").strip()
     normalized_missing_item = str(missing_item or "").strip()
+    normalized_capability_level = str(capability_level or "").strip()
+    normalized_profile_key = str(profile_key or "").strip()
     rows = list(audit.get("rows") or [])
     filtered_rows = []
     for item in rows:
@@ -838,6 +842,10 @@ def filter_driver_coverage_audit(
         if normalized_next_action and str(item.get("nextAction") or "") != normalized_next_action:
             continue
         if normalized_missing_item and normalized_missing_item not in missing_items:
+            continue
+        if normalized_capability_level and str(item.get("capabilityLevel") or "") != normalized_capability_level:
+            continue
+        if normalized_profile_key and str(item.get("profileKey") or "") != normalized_profile_key:
             continue
         filtered_rows.append(item)
 
@@ -869,6 +877,8 @@ def filter_driver_coverage_audit(
             "onlyGaps": bool(only_gaps),
             "nextAction": normalized_next_action,
             "missingItem": normalized_missing_item,
+            "capabilityLevel": normalized_capability_level,
+            "profileKey": normalized_profile_key,
         },
     }
 
@@ -896,6 +906,8 @@ def render_driver_coverage_audit_markdown(audit: dict[str, Any]) -> str:
         f"- 只看缺口: `{bool(filters.get('onlyGaps'))}`",
         f"- 下一步动作: `{filters.get('nextAction', '') or '-'}`",
         f"- 缺口类型: `{filters.get('missingItem', '') or '-'}`",
+        f"- 能力等级: `{filters.get('capabilityLevel', '') or '-'}`",
+        f"- Profile Key: `{filters.get('profileKey', '') or '-'}`",
         "",
         "## 缺口汇总",
         "",

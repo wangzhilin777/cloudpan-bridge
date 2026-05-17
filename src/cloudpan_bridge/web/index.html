@@ -748,6 +748,27 @@
                 <option value="capture">缺 capture</option>
                 <option value="capability">缺 capability</option>
               </select>
+              <select id="coverage-capability-level-filter" style="width:auto;min-width:220px;">
+                <option value="">全部能力等级</option>
+                <option value="fast_upload_supported">fast_upload_supported</option>
+                <option value="fast_upload_partial">fast_upload_partial</option>
+                <option value="relay_supported">relay_supported</option>
+                <option value="download_upload_only">download_upload_only</option>
+                <option value="unsupported">unsupported</option>
+              </select>
+              <select id="coverage-profile-key-filter" style="width:auto;min-width:220px;">
+                <option value="">全部 profile key</option>
+                <option value="generic">generic</option>
+                <option value="189cloud">189cloud</option>
+                <option value="quark">quark</option>
+                <option value="123pan">123pan</option>
+                <option value="baidu">baidu</option>
+                <option value="thunder">thunder</option>
+                <option value="aliyundriveopen">aliyundriveopen</option>
+                <option value="onedrive">onedrive</option>
+                <option value="pikpak">pikpak</option>
+                <option value="139yun">139yun</option>
+              </select>
               <button class="secondary" id="export-coverage-json" data-i18n="btn.export_coverage_json">导出覆盖审计 JSON</button>
               <button class="secondary" id="export-coverage-md" data-i18n="btn.export_coverage_md">导出覆盖审计 Markdown</button>
             </div>
@@ -1148,6 +1169,8 @@
         onlyGaps: Boolean(document.getElementById("coverage-only-gaps")?.checked),
         nextAction: String(document.getElementById("coverage-next-action-filter")?.value || ""),
         missingItem: String(document.getElementById("coverage-missing-item-filter")?.value || ""),
+        capabilityLevel: String(document.getElementById("coverage-capability-level-filter")?.value || ""),
+        profileKey: String(document.getElementById("coverage-profile-key-filter")?.value || ""),
       };
     }
 
@@ -1156,9 +1179,13 @@
       const onlyGaps = document.getElementById("coverage-only-gaps");
       const nextAction = document.getElementById("coverage-next-action-filter");
       const missingItem = document.getElementById("coverage-missing-item-filter");
+      const capabilityLevel = document.getElementById("coverage-capability-level-filter");
+      const profileKey = document.getElementById("coverage-profile-key-filter");
       if (onlyGaps) onlyGaps.checked = Boolean(state.onlyGaps);
       if (nextAction && typeof state.nextAction === "string") nextAction.value = state.nextAction;
       if (missingItem && typeof state.missingItem === "string") missingItem.value = state.missingItem;
+      if (capabilityLevel && typeof state.capabilityLevel === "string") capabilityLevel.value = state.capabilityLevel;
+      if (profileKey && typeof state.profileKey === "string") profileKey.value = state.profileKey;
     }
     const PROVIDER_DRIVER_HINTS = {
       "189cloud": ["189Cloud", "189CloudPC", "189CloudTV"],
@@ -1381,6 +1408,8 @@
             only_gaps: filters.onlyGaps,
             next_action: filters.nextAction,
             missing_item: filters.missingItem,
+            capability_level: filters.capabilityLevel,
+            profile_key: filters.profileKey,
           }),
         });
       } catch (_error) {
@@ -1719,12 +1748,16 @@
         if (filters.onlyGaps && (!Array.isArray(item.missingItems) || !item.missingItems.length)) return false;
         if (filters.nextAction && String(item.nextAction || "") !== filters.nextAction) return false;
         if (filters.missingItem && (!Array.isArray(item.missingItems) || !item.missingItems.includes(filters.missingItem))) return false;
+        if (filters.capabilityLevel && String(item.capabilityLevel || "") !== filters.capabilityLevel) return false;
+        if (filters.profileKey && String(item.profileKey || "") !== filters.profileKey) return false;
         return true;
       });
       const filteredBacklog = backlog.filter((item) => {
         if (filters.onlyGaps && (!Array.isArray(item.missingItems) || !item.missingItems.length)) return false;
         if (filters.nextAction && String(item.nextAction || "") !== filters.nextAction) return false;
         if (filters.missingItem && (!Array.isArray(item.missingItems) || !item.missingItems.includes(filters.missingItem))) return false;
+        if (filters.capabilityLevel && String(item.capabilityLevel || "") !== filters.capabilityLevel) return false;
+        if (filters.profileKey && String(item.profileKey || "") !== filters.profileKey) return false;
         return true;
       });
       if (!auditRows.length) {
@@ -3046,6 +3079,14 @@
         setCoverageFilterState(currentCoverageFilters());
         renderAboutRegistry();
       });
+      document.getElementById("coverage-capability-level-filter").addEventListener("change", () => {
+        setCoverageFilterState(currentCoverageFilters());
+        renderAboutRegistry();
+      });
+      document.getElementById("coverage-profile-key-filter").addEventListener("change", () => {
+        setCoverageFilterState(currentCoverageFilters());
+        renderAboutRegistry();
+      });
       document.getElementById("export-coverage-json").onclick = async () => {
         await refreshCoverageAudit();
         if (!coverageAuditCache) return;
@@ -3064,6 +3105,8 @@
             only_gaps: filters.onlyGaps,
             next_action: filters.nextAction,
             missing_item: filters.missingItem,
+            capability_level: filters.capabilityLevel,
+            profile_key: filters.profileKey,
           }),
           headers: { "content-type": "application/json" },
         });

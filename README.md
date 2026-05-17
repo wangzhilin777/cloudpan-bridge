@@ -156,6 +156,9 @@
   - 支持导出 `JSON / Markdown` 审计结果，便于拆分后续任务
   - 支持页面内只看缺口、按下一步动作过滤
   - 还支持按缺口类型过滤，例如只看“缺 capture”的驱动
+  - 还支持按 `capability level` 与 `profileKey` 过滤
+    - 例如只看 `download_upload_only`
+    - 或只看某个具体 profile，如 `aliyundriveopen`
   - 覆盖筛选条件会自动记住，下次进入页面继续延续
   - 导出结果会跟随当前筛选视图，不再固定导出全量
   - 每条审计记录现在还会展示：
