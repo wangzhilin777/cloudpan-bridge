@@ -799,6 +799,8 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
                 {
                     "driver": driver,
                     "normalized": normalized,
+                    "profileKey": str(profile.get("key") or "generic"),
+                    "capabilityLevel": capability_level or "unsupported",
                     "missingItems": missing_items,
                     "nextAction": next_action,
                     "priorityRank": priority_rank,
