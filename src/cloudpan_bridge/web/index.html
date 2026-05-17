@@ -1371,12 +1371,16 @@
         renderAboutRegistry();
         return;
       }
+      const filters = currentCoverageFilters();
       try {
         coverageAuditCache = await call("/api/provider/coverage_audit", {
           method: "POST",
           body: JSON.stringify({
             drivers: driversCache,
             target: "guangya",
+            only_gaps: filters.onlyGaps,
+            next_action: filters.nextAction,
+            missing_item: filters.missingItem,
           }),
         });
       } catch (_error) {
@@ -3040,9 +3044,7 @@
         renderAboutRegistry();
       });
       document.getElementById("export-coverage-json").onclick = async () => {
-        if (!coverageAuditCache) {
-          await refreshCoverageAudit();
-        }
+        await refreshCoverageAudit();
         if (!coverageAuditCache) return;
         downloadTextFile("cloudpan-bridge-coverage-audit.json", JSON.stringify(coverageAuditCache, null, 2), "application/json;charset=utf-8");
       };
@@ -3050,11 +3052,15 @@
         if (!Array.isArray(driversCache) || !driversCache.length) {
           await loadDrivers();
         }
+        const filters = currentCoverageFilters();
         const markdown = await call("/api/provider/coverage_audit_markdown", {
           method: "POST",
           body: JSON.stringify({
             drivers: driversCache,
             target: "guangya",
+            only_gaps: filters.onlyGaps,
+            next_action: filters.nextAction,
+            missing_item: filters.missingItem,
           }),
           headers: { "content-type": "application/json" },
         });

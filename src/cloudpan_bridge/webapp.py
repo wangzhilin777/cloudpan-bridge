@@ -25,6 +25,7 @@ from .provider_capture import (
 )
 from .provider_registry import (
     build_driver_coverage_audit,
+    filter_driver_coverage_audit,
     assess_driver_target_capability,
     build_driver_capability_matrix,
     build_driver_target_capability,
@@ -994,7 +995,13 @@ def create_app(config_path: Path) -> FastAPI:
         target = str(payload.get("target") or "guangya").strip() or "guangya"
         if not isinstance(drivers, list):
             raise HTTPException(status_code=400, detail="缺少 drivers")
-        return build_driver_coverage_audit([str(item or "") for item in drivers], target=target)
+        audit = build_driver_coverage_audit([str(item or "") for item in drivers], target=target)
+        return filter_driver_coverage_audit(
+            audit,
+            only_gaps=bool(payload.get("only_gaps")),
+            next_action=str(payload.get("next_action") or ""),
+            missing_item=str(payload.get("missing_item") or ""),
+        )
 
     @app.post("/api/provider/coverage_audit_markdown")
     def post_provider_coverage_audit_markdown(payload: dict[str, Any] | None = None) -> PlainTextResponse:
@@ -1004,6 +1011,12 @@ def create_app(config_path: Path) -> FastAPI:
         if not isinstance(drivers, list):
             raise HTTPException(status_code=400, detail="缺少 drivers")
         audit = build_driver_coverage_audit([str(item or "") for item in drivers], target=target)
+        audit = filter_driver_coverage_audit(
+            audit,
+            only_gaps=bool(payload.get("only_gaps")),
+            next_action=str(payload.get("next_action") or ""),
+            missing_item=str(payload.get("missing_item") or ""),
+        )
         markdown = render_driver_coverage_audit_markdown(audit)
         return PlainTextResponse(markdown, media_type="text/markdown; charset=utf-8")
 

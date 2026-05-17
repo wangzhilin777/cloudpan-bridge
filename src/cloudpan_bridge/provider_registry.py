@@ -830,12 +830,66 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
     }
 
 
+def filter_driver_coverage_audit(
+    audit: dict[str, Any],
+    *,
+    only_gaps: bool = False,
+    next_action: str = "",
+    missing_item: str = "",
+) -> dict[str, Any]:
+    normalized_next_action = str(next_action or "").strip()
+    normalized_missing_item = str(missing_item or "").strip()
+    rows = list(audit.get("rows") or [])
+    filtered_rows = []
+    for item in rows:
+        missing_items = list(item.get("missingItems") or [])
+        if only_gaps and not missing_items:
+            continue
+        if normalized_next_action and str(item.get("nextAction") or "") != normalized_next_action:
+            continue
+        if normalized_missing_item and normalized_missing_item not in missing_items:
+            continue
+        filtered_rows.append(item)
+
+    filtered_backlog = [
+        item for item in list(audit.get("backlog") or [])
+        if any(str(item.get("driver") or "") == str(row.get("driver") or "") for row in filtered_rows)
+    ]
+    totals = {
+        "total": len(filtered_rows),
+        "profile": sum(1 for item in filtered_rows if item.get("hasProfile")),
+        "guide": sum(1 for item in filtered_rows if item.get("hasGuide")),
+        "capture": sum(1 for item in filtered_rows if item.get("hasCapture")),
+        "capability": sum(1 for item in filtered_rows if item.get("hasCapability")),
+    }
+    gap_buckets = {
+        "missingProfile": sum(1 for item in filtered_rows if "profile" in list(item.get("missingItems") or [])),
+        "missingGuide": sum(1 for item in filtered_rows if "guide" in list(item.get("missingItems") or [])),
+        "missingCapture": sum(1 for item in filtered_rows if "capture" in list(item.get("missingItems") or [])),
+        "missingCapability": sum(1 for item in filtered_rows if "capability" in list(item.get("missingItems") or [])),
+        "fullyCovered": sum(1 for item in filtered_rows if not list(item.get("missingItems") or [])),
+    }
+    return {
+        "target": str(audit.get("target") or "guangya"),
+        "rows": filtered_rows,
+        "totals": totals,
+        "gapBuckets": gap_buckets,
+        "backlog": filtered_backlog,
+        "filters": {
+            "onlyGaps": bool(only_gaps),
+            "nextAction": normalized_next_action,
+            "missingItem": normalized_missing_item,
+        },
+    }
+
+
 def render_driver_coverage_audit_markdown(audit: dict[str, Any]) -> str:
     target = str(audit.get("target") or "guangya")
     totals = dict(audit.get("totals") or {})
     gap_buckets = dict(audit.get("gapBuckets") or {})
     backlog = list(audit.get("backlog") or [])
     rows = list(audit.get("rows") or [])
+    filters = dict(audit.get("filters") or {})
 
     lines = [
         "# CloudPan Bridge 驱动覆盖审计",
@@ -846,6 +900,12 @@ def render_driver_coverage_audit_markdown(audit: dict[str, Any]) -> str:
         f"- 已有 guide: `{totals.get('guide', 0)}`",
         f"- 已有 capture: `{totals.get('capture', 0)}`",
         f"- 已有 capability: `{totals.get('capability', 0)}`",
+        "",
+        "## 当前筛选",
+        "",
+        f"- 只看缺口: `{bool(filters.get('onlyGaps'))}`",
+        f"- 下一步动作: `{filters.get('nextAction', '') or '-'}`",
+        f"- 缺口类型: `{filters.get('missingItem', '') or '-'}`",
         "",
         "## 缺口汇总",
         "",
