@@ -559,6 +559,41 @@ def test_provider_capability_endpoint_returns_driver_to_guangya_matrix(tmp_path:
     assert payload["level"] == "download_upload_only"
 
 
+def test_provider_coverage_audit_endpoint_reports_registry_and_capture_coverage(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_audit",
+        json={
+            "drivers": ["AliyundriveOpen", "OneDrive", "UnknownDrive", "Thunder"],
+            "target": "guangya",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    rows = {item["normalized"]: item for item in payload["rows"]}
+    assert payload["totals"]["total"] == 4
+    assert rows["aliyundriveopen"]["hasProfile"] is True
+    assert rows["aliyundriveopen"]["hasGuide"] is True
+    assert rows["aliyundriveopen"]["hasCapture"] is True
+    assert rows["aliyundriveopen"]["capabilityLevel"] == "download_upload_only"
+    assert rows["thunder"]["hasCapability"] is True
+    assert rows["unknowndrive"]["hasProfile"] is False
+    assert rows["unknowndrive"]["hasGuide"] is False
+    assert rows["unknowndrive"]["hasCapture"] is False
+
+
 def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(

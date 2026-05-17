@@ -24,6 +24,7 @@ from .provider_capture import (
     normalize_provider_capture_entry,
 )
 from .provider_registry import (
+    build_driver_coverage_audit,
     assess_driver_target_capability,
     build_driver_capability_matrix,
     build_driver_target_capability,
@@ -984,6 +985,15 @@ def create_app(config_path: Path) -> FastAPI:
         if not driver.strip():
             raise HTTPException(status_code=400, detail="缺少 driver")
         return build_driver_target_capability(driver, target=target)
+
+    @app.post("/api/provider/coverage_audit")
+    def post_provider_coverage_audit(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload = payload or {}
+        drivers = payload.get("drivers")
+        target = str(payload.get("target") or "guangya").strip() or "guangya"
+        if not isinstance(drivers, list):
+            raise HTTPException(status_code=400, detail="缺少 drivers")
+        return build_driver_coverage_audit([str(item or "") for item in drivers], target=target)
 
     @app.post("/api/provider/capability_assess")
     def post_provider_capability_assess(payload: dict[str, Any] | None = None) -> dict[str, Any]:

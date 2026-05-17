@@ -709,6 +709,72 @@ def build_driver_capability_matrix(target: str = "guangya") -> dict[str, dict[st
     return matrix
 
 
+def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> dict[str, Any]:
+    matrix = build_driver_capability_matrix(target=target)
+    capture_supported_aliases: set[str] = set()
+    for guide in SOURCE_PROVIDER_PROFILES.values():
+        for alias in list(guide.get("driver_aliases") or []):
+            capture_supported_aliases.add(_normalize_key(alias))
+    capture_key_aliases = {
+        _normalize_key("189cloud"): ["189cloud", "189cloudpc", "189cloudtv"],
+        _normalize_key("quark"): ["quark", "quarkopen", "quarktv"],
+        _normalize_key("123pan"): ["123pan", "123open"],
+        _normalize_key("baidu"): ["baidunetdisk", "baiduphoto", "baidu"],
+        _normalize_key("thunder"): ["thunder", "thunderx", "thunderexpert", "xunlei"],
+        _normalize_key("aliyundriveopen"): ["aliyundriveopen", "aliyundrive", "alipan", "aliyun"],
+        _normalize_key("onedrive"): ["onedrive"],
+        _normalize_key("pikpak"): ["pikpak"],
+        _normalize_key("139yun"): ["139yun", "139"],
+    }
+    capture_keys = set(capture_key_aliases.keys())
+
+    rows: list[dict[str, Any]] = []
+    totals = {
+        "total": 0,
+        "profile": 0,
+        "guide": 0,
+        "capture": 0,
+        "capability": 0,
+    }
+    for driver in sorted({str(item or "").strip() for item in drivers if str(item or "").strip()}, key=lambda item: item.lower()):
+        normalized = _normalize_key(driver)
+        profile = get_source_profile_by_driver(driver)
+        has_profile = str(profile.get("key") or "") != "generic"
+        guide = get_driver_guide(driver)
+        has_guide = guide is not None
+        has_capture = normalized in capture_supported_aliases or any(
+            normalized in {_normalize_key(alias) for alias in aliases}
+            for aliases in capture_key_aliases.values()
+        )
+        capability = matrix.get(normalized)
+        capability_level = str((capability or {}).get("level") or "")
+        has_capability = bool(capability_level and capability_level != "unsupported")
+        coverage_score = int(has_profile) + int(has_guide) + int(has_capture) + int(has_capability)
+        row = {
+            "driver": driver,
+            "normalized": normalized,
+            "profileKey": str(profile.get("key") or "generic"),
+            "hasProfile": has_profile,
+            "hasGuide": has_guide,
+            "hasCapture": has_capture,
+            "hasCapability": has_capability,
+            "capabilityLevel": capability_level or "unsupported",
+            "coverageScore": coverage_score,
+            "docLinks": list(profile.get("docLinks") or []),
+        }
+        rows.append(row)
+        totals["total"] += 1
+        totals["profile"] += int(has_profile)
+        totals["guide"] += int(has_guide)
+        totals["capture"] += int(has_capture)
+        totals["capability"] += int(has_capability)
+    return {
+        "target": target,
+        "rows": rows,
+        "totals": totals,
+    }
+
+
 def assess_driver_target_capability(
     driver: str,
     analysis_summary: dict[str, Any] | None = None,

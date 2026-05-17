@@ -727,6 +727,12 @@
             <div class="subtle" data-i18n="desc.driver_matrix">这是当前内置的“源驱动 -> Guangya”能力矩阵，只表示当前项目的真实支持判断，不等于所有跨网盘都能秒传。</div>
             <div class="mount-list" id="about-driver-matrix">等待载入...</div>
           </div>
+
+          <div class="panel">
+            <h2 data-i18n="panel.coverage_audit">驱动覆盖审计</h2>
+            <div class="subtle" data-i18n="desc.coverage_audit">这里会把当前 OpenList 实际驱动列表和内置 registry 对比，直接看出哪些驱动已经具备 profile、guide、capture、capability，方便后续继续补全。</div>
+            <div class="mount-list" id="about-coverage-audit">等待载入...</div>
+          </div>
         </section>
       </div>
 
@@ -812,6 +818,7 @@
         "panel.source_profiles": "源端 Profiles",
         "panel.target_profiles": "目标端 Profiles",
         "panel.driver_matrix": "Driver 能力矩阵",
+        "panel.coverage_audit": "驱动覆盖审计",
         "card.runtime": "OpenList Runtime",
         "card.sync": "同步状态",
         "card.capture": "光鸭抓取",
@@ -897,6 +904,7 @@
         "desc.source_profiles": "这里列出当前内置的 OpenList 源端 profile、常见哈希和推荐频率。后续继续扩全驱动时，就往这层补。",
         "desc.target_profiles": "这里列出当前目标端适配器支持的快传指纹和降级方式。现在正式内置目标端仍是 Guangya。",
         "desc.driver_matrix": "这是当前内置的“源驱动 -> Guangya”能力矩阵，只表示当前项目的真实支持判断，不等于所有跨网盘都能秒传。",
+        "desc.coverage_audit": "这里会把当前 OpenList 实际驱动列表和内置 registry 对比，直接看出哪些驱动已经具备 profile、guide、capture、capability，方便后续继续补全。",
         "option.openlist_mode.external": "外部模式",
         "option.openlist_mode.managed": "托管模式",
         "option.rate_limit_mode.safe": "稳妥",
@@ -933,6 +941,7 @@
         "panel.source_profiles": "Source Profiles",
         "panel.target_profiles": "Target Profiles",
         "panel.driver_matrix": "Driver Capability Matrix",
+        "panel.coverage_audit": "Driver Coverage Audit",
         "card.runtime": "OpenList Runtime",
         "card.sync": "Sync Status",
         "card.capture": "Guangya Capture",
@@ -1018,6 +1027,7 @@
         "desc.source_profiles": "This lists the built-in OpenList source profiles, likely hashes, and recommended rate presets. Keep extending this layer as more drivers are covered.",
         "desc.target_profiles": "This lists the current target adapters, their fast-upload hashes, and fallback modes. Guangya is still the primary built-in target.",
         "desc.driver_matrix": "This is the current built-in source-driver to Guangya matrix. It reflects this project's real support judgment, not a promise that all cross-cloud copies can fast upload.",
+        "desc.coverage_audit": "This compares the live OpenList driver list with the built-in registry so you can see which drivers already have profiles, guides, capture, and capability coverage.",
         "option.openlist_mode.external": "External",
         "option.openlist_mode.managed": "Managed",
         "option.rate_limit_mode.safe": "Safe",
@@ -1092,6 +1102,7 @@
     let driverCaptureBlueprint = null;
     let currentDriverGuide = null;
     let currentProviderGuide = null;
+    let coverageAuditCache = null;
     const PROVIDER_DRIVER_HINTS = {
       "189cloud": ["189Cloud", "189CloudPC", "189CloudTV"],
       "quark": ["Quark", "QuarkOpen", "QuarkTV"],
@@ -1294,6 +1305,26 @@
         capabilityAssessmentCache = null;
       }
       renderCapabilitySummary();
+    }
+
+    async function refreshCoverageAudit() {
+      if (!Array.isArray(driversCache) || !driversCache.length) {
+        coverageAuditCache = null;
+        renderAboutRegistry();
+        return;
+      }
+      try {
+        coverageAuditCache = await call("/api/provider/coverage_audit", {
+          method: "POST",
+          body: JSON.stringify({
+            drivers: driversCache,
+            target: "guangya",
+          }),
+        });
+      } catch (_error) {
+        coverageAuditCache = null;
+      }
+      renderAboutRegistry();
     }
 
     function currentDriverContext() {
@@ -1512,7 +1543,8 @@
       const sourceRoot = document.getElementById("about-source-profiles");
       const targetRoot = document.getElementById("about-target-profiles");
       const matrixRoot = document.getElementById("about-driver-matrix");
-      if (!summaryRoot || !sourceRoot || !targetRoot || !matrixRoot) return;
+      const coverageRoot = document.getElementById("about-coverage-audit");
+      if (!summaryRoot || !sourceRoot || !targetRoot || !matrixRoot || !coverageRoot) return;
       const sourceProfiles = Object.values(providerRegistryPayload?.source_profiles || {});
       const targetProfiles = Object.values(providerRegistryPayload?.target_profiles || {});
       const driverMatrix = Object.values(providerRegistryPayload?.driver_matrix || {});
@@ -1588,6 +1620,36 @@
               </div>
             `;
           }).join("");
+      }
+
+      const auditRows = Array.isArray(coverageAuditCache?.rows) ? coverageAuditCache.rows : [];
+      const auditTotals = coverageAuditCache?.totals || {};
+      if (!auditRows.length) {
+        coverageRoot.textContent = currentLang() === "en"
+          ? "Coverage audit will appear after the OpenList driver list is loaded."
+          : currentLang() === "mix"
+            ? "驱动列表载入后，这里会显示覆盖审计结果。 / Coverage audit will appear after drivers are loaded."
+            : "驱动列表载入后，这里会显示覆盖审计结果。";
+      } else {
+        coverageRoot.innerHTML = `
+          <div class="subtle" style="margin-bottom:10px;">
+            ${currentLang() === "en"
+              ? `Total=${auditTotals.total ?? 0}, profile=${auditTotals.profile ?? 0}, guide=${auditTotals.guide ?? 0}, capture=${auditTotals.capture ?? 0}, capability=${auditTotals.capability ?? 0}`
+              : currentLang() === "mix"
+                ? `总数 / Total=${auditTotals.total ?? 0}, profile=${auditTotals.profile ?? 0}, guide=${auditTotals.guide ?? 0}, capture=${auditTotals.capture ?? 0}, capability=${auditTotals.capability ?? 0}`
+                : `总数=${auditTotals.total ?? 0}，profile=${auditTotals.profile ?? 0}，guide=${auditTotals.guide ?? 0}，capture=${auditTotals.capture ?? 0}，capability=${auditTotals.capability ?? 0}`}
+          </div>
+          ${auditRows.map((item) => `
+            <div class="row-item">
+              <div>
+                <div>${escapeHtml(item.driver || "-")}</div>
+                <div class="mono">profile=${item.hasProfile ? "yes" : "no"} | guide=${item.hasGuide ? "yes" : "no"} | capture=${item.hasCapture ? "yes" : "no"} | capability=${item.hasCapability ? "yes" : "no"}</div>
+                <div class="mono">${currentLang() === "en" ? "level" : currentLang() === "mix" ? "等级 / level" : "等级"}=${escapeHtml(capabilityLevelText(item.capabilityLevel || "unsupported"))} | score=${item.coverageScore ?? 0}/4</div>
+                <div class="mono">profileKey=${escapeHtml(item.profileKey || "generic")}</div>
+              </div>
+            </div>
+          `).join("")}
+        `;
       }
     }
 
@@ -2363,6 +2425,7 @@
         document.getElementById("driver-fields").innerHTML = `<div class='subtle'>${currentLang() === "en" ? "No drivers loaded." : currentLang() === "mix" ? "未获取到驱动列表 / No drivers loaded." : "未获取到驱动列表。"}</div>`;
       }
       applyProviderSelectionFromDriver(select.value || "");
+      await refreshCoverageAudit();
     }
 
     function renderDriverFields(info) {

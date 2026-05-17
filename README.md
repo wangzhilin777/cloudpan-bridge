@@ -149,6 +149,9 @@
 - 已内置的源端 profiles
 - 已内置的目标端 profiles
 - 当前 driver 到 Guangya 的能力矩阵条目
+- 当前 OpenList 驱动覆盖审计
+  - 直接显示哪些驱动已经具备 `profile / guide / capture / capability`
+  - 方便后续按缺口继续补 OpenList 全驱动
 - 各源端的登录模式、哈希能力、下载链路、抓取策略、默认挂载值、风控备注
 
 这样后面继续补 OpenList 全驱动时，可以直接把新增结果往 registry 填，而不是继续把逻辑散落在页面脚本里。
