@@ -8,7 +8,7 @@ from threading import Lock, Thread
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from .config import AppConfig, write_example_config
 from .guangya_direct import GuangyaMiaochuanImporter, normalize_guangya_authorization
@@ -33,6 +33,7 @@ from .provider_registry import (
     list_driver_guides,
     list_source_profiles,
     list_target_profiles,
+    render_driver_coverage_audit_markdown,
 )
 from .syncer import (
     SyncRunner,
@@ -994,6 +995,17 @@ def create_app(config_path: Path) -> FastAPI:
         if not isinstance(drivers, list):
             raise HTTPException(status_code=400, detail="缺少 drivers")
         return build_driver_coverage_audit([str(item or "") for item in drivers], target=target)
+
+    @app.post("/api/provider/coverage_audit_markdown")
+    def post_provider_coverage_audit_markdown(payload: dict[str, Any] | None = None) -> PlainTextResponse:
+        payload = payload or {}
+        drivers = payload.get("drivers")
+        target = str(payload.get("target") or "guangya").strip() or "guangya"
+        if not isinstance(drivers, list):
+            raise HTTPException(status_code=400, detail="缺少 drivers")
+        audit = build_driver_coverage_audit([str(item or "") for item in drivers], target=target)
+        markdown = render_driver_coverage_audit_markdown(audit)
+        return PlainTextResponse(markdown, media_type="text/markdown; charset=utf-8")
 
     @app.post("/api/provider/capability_assess")
     def post_provider_capability_assess(payload: dict[str, Any] | None = None) -> dict[str, Any]:

@@ -830,6 +830,66 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
     }
 
 
+def render_driver_coverage_audit_markdown(audit: dict[str, Any]) -> str:
+    target = str(audit.get("target") or "guangya")
+    totals = dict(audit.get("totals") or {})
+    gap_buckets = dict(audit.get("gapBuckets") or {})
+    backlog = list(audit.get("backlog") or [])
+    rows = list(audit.get("rows") or [])
+
+    lines = [
+        "# CloudPan Bridge 驱动覆盖审计",
+        "",
+        f"- 目标端: `{target}`",
+        f"- 驱动总数: `{totals.get('total', 0)}`",
+        f"- 已有 profile: `{totals.get('profile', 0)}`",
+        f"- 已有 guide: `{totals.get('guide', 0)}`",
+        f"- 已有 capture: `{totals.get('capture', 0)}`",
+        f"- 已有 capability: `{totals.get('capability', 0)}`",
+        "",
+        "## 缺口汇总",
+        "",
+        f"- 完全覆盖: `{gap_buckets.get('fullyCovered', 0)}`",
+        f"- 缺 profile: `{gap_buckets.get('missingProfile', 0)}`",
+        f"- 缺 guide: `{gap_buckets.get('missingGuide', 0)}`",
+        f"- 缺 capture: `{gap_buckets.get('missingCapture', 0)}`",
+        f"- 缺 capability: `{gap_buckets.get('missingCapability', 0)}`",
+        "",
+        "## 优先级 Backlog",
+        "",
+    ]
+
+    if backlog:
+        for index, item in enumerate(backlog, start=1):
+            lines.append(
+                f"{index}. `{item.get('driver', '-')}` | P{item.get('priorityRank', '-')} | "
+                f"{item.get('nextAction', '-')} | 缺口: {', '.join(item.get('missingItems') or []) or '-'}"
+            )
+    else:
+        lines.append("- 当前已加载驱动都已覆盖。")
+
+    lines.extend(["", "## 全量明细", ""])
+    if rows:
+        lines.append("| Driver | Profile | Guide | Capture | Capability | Level | Score | Next | Missing |")
+        lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+        for item in rows:
+            lines.append(
+                f"| `{item.get('driver', '-')}` | "
+                f"{'yes' if item.get('hasProfile') else 'no'} | "
+                f"{'yes' if item.get('hasGuide') else 'no'} | "
+                f"{'yes' if item.get('hasCapture') else 'no'} | "
+                f"{'yes' if item.get('hasCapability') else 'no'} | "
+                f"`{item.get('capabilityLevel', 'unsupported')}` | "
+                f"{item.get('coverageScore', 0)}/4 | "
+                f"`{item.get('nextAction', '-')}` | "
+                f"{', '.join(item.get('missingItems') or []) or '-'} |"
+            )
+    else:
+        lines.append("- 暂无驱动数据。")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def assess_driver_target_capability(
     driver: str,
     analysis_summary: dict[str, Any] | None = None,
