@@ -2,7 +2,9 @@ import json
 from pathlib import Path, PurePosixPath
 
 from fastapi.testclient import TestClient
+import pytest
 
+import cloudpan_bridge.provider_registry as provider_registry_module
 from cloudpan_bridge.config import AppConfig
 from cloudpan_bridge.guangya_direct import GuangyaMiaochuanImporter
 from cloudpan_bridge.guangya import GuangyaService
@@ -600,6 +602,40 @@ def test_provider_coverage_audit_endpoint_reports_registry_and_capture_coverage(
     assert rows["unknowndrive"]["missingItems"] == ["profile", "guide", "capture", "capability"]
     assert rows["unknowndrive"]["nextAction"] == "add_profile_first"
     assert rows["unknowndrive"]["priorityRank"] == 1
+
+
+def test_provider_coverage_audit_uses_real_capture_specs_instead_of_profile_aliases(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_profiles = provider_registry_module.SOURCE_PROVIDER_PROFILES
+    fake_profiles = {
+        **original_profiles,
+        "fakecapturegap": {
+            **dict(original_profiles["generic"]),
+            "key": "fakecapturegap",
+            "label": "Fake Capture Gap",
+            "label_zh": "假驱动抓取缺口",
+            "driver_aliases": ["FakeCaptureGap"],
+            "doc_links": [],
+            "capability_to_targets": {
+                "guangya": {
+                    "level": "download_upload_only",
+                    "recommended_flow": "仅用于测试覆盖审计。",
+                    "recommended_flow_en": "For coverage audit regression testing only.",
+                }
+            },
+        },
+    }
+    monkeypatch.setattr(provider_registry_module, "SOURCE_PROVIDER_PROFILES", fake_profiles)
+
+    audit = provider_registry_module.build_driver_coverage_audit(["FakeCaptureGap"], target="guangya")
+    row = audit["rows"][0]
+    assert row["normalized"] == "fakecapturegap"
+    assert row["hasProfile"] is True
+    assert row["hasGuide"] is False
+    assert row["hasCapture"] is False
+    assert row["hasCapability"] is True
+    assert row["missingItems"] == ["guide", "capture"]
+    assert row["nextAction"] == "add_guide"
+    assert audit["gapBuckets"]["missingCapture"] == 1
 
 
 def test_provider_coverage_audit_endpoint_supports_filtered_view_export(tmp_path: Path) -> None:

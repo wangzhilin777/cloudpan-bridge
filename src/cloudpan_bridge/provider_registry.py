@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .provider_capture import build_capture_supported_driver_aliases
+
 
 DRIVER_GUIDES: dict[str, dict[str, Any]] = {
     "aliyundriveopen": {
@@ -711,22 +713,7 @@ def build_driver_capability_matrix(target: str = "guangya") -> dict[str, dict[st
 
 def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> dict[str, Any]:
     matrix = build_driver_capability_matrix(target=target)
-    capture_supported_aliases: set[str] = set()
-    for guide in SOURCE_PROVIDER_PROFILES.values():
-        for alias in list(guide.get("driver_aliases") or []):
-            capture_supported_aliases.add(_normalize_key(alias))
-    capture_key_aliases = {
-        _normalize_key("189cloud"): ["189cloud", "189cloudpc", "189cloudtv"],
-        _normalize_key("quark"): ["quark", "quarkopen", "quarktv"],
-        _normalize_key("123pan"): ["123pan", "123open"],
-        _normalize_key("baidu"): ["baidunetdisk", "baiduphoto", "baidu"],
-        _normalize_key("thunder"): ["thunder", "thunderx", "thunderexpert", "xunlei"],
-        _normalize_key("aliyundriveopen"): ["aliyundriveopen", "aliyundrive", "alipan", "aliyun"],
-        _normalize_key("onedrive"): ["onedrive"],
-        _normalize_key("pikpak"): ["pikpak"],
-        _normalize_key("139yun"): ["139yun", "139"],
-    }
-    capture_keys = set(capture_key_aliases.keys())
+    capture_supported_aliases = build_capture_supported_driver_aliases()
 
     rows: list[dict[str, Any]] = []
     totals = {
@@ -750,10 +737,7 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
         has_profile = str(profile.get("key") or "") != "generic"
         guide = get_driver_guide(driver)
         has_guide = guide is not None
-        has_capture = normalized in capture_supported_aliases or any(
-            normalized in {_normalize_key(alias) for alias in aliases}
-            for aliases in capture_key_aliases.values()
-        )
+        has_capture = normalized in capture_supported_aliases
         capability = matrix.get(normalized)
         capability_level = str((capability or {}).get("level") or "")
         has_capability = bool(capability_level and capability_level != "unsupported")

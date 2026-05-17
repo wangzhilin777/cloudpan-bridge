@@ -137,6 +137,11 @@ def _ordered_unique(values: list[str]) -> list[str]:
     return result
 
 
+def normalize_provider_alias(value: str) -> str:
+    text = re.sub(r"[^a-z0-9]+", "", str(value or "").strip().lower())
+    return text
+
+
 def guess_login_url_for_driver(driver: str) -> str:
     text = str(driver or "").strip().lower()
     if not text:
@@ -457,6 +462,25 @@ def default_provider_specs() -> dict[str, ProviderCaptureSpec]:
             description="优先抓取 139 云盘 Authorization；目录 ID、代理与更多参数仍建议按驱动接入说明补齐。",
         ),
     }
+
+
+def build_capture_supported_driver_aliases(
+    specs: dict[str, ProviderCaptureSpec] | None = None,
+) -> set[str]:
+    capture_specs = specs or default_provider_specs()
+    aliases: set[str] = set()
+    for spec_key, spec in capture_specs.items():
+        normalized_key = normalize_provider_alias(spec_key)
+        if normalized_key:
+            aliases.add(normalized_key)
+        normalized_spec = normalize_provider_alias(spec.key)
+        if normalized_spec:
+            aliases.add(normalized_spec)
+        for driver in list(spec.recommended_drivers or []):
+            normalized_driver = normalize_provider_alias(driver)
+            if normalized_driver:
+                aliases.add(normalized_driver)
+    return aliases
 
 
 class ProviderCaptureManager:
