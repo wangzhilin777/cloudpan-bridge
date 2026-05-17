@@ -1330,6 +1330,37 @@
       return currentLang() === "en" ? text.en : currentLang() === "mix" ? `${text.zh} / ${text.en}` : text.zh;
     }
 
+    function strategyModeText(mode) {
+      const mapping = {
+        analyze_first: {
+          zh: "先分析再决定",
+          en: "Analyze first",
+        },
+        direct_metadata_first: {
+          zh: "优先直接秒传/元数据导入",
+          en: "Direct metadata-first sync",
+        },
+        leaf_metadata_then_pending: {
+          zh: "最底层边扫边秒传，再进待补传树",
+          en: "Leaf sync first, pending tree next",
+        },
+        stream_relay_first: {
+          zh: "优先中转流传输",
+          en: "Relay streaming first",
+        },
+        pending_tree_first: {
+          zh: "优先待补传树分目录补传",
+          en: "Pending-tree-first reupload",
+        },
+        manual_verify_first: {
+          zh: "先人工核对能力与登录态",
+          en: "Manual verification first",
+        },
+      };
+      const text = mapping[String(mode || "").toLowerCase()] || mapping.analyze_first;
+      return currentLang() === "en" ? text.en : currentLang() === "mix" ? `${text.zh} / ${text.en}` : text.zh;
+    }
+
     function renderCapabilitySummary() {
       const root = document.getElementById("capability-summary");
       if (!root) return;
@@ -1353,6 +1384,7 @@
       const notes = capability.notes || {};
       const assessedLevel = assessment?.assessedLevel || capability.level;
       const rationale = assessment?.rationale || {};
+      const strategy = assessment?.strategy || {};
       const likelyHashes = Array.isArray(sourceProfile.likelyHashes) ? sourceProfile.likelyHashes : [];
       const analysisSummary = sourceAnalyzeCache?.summary || {};
       const analysisLine = sourceAnalyzeCache
@@ -1373,15 +1405,40 @@
         : currentLang() === "mix"
           ? `${rationale.zh || ""} / ${rationale.en || ""}`.trim()
           : (rationale.zh || "");
+      const throttleHintText = currentLang() === "en"
+        ? (strategy?.throttleHint?.en || "")
+        : currentLang() === "mix"
+          ? `${strategy?.throttleHint?.zh || ""} / ${strategy?.throttleHint?.en || ""}`.trim()
+          : (strategy?.throttleHint?.zh || "");
+      const suggestedActions = Array.isArray(strategy?.suggestedActions) ? strategy.suggestedActions : [];
+      const suggestedText = suggestedActions.length
+        ? suggestedActions.map((item, index) => {
+            const text = currentLang() === "en"
+              ? (item?.en || "")
+              : currentLang() === "mix"
+                ? `${item?.zh || ""} / ${item?.en || ""}`.trim()
+                : (item?.zh || "");
+            return `${index + 1}. ${text}`;
+          }).join("<br>")
+        : "-";
+      const executionFlags = [
+        `${currentLang() === "en" ? "Analyze first" : currentLang() === "mix" ? "先分析 / Analyze first" : "先分析"}=${strategy?.shouldAnalyzeFirst ? "yes" : "no"}`,
+        `${currentLang() === "en" ? "Prefer leaf mode" : currentLang() === "mix" ? "叶子目录优先 / Prefer leaf mode" : "叶子目录优先"}=${strategy?.preferLeafMode ? "yes" : "no"}`,
+        `${currentLang() === "en" ? "Prefer pending tree" : currentLang() === "mix" ? "待补传树优先 / Prefer pending tree" : "待补传树优先"}=${strategy?.preferPendingTree ? "yes" : "no"}`,
+      ].join(" | ");
       root.innerHTML = `
         <div><strong>${escapeHtml(context.driver || "-")}</strong> -> <strong>${escapeHtml(targetProfile.labelZh || targetProfile.label || "Guangya")}</strong></div>
         <div class="mono">${currentLang() === "en" ? "Capability level" : currentLang() === "mix" ? "静态等级 / Capability level" : "静态等级"}: ${escapeHtml(capabilityLevelText(capability.level))}</div>
         <div class="mono">${currentLang() === "en" ? "Runtime assessment" : currentLang() === "mix" ? "动态判断 / Runtime assessment" : "动态判断"}: ${escapeHtml(capabilityLevelText(assessedLevel))}</div>
+        <div class="mono">${currentLang() === "en" ? "Execution mode" : currentLang() === "mix" ? "执行模式 / Execution mode" : "执行模式"}: ${escapeHtml(strategyModeText(strategy?.recommendedMode || "analyze_first"))}</div>
         <div class="mono">${currentLang() === "en" ? "Likely hashes" : currentLang() === "mix" ? "常见哈希 / Likely hashes" : "常见哈希"}: ${escapeHtml(likelyHashes.join(", ") || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Recommended rate profile" : currentLang() === "mix" ? "推荐频率 / Recommended rate profile" : "推荐频率"}: ${escapeHtml(sourceProfile.recommendedRateProfile || "-")}</div>
         <div class="mono">${escapeHtml(analysisLine)}</div>
         <div class="mono">${currentLang() === "en" ? "Suggested path" : currentLang() === "mix" ? "建议路径 / Suggested path" : "建议路径"}: ${escapeHtml(recommendedFlow || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Runtime rationale" : currentLang() === "mix" ? "动态理由 / Runtime rationale" : "动态理由"}: ${escapeHtml(rationaleText || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Throttle hint" : currentLang() === "mix" ? "节奏建议 / Throttle hint" : "节奏建议"}: ${escapeHtml(throttleHintText || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Execution flags" : currentLang() === "mix" ? "执行偏好 / Execution flags" : "执行偏好"}: ${escapeHtml(executionFlags)}</div>
+        <div class="mono">${currentLang() === "en" ? "Suggested actions" : currentLang() === "mix" ? "建议动作 / Suggested actions" : "建议动作"}:<br>${suggestedText}</div>
         <div class="mono">${currentLang() === "en" ? "Notes" : currentLang() === "mix" ? "说明 / Notes" : "说明"}: ${escapeHtml(notesText || "-")}</div>
       `;
     }

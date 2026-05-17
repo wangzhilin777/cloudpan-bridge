@@ -713,6 +713,8 @@ def assess_driver_target_capability(
     assessed_level = base_level
     rationale_zh = "当前未提供目录分析结果，先按静态矩阵建议处理。"
     rationale_en = "No source analysis summary has been provided yet. Fall back to the static matrix."
+    source_profile = dict(capability.get("sourceProfile") or {})
+    recommended_rate_profile = str(source_profile.get("recommendedRateProfile") or "safe")
 
     if total > 0:
         if base_level == "fast_upload_partial":
@@ -742,6 +744,129 @@ def assess_driver_target_capability(
             rationale_zh = "当前目录分析与静态矩阵基本一致。"
             rationale_en = "The runtime analysis is broadly consistent with the static matrix."
 
+    fast_ratio = (fast_ready / total) if total > 0 else 0.0
+    md5_ratio = (md5_ready / total) if total > 0 else 0.0
+    gcid_ratio = (gcid_ready / total) if total > 0 else 0.0
+    should_analyze_first = total <= 0
+    prefer_leaf_mode = recommended_rate_profile == "safe"
+    prefer_pending_tree = assessed_level in {"download_upload_only", "unsupported"}
+    recommended_mode = "analyze_first"
+    throttle_hint_zh = "先按保守节奏运行，必要时再提速。"
+    throttle_hint_en = "Start conservatively and increase speed only after validation."
+    suggested_actions = [
+        {
+            "key": "analyze_source",
+            "zh": "先分析当前目录，确认 MD5 / GCID 命中率，再决定是否直接同步。",
+            "en": "Analyze the current directory first, then decide whether direct sync is suitable.",
+        }
+    ]
+
+    if recommended_rate_profile == "safe":
+        throttle_hint_zh = "建议优先使用 safe 频率，并按最底层目录小批量推进。"
+        throttle_hint_en = "Prefer the safe rate profile and move in small leaf-directory batches."
+    elif recommended_rate_profile == "balanced":
+        throttle_hint_zh = "建议先用 balanced 频率，从小目录验证后再扩大范围。"
+        throttle_hint_en = "Start with the balanced rate profile and expand only after a small-directory validation."
+    elif recommended_rate_profile == "fast":
+        throttle_hint_zh = "当前驱动相对适合快速验证，但仍建议先跑一个小目录。"
+        throttle_hint_en = "This driver is relatively fast-friendly, but you should still validate with a small directory first."
+
+    if not should_analyze_first:
+        if assessed_level == "fast_upload_supported":
+            recommended_mode = "direct_metadata_first"
+            prefer_pending_tree = False
+            suggested_actions = [
+                {
+                    "key": "run_direct",
+                    "zh": "当前目录快传指纹齐全，优先直接同步或直接导出秒传 JSON。",
+                    "en": "This directory is fully fast-upload ready. Prefer direct sync or direct JSON export/import.",
+                },
+                {
+                    "key": "build_miaochuan_json",
+                    "zh": "如果你想更稳，可先生成当前目录秒传 JSON，再导入 Guangya。",
+                    "en": "For a steadier path, generate a flash-upload JSON for this directory first, then import it into Guangya.",
+                },
+            ]
+        elif assessed_level == "fast_upload_partial":
+            recommended_mode = "leaf_metadata_then_pending"
+            prefer_pending_tree = fast_ratio < 0.35
+            prefer_leaf_mode = True
+            suggested_actions = [
+                {
+                    "key": "run_leaf_direct",
+                    "zh": "当前目录只有部分文件能快传，建议优先按最底层目录边扫边秒传。",
+                    "en": "Only part of the directory is fast-upload ready. Prefer leaf-directory scan-and-sync first.",
+                },
+                {
+                    "key": "pending_tree",
+                    "zh": "未命中的文件保留到待补传树，再按目录勾选补传，避免一开始就大批量下载上传。",
+                    "en": "Keep misses in the pending tree and reupload by directory instead of starting with large fallback batches.",
+                },
+            ]
+            if md5_ratio > 0 and gcid_ratio == 0:
+                suggested_actions.append(
+                    {
+                        "key": "md5_bias",
+                        "zh": "当前目录更偏 MD5 指纹，建议优先验证光鸭 MD5 秒传命中率。",
+                        "en": "This directory is MD5-heavy. Verify Guangya MD5 hit rate first.",
+                    }
+                )
+            elif gcid_ratio > 0 and md5_ratio == 0:
+                suggested_actions.append(
+                    {
+                        "key": "gcid_bias",
+                        "zh": "当前目录更偏 GCID 指纹，建议先看 GCID 路径是否稳定可用。",
+                        "en": "This directory is GCID-heavy. Check whether the GCID path is stable first.",
+                    }
+                )
+        elif assessed_level == "relay_supported":
+            recommended_mode = "stream_relay_first"
+            prefer_pending_tree = False
+            suggested_actions = [
+                {
+                    "key": "stream_relay",
+                    "zh": "当前组合更适合中转流传输，不建议宣传成真正秒传。",
+                    "en": "This combination is better treated as relay streaming, not true fast upload.",
+                },
+                {
+                    "key": "small_batch",
+                    "zh": "先小批量验证下载链路和上传链路，再决定是否扩大范围。",
+                    "en": "Validate the download and upload chains on a small batch before scaling up.",
+                },
+            ]
+        elif assessed_level == "download_upload_only":
+            recommended_mode = "pending_tree_first"
+            prefer_leaf_mode = True
+            prefer_pending_tree = True
+            suggested_actions = [
+                {
+                    "key": "pending_tree",
+                    "zh": "当前目录更适合先建待补传树，再按目录勾选补传。",
+                    "en": "This directory is better handled through the pending tree and directory-based reupload.",
+                },
+                {
+                    "key": "small_file_threshold",
+                    "zh": "可只让小文件自动补传，大文件保留到后续分目录处理。",
+                    "en": "Limit automatic fallback to small files and keep larger files for later directory-based execution.",
+                },
+            ]
+        elif assessed_level == "unsupported":
+            recommended_mode = "manual_verify_first"
+            prefer_leaf_mode = False
+            prefer_pending_tree = False
+            suggested_actions = [
+                {
+                    "key": "stop_and_verify",
+                    "zh": "当前组合暂不支持自动执行，建议先核对驱动文档、登录态和目标端能力。",
+                    "en": "This combination is not ready for automatic execution. Verify driver docs, auth state, and target capability first.",
+                },
+                {
+                    "key": "small_probe",
+                    "zh": "如果必须继续，只建议用一个极小目录做人工探测，不要直接跑全盘。",
+                    "en": "If you must continue, probe with a very small directory only. Do not run the full tree directly.",
+                },
+            ]
+
     return {
         **capability,
         "analysisSummary": summary,
@@ -756,5 +881,19 @@ def assess_driver_target_capability(
             "md5Ready": md5_ready,
             "gcidReady": gcid_ready,
             "missingFast": missing_fast,
+        },
+        "strategy": {
+            "recommendedMode": recommended_mode,
+            "suggestedActions": suggested_actions,
+            "throttleHint": {
+                "zh": throttle_hint_zh,
+                "en": throttle_hint_en,
+            },
+            "shouldAnalyzeFirst": should_analyze_first,
+            "preferLeafMode": prefer_leaf_mode,
+            "preferPendingTree": prefer_pending_tree,
+            "fastReadyRatio": round(fast_ratio, 4),
+            "md5ReadyRatio": round(md5_ratio, 4),
+            "gcidReadyRatio": round(gcid_ratio, 4),
         },
     }

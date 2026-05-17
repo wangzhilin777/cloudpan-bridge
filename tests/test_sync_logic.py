@@ -558,6 +558,72 @@ def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Pat
     assert payload["level"] == "fast_upload_partial"
     assert payload["assessedLevel"] == "fast_upload_supported"
     assert payload["score"]["fastReady"] == 3
+    assert payload["strategy"]["recommendedMode"] == "direct_metadata_first"
+    assert payload["strategy"]["shouldAnalyzeFirst"] is False
+    assert payload["strategy"]["preferPendingTree"] is False
+
+
+def test_provider_capability_assess_without_analysis_requires_probe_first(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/capability_assess",
+        json={
+            "driver": "Baidu",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["level"] == "fast_upload_partial"
+    assert payload["assessedLevel"] == "fast_upload_partial"
+    assert payload["strategy"]["recommendedMode"] == "analyze_first"
+    assert payload["strategy"]["shouldAnalyzeFirst"] is True
+
+
+def test_provider_capability_assess_download_only_prefers_pending_tree(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/capability_assess",
+        json={
+            "driver": "AliyundriveOpen",
+            "analysis_summary": {
+                "total": 4,
+                "fast_upload_ready": 0,
+                "md5_ready": 0,
+                "gcid_ready": 0,
+                "missing_fast_upload": 4,
+            },
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["level"] == "download_upload_only"
+    assert payload["assessedLevel"] == "download_upload_only"
+    assert payload["strategy"]["recommendedMode"] == "pending_tree_first"
+    assert payload["strategy"]["preferPendingTree"] is True
 
 
 def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
