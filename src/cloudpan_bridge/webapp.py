@@ -1256,13 +1256,13 @@ def create_app(config_path: Path) -> FastAPI:
         nonlocal config
         payload = payload or {}
         client = build_openlist_client(
-            openlist_url=str(payload.get("openlist_url") or effective_openlist_url()),
-            openlist_username=str(payload.get("openlist_username") or config.openlist_username),
-            openlist_password=str(payload.get("openlist_password") or config.openlist_password),
-            openlist_token=str(payload.get("openlist_token") or config.openlist_token),
+            openlist_url=str(resolve_payload_value(payload, "openlist_url", ("openlist", "url"), effective_openlist_url())),
+            openlist_username=str(resolve_payload_value(payload, "openlist_username", ("openlist", "username"), config.openlist_username)),
+            openlist_password=str(resolve_payload_value(payload, "openlist_password", ("openlist", "password"), config.openlist_password)),
+            openlist_token=str(resolve_payload_value(payload, "openlist_token", ("openlist", "token"), config.openlist_token)),
         )
         try:
-            browser = client.list_directories(str(payload.get("path") or "/"))
+            browser = client.list_directories(str(resolve_payload_value(payload, "path", ("ui", "browser", "current_path"), "/")))
             with sync_lock:
                 sync_state["directory_browser"] = browser
             return {"ok": True, **browser}
@@ -1276,7 +1276,7 @@ def create_app(config_path: Path) -> FastAPI:
     def analyze_source(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         nonlocal config
         payload = payload or {}
-        source_path = str(payload.get("source_path") or config.source_path or "/").strip()
+        source_path = str(resolve_payload_value(payload, "source_path", ("sync", "source_path"), config.source_path or "/")).strip()
         run_config = AppConfig.load(config_path)
         if run_config.openlist_mode == "managed":
             ensure_runtime_ready()
@@ -1287,7 +1287,7 @@ def create_app(config_path: Path) -> FastAPI:
             entries, plan, removed_paths = runner.analyze()
         finally:
             runner.source.close()
-        limit = max(1, int(payload.get("limit") or 200))
+        limit = max(1, int(resolve_payload_value(payload, "limit", default=200) or 200))
         return {
             "source_path": run_config.source_path,
             "summary": summarize_source_entries(entries),
@@ -1301,7 +1301,7 @@ def create_app(config_path: Path) -> FastAPI:
     def build_source_miaochuan_preview(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         nonlocal config
         payload = payload or {}
-        source_path = str(payload.get("source_path") or config.source_path or "/").strip()
+        source_path = str(resolve_payload_value(payload, "source_path", ("sync", "source_path"), config.source_path or "/")).strip()
         run_config = AppConfig.load(config_path)
         if run_config.openlist_mode == "managed":
             ensure_runtime_ready()

@@ -807,6 +807,118 @@ def test_openlist_login_accepts_grouped_openlist_fields(tmp_path: Path, monkeypa
     assert saved["openlist"]["token"] == "grouped-token"
 
 
+def test_openlist_list_dirs_accepts_grouped_fields(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "openlist": {
+    "url": "http://127.0.0.1:5244",
+    "username": "admin",
+    "password": ""
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge import webapp as webapp_module
+
+    captured: dict[str, str] = {}
+
+    class FakeClient:
+        def __init__(self, *, base_url: str, token: str, username: str, password: str, **_: object) -> None:
+            captured["base_url"] = base_url
+            captured["token"] = token
+            captured["username"] = username
+            captured["password"] = password
+
+        def list_directories(self, path: str) -> dict[str, object]:
+            captured["path"] = path
+            return {"path": path, "items": [], "parent_path": "/"}
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(webapp_module, "OpenListClient", FakeClient)
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.post(
+        "/api/openlist/list_dirs",
+        json={
+            "grouped_config": {
+                "openlist": {
+                    "url": "http://127.0.0.1:5245",
+                    "username": "grouped-admin",
+                    "password": "grouped-pass",
+                    "token": "grouped-token"
+                },
+                "ui": {
+                    "browser": {
+                        "current_path": "/photos/2026"
+                    }
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    assert captured["base_url"] == "http://127.0.0.1:5245"
+    assert captured["username"] == "grouped-admin"
+    assert captured["password"] == "grouped-pass"
+    assert captured["token"] == "grouped-token"
+    assert captured["path"] == "/photos/2026"
+
+
+def test_source_analyze_accepts_grouped_source_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/from-config"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge import webapp as webapp_module
+
+    seen: dict[str, object] = {}
+
+    class DummySource:
+        def close(self) -> None:
+            seen["closed"] = True
+
+    class FakeRunner:
+        def __init__(self, config: AppConfig, log: object | None = None, source_root_for_target: str = "") -> None:
+            seen["source_path"] = config.source_path
+            self.source = DummySource()
+
+        def analyze(self) -> tuple[list[SourceEntry], list[object], list[str]]:
+            return (
+                [SourceEntry(path="/grouped/file.txt", md5="ABC", size=1, provider="openlist", hash_type="md5")],
+                [],
+                [],
+            )
+
+    monkeypatch.setattr(webapp_module, "SyncRunner", FakeRunner)
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.post(
+        "/api/source/analyze",
+        json={
+            "grouped_config": {
+                "sync": {
+                    "source_path": "/grouped"
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert seen["source_path"] == "/grouped"
+    assert seen["closed"] is True
+    assert payload["source_path"] == "/grouped"
+    assert payload["summary"]["total"] == 1
+
+
 def test_config_endpoint_updates_grouped_panel_open_states(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
