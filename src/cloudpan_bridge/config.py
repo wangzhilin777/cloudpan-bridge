@@ -66,6 +66,9 @@ class AppConfig:
     s3_target_access_key: str = ""
     s3_target_secret_key: str = ""
     s3_target_region: str = ""
+    smb_target_url: str = ""
+    smb_target_username: str = ""
+    smb_target_password: str = ""
     ftp_target_url: str = ""
     ftp_target_username: str = ""
     ftp_target_password: str = ""
@@ -134,6 +137,9 @@ class AppConfig:
             s3_target_access_key=str(_pick(payload.get("s3_target_access_key"), targets.get("s3", {}).get("access_key"), default="")),
             s3_target_secret_key=str(_pick(payload.get("s3_target_secret_key"), targets.get("s3", {}).get("secret_key"), default="")),
             s3_target_region=str(_pick(payload.get("s3_target_region"), targets.get("s3", {}).get("region"), default="")),
+            smb_target_url=str(_pick(payload.get("smb_target_url"), targets.get("smb", {}).get("url"), default="")),
+            smb_target_username=str(_pick(payload.get("smb_target_username"), targets.get("smb", {}).get("username"), default="")),
+            smb_target_password=str(_pick(payload.get("smb_target_password"), targets.get("smb", {}).get("password"), default="")),
             ftp_target_url=str(_pick(payload.get("ftp_target_url"), targets.get("ftp", {}).get("url"), default="")),
             ftp_target_username=str(_pick(payload.get("ftp_target_username"), targets.get("ftp", {}).get("username"), default="")),
             ftp_target_password=str(_pick(payload.get("ftp_target_password"), targets.get("ftp", {}).get("password"), default="")),
@@ -195,6 +201,9 @@ class AppConfig:
             "s3_target_access_key": self.s3_target_access_key,
             "s3_target_secret_key": self.s3_target_secret_key,
             "s3_target_region": self.s3_target_region,
+            "smb_target_url": self.smb_target_url,
+            "smb_target_username": self.smb_target_username,
+            "smb_target_password": self.smb_target_password,
             "ftp_target_url": self.ftp_target_url,
             "ftp_target_username": self.ftp_target_username,
             "ftp_target_password": self.ftp_target_password,
@@ -271,6 +280,11 @@ class AppConfig:
                     "secret_key": self.s3_target_secret_key,
                     "region": self.s3_target_region,
                 },
+                "smb": {
+                    "url": self.smb_target_url,
+                    "username": self.smb_target_username,
+                    "password": self.smb_target_password,
+                },
                 "ftp": {
                     "url": self.ftp_target_url,
                     "username": self.ftp_target_username,
@@ -334,6 +348,9 @@ def write_example_config(path: Path) -> None:
         s3_target_access_key="",
         s3_target_secret_key="",
         s3_target_region="",
+        smb_target_url="",
+        smb_target_username="",
+        smb_target_password="",
         ftp_target_url="",
         ftp_target_username="",
         ftp_target_password="",

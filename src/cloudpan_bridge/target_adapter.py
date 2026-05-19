@@ -472,6 +472,140 @@ class S3TargetAdapter:
         return None
 
 
+class SmbTargetAdapter:
+    def __init__(
+        self,
+        base_url: str,
+        username: str = "",
+        password: str = "",
+        *,
+        client_module: Any | None = None,
+    ) -> None:
+        self.base_url = str(base_url or "").strip()
+        self.username = username
+        self.password = password
+        self.client_module = client_module
+        self._registered = False
+        parsed = urlparse(self.base_url if "://" in self.base_url else f"smb://{self.base_url.lstrip('/')}")
+        self.host = parsed.hostname or ""
+        self.share = ""
+        self.root_path = "/"
+        parsed_path = str(parsed.path or "").lstrip("/")
+        if parsed_path:
+            parts = PurePosixPath("/" + parsed_path).parts[1:]
+            if parts:
+                self.share = str(parts[0])
+                self.root_path = "/" + "/".join(parts[1:]) if len(parts) > 1 else "/"
+
+    def _load_client_module(self) -> Any:
+        if self.client_module is not None:
+            return self.client_module
+        try:
+            import smbclient  # type: ignore[import-not-found]
+        except ImportError as exc:  # pragma: no cover - exercised through runtime selection
+            raise RuntimeError("SMB 目标端需要先安装 smbprotocol：pip install smbprotocol") from exc
+        self.client_module = smbclient
+        return smbclient
+
+    def ensure_auth(self) -> None:
+        if not self.host:
+            raise RuntimeError("SMB 目标端未配置 URL。")
+        if not self.share:
+            raise RuntimeError("SMB 目标端未配置共享名。")
+        client = self._load_client_module()
+        if not self._registered:
+            client.register_session(self.host, username=self.username, password=self.password)
+            self._registered = True
+
+    def export_state(self) -> dict[str, str]:
+        return {
+            "url": self.base_url,
+            "username": self.username,
+        }
+
+    def close(self) -> None:
+        return None
+
+    def _normalize_path(self, path: str) -> str:
+        normalized = str(PurePosixPath("/" + str(path or "/").lstrip("/")))
+        return "/" if normalized == "." else normalized
+
+    def _build_unc_path(self, path: str) -> str:
+        normalized = self._normalize_path(path)
+        remote = normalized.lstrip("/")
+        base_parts = [self.share]
+        root = str(self.root_path or "/").strip("/")
+        if root:
+            base_parts.append(root)
+        if remote:
+            base_parts.extend(part for part in remote.split("/") if part)
+        unc_tail = "\\".join(part for part in base_parts if part)
+        return f"\\\\{self.host}\\{unc_tail}"
+
+    def ensure_target_dir(self, path: str) -> str:
+        self.ensure_auth()
+        client = self._load_client_module()
+        normalized = self._normalize_path(path)
+        current = PurePosixPath("/")
+        for part in PurePosixPath(normalized).parts[1:]:
+            current = current / part
+            unc = self._build_unc_path(str(current))
+            try:
+                client.mkdir(unc)
+            except Exception:
+                pass
+        return normalized
+
+    def delete_if_exists(self, parent_id: str, name: str) -> bool:
+        target_path = str(PurePosixPath(self._normalize_path(parent_id)) / name)
+        return self.remove_target_path(target_path)
+
+    def remove_target_path(self, path: str) -> bool:
+        self.ensure_auth()
+        client = self._load_client_module()
+        normalized = self._normalize_path(path)
+        if normalized == "/":
+            return False
+        unc = self._build_unc_path(normalized)
+        try:
+            client.remove(unc)
+            return True
+        except Exception:
+            try:
+                client.rmdir(unc)
+                return True
+            except Exception:
+                return False
+
+    def try_fast_upload(
+        self,
+        file_name: str,
+        file_size: int,
+        parent_id: str,
+        md5_hex: str = "",
+        gcid: str = "",
+    ) -> DirectImportResult:
+        return DirectImportResult(
+            success=False,
+            reason="SMB 目标端当前只支持普通上传/覆盖，不支持元数据秒传。",
+        )
+
+    def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, Any]:
+        self.ensure_auth()
+        client = self._load_client_module()
+        target_path = str(PurePosixPath(self._normalize_path(target_parent_id)) / target_name)
+        unc = self._build_unc_path(target_path)
+        with local_path.open("rb") as src, client.open_file(unc, mode="wb") as dst:
+            shutil.copyfileobj(src, dst)
+        return {
+            "path": target_path,
+            "size": local_path.stat().st_size,
+        }
+
+    def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
+        return None
+
+
 class FtpTargetAdapter:
     def __init__(
         self,
@@ -731,7 +865,7 @@ class SftpTargetAdapter:
 
 
 def supported_target_keys() -> list[str]:
-    return ["guangya", "openlist", "localfs", "webdav", "s3", "ftp", "sftp"]
+    return ["guangya", "openlist", "localfs", "webdav", "s3", "ftp", "sftp", "smb"]
 
 
 def create_target_adapter(config: AppConfig, state: SyncState, target_key: str = "") -> TargetAdapter:
@@ -777,6 +911,12 @@ def create_target_adapter(config: AppConfig, state: SyncState, target_key: str =
             secret_key=config.s3_target_secret_key,
             region=config.s3_target_region,
             prefix=config.s3_target_prefix,
+        )
+    if normalized == "smb":
+        return SmbTargetAdapter(
+            base_url=config.smb_target_url,
+            username=config.smb_target_username,
+            password=config.smb_target_password,
         )
     if normalized == "ftp":
         return FtpTargetAdapter(

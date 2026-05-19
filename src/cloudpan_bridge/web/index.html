@@ -756,6 +756,18 @@
                 <label data-i18n="label.s3_target_secret_key">S3 Secret Key</label>
                 <input id="s3_target_secret_key" type="password">
               </div>
+              <div class="col-span-2" data-target-only="smb">
+                <label data-i18n="label.smb_target_url">SMB 目标地址</label>
+                <input id="smb_target_url" placeholder="smb://server/share/path">
+              </div>
+              <div data-target-only="smb">
+                <label data-i18n="label.smb_target_username">SMB 用户名</label>
+                <input id="smb_target_username">
+              </div>
+              <div data-target-only="smb">
+                <label data-i18n="label.smb_target_password">SMB 密码</label>
+                <input id="smb_target_password" type="password">
+              </div>
               <div class="col-span-2" data-target-only="ftp">
                 <label data-i18n="label.ftp_target_url">FTP 目标地址</label>
                 <input id="ftp_target_url" placeholder="ftp://example.com:21/uploads">
@@ -877,7 +889,7 @@
       "source_path", "target_path", "openlist_mode", "managed_openlist_bin", "managed_openlist_data_dir",
       "managed_openlist_port", "openlist_url", "openlist_token", "openlist_username", "openlist_password",
       "target_key", "guangya_phone", "guangya_authorization", "guangya_access_token", "guangya_refresh_token",
-      "guangya_device_id", "local_target_root", "webdav_target_url", "webdav_target_username", "webdav_target_password", "s3_target_endpoint", "s3_target_bucket", "s3_target_prefix", "s3_target_access_key", "s3_target_secret_key", "s3_target_region", "ftp_target_url", "ftp_target_username", "ftp_target_password", "sftp_target_url", "sftp_target_username", "sftp_target_password", "delete_removed", "target_delete_removed", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
+      "guangya_device_id", "local_target_root", "webdav_target_url", "webdav_target_username", "webdav_target_password", "s3_target_endpoint", "s3_target_bucket", "s3_target_prefix", "s3_target_access_key", "s3_target_secret_key", "s3_target_region", "smb_target_url", "smb_target_username", "smb_target_password", "ftp_target_url", "ftp_target_username", "ftp_target_password", "sftp_target_url", "sftp_target_username", "sftp_target_password", "delete_removed", "target_delete_removed", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
       "auto_download_threshold_mb", "rate_limit_mode", "log_file", "temp_dir", "state_file"
     ];
     const CONFIG_GROUPED_PATHS = {
@@ -907,6 +919,9 @@
       s3_target_access_key: ["targets", "s3", "access_key"],
       s3_target_secret_key: ["targets", "s3", "secret_key"],
       s3_target_region: ["targets", "s3", "region"],
+      smb_target_url: ["targets", "smb", "url"],
+      smb_target_username: ["targets", "smb", "username"],
+      smb_target_password: ["targets", "smb", "password"],
       ftp_target_url: ["targets", "ftp", "url"],
       ftp_target_username: ["targets", "ftp", "username"],
       ftp_target_password: ["targets", "ftp", "password"],
@@ -1070,6 +1085,9 @@
         "label.s3_target_access_key": "S3 Access Key",
         "label.s3_target_secret_key": "S3 Secret Key",
         "label.s3_target_region": "S3 Region",
+        "label.smb_target_url": "SMB 目标地址",
+        "label.smb_target_username": "SMB 用户名",
+        "label.smb_target_password": "SMB 密码",
         "label.ftp_target_url": "FTP 目标地址",
         "label.ftp_target_username": "FTP 用户名",
         "label.ftp_target_password": "FTP 密码",
@@ -1085,7 +1103,7 @@
         "desc.capability": "根据当前选择的源驱动和现有目标端 Guangya，给出诚实降级后的推荐路径。这里不会把“只能补传”的组合误导成可秒传。",
         "desc.logs": "这里会自动滚动到最新日志。同步、队列、挂载和目标端状态都可以从这里看。",
         "desc.source_profiles": "这里列出当前内置的 OpenList 源端 profile、常见哈希和推荐频率。后续继续扩全驱动时，就往这层补。",
-        "desc.target_profiles": "这里列出当前目标端适配器支持的快传指纹和降级方式。当前内置目标端包括 Guangya、OpenList、LocalFS、WebDAV、S3、FTP 与 SFTP，其中只有 Guangya 支持元数据秒传。",
+        "desc.target_profiles": "这里列出当前目标端适配器支持的快传指纹和降级方式。当前内置目标端包括 Guangya、OpenList、LocalFS、WebDAV、S3、SMB、FTP 与 SFTP，其中只有 Guangya 支持元数据秒传。",
         "desc.driver_matrix": "这是当前内置的“源驱动 -> Guangya”能力矩阵，只表示当前项目的真实支持判断，不等于所有跨网盘都能秒传。",
         "desc.coverage_audit": "这里会把当前 OpenList 实际驱动列表和内置 registry 对比，直接看出哪些驱动已经具备 profile、guide、capture、capability，方便后续继续补全。",
         "desc.target_delete_removed": "默认只做新增 + 覆盖。只有同时开启 delete_removed 和 target_delete_removed 时，才会尝试删除目标端真实文件。",
@@ -1218,6 +1236,9 @@
         "label.s3_target_access_key": "S3 Access Key",
         "label.s3_target_secret_key": "S3 Secret Key",
         "label.s3_target_region": "S3 Region",
+        "label.smb_target_url": "SMB Target URL",
+        "label.smb_target_username": "SMB Username",
+        "label.smb_target_password": "SMB Password",
         "label.ftp_target_url": "FTP Target URL",
         "label.ftp_target_username": "FTP Username",
         "label.ftp_target_password": "FTP Password",
@@ -1233,7 +1254,7 @@
         "desc.capability": "Show the honest recommendation for the current source driver to Guangya, including fallback behavior instead of overpromising fast upload.",
         "desc.logs": "Logs auto-scroll to the newest line. Sync, queue, mount, and target-state activity all appear here.",
         "desc.source_profiles": "This lists the built-in OpenList source profiles, likely hashes, and recommended rate presets. Keep extending this layer as more drivers are covered.",
-        "desc.target_profiles": "This lists the current target adapters, their fast-upload hashes, and fallback modes. Built-in targets now include Guangya, OpenList, LocalFS, WebDAV, S3, FTP, and SFTP, while only Guangya supports metadata-based fast upload.",
+        "desc.target_profiles": "This lists the current target adapters, their fast-upload hashes, and fallback modes. Built-in targets now include Guangya, OpenList, LocalFS, WebDAV, S3, SMB, FTP, and SFTP, while only Guangya supports metadata-based fast upload.",
         "desc.driver_matrix": "This is the current built-in source-driver to Guangya matrix. It reflects this project's real support judgment, not a promise that all cross-cloud copies can fast upload.",
         "desc.coverage_audit": "This compares the live OpenList driver list with the built-in registry so you can see which drivers already have profiles, guides, capture, and capability coverage.",
         "desc.target_delete_removed": "Default mode only adds and overwrites. Real target deletion is attempted only when both delete_removed and target_delete_removed are enabled.",

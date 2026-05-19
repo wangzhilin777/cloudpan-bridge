@@ -29,7 +29,7 @@ from cloudpan_bridge.syncer import (
     serialize_source_entry,
     summarize_source_entries,
 )
-from cloudpan_bridge.target_adapter import FtpTargetAdapter, GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, S3TargetAdapter, SftpTargetAdapter, WebDavTargetAdapter
+from cloudpan_bridge.target_adapter import FtpTargetAdapter, GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, S3TargetAdapter, SftpTargetAdapter, SmbTargetAdapter, WebDavTargetAdapter
 from cloudpan_bridge.webapp import (
     build_pending_selected_execution_groups,
     compute_rate_limit_cooldown_ms,
@@ -150,6 +150,11 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
       "secret_key": "SECRET_TEST",
       "region": "ap-southeast-1"
     },
+    "smb": {
+      "url": "smb://nas/share/archive",
+      "username": "smb-user",
+      "password": "smb-pass"
+    },
     "ftp": {
       "url": "ftp://ftp.example.com:21/root",
       "username": "ftp-user",
@@ -219,6 +224,9 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert cfg.s3_target_access_key == "AKIA_TEST"
     assert cfg.s3_target_secret_key == "SECRET_TEST"
     assert cfg.s3_target_region == "ap-southeast-1"
+    assert cfg.smb_target_url == "smb://nas/share/archive"
+    assert cfg.smb_target_username == "smb-user"
+    assert cfg.smb_target_password == "smb-pass"
     assert cfg.ftp_target_url == "ftp://ftp.example.com:21/root"
     assert cfg.ftp_target_username == "ftp-user"
     assert cfg.ftp_target_password == "ftp-pass"
@@ -236,6 +244,7 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert nested["targets"]["webdav"]["url"] == "https://dav.example.com/root"
     assert nested["targets"]["s3"]["endpoint"] == "https://s3.example.com"
     assert nested["targets"]["s3"]["bucket"] == "archive-bucket"
+    assert nested["targets"]["smb"]["url"] == "smb://nas/share/archive"
     assert nested["targets"]["ftp"]["url"] == "ftp://ftp.example.com:21/root"
     assert nested["targets"]["sftp"]["url"] == "sftp://sftp.example.com:22/root"
     assert nested["source_session"]["provider_captures"]["quark"]["captured"]["cookie_header"] == "k=v"
@@ -266,6 +275,9 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
   "s3_target_access_key": "legacy-ak",
   "s3_target_secret_key": "legacy-sk",
   "s3_target_region": "cn-test-1",
+  "smb_target_url": "smb://legacy-nas/share/root",
+  "smb_target_username": "legacy-smb",
+  "smb_target_password": "legacy-smb-pass",
   "ftp_target_url": "ftp://legacy.example.com/root",
   "ftp_target_username": "legacy-ftp",
   "ftp_target_password": "legacy-ftp-pass",
@@ -287,6 +299,8 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
     assert serialized["targets"]["s3"]["endpoint"] == "https://legacy-s3.example.com"
     assert serialized["targets"]["s3"]["bucket"] == "legacy-bucket"
     assert serialized["targets"]["s3"]["access_key"] == "legacy-ak"
+    assert serialized["targets"]["smb"]["url"] == "smb://legacy-nas/share/root"
+    assert serialized["targets"]["smb"]["username"] == "legacy-smb"
     assert serialized["targets"]["ftp"]["url"] == "ftp://legacy.example.com/root"
     assert serialized["targets"]["ftp"]["username"] == "legacy-ftp"
     assert serialized["targets"]["sftp"]["url"] == "sftp://legacy.example.com/root"
@@ -567,6 +581,37 @@ def test_sync_runner_builds_s3_target_adapter(tmp_path) -> None:
     adapter.close()
 
 
+def test_sync_runner_builds_smb_target_adapter(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst",
+                },
+                "targets": {
+                    "active_target": "smb",
+                    "smb": {
+                        "url": "smb://nas/share/archive",
+                        "username": "smb-user",
+                        "password": "smb-pass",
+                    },
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    adapter = runner._build_target_adapter(SyncState())
+    assert isinstance(adapter, SmbTargetAdapter)
+    exported = adapter.export_state()
+    assert exported["url"] == "smb://nas/share/archive"
+    assert exported["username"] == "smb-user"
+    adapter.close()
+
+
 def test_sync_runner_builds_ftp_target_adapter(tmp_path) -> None:
     path = tmp_path / "config.json"
     path.write_text(
@@ -726,6 +771,65 @@ def test_s3_target_adapter_uses_basic_s3_calls(tmp_path) -> None:
     assert ("delete_object", "archive-bucket", "cloudpan-bridge/archive/photos/2026/demo.txt") in fake_client.calls
     adapter.close()
     assert fake_client.closed is True
+
+
+def test_smb_target_adapter_uses_basic_smb_calls(tmp_path) -> None:
+    local_file = tmp_path / "demo.txt"
+    local_file.write_text("hello", encoding="utf-8")
+
+    class FakeRemoteFile:
+        def __init__(self) -> None:
+            self.buffer = bytearray()
+
+        def write(self, data: bytes) -> int:
+            self.buffer.extend(data)
+            return len(data)
+
+        def __enter__(self) -> "FakeRemoteFile":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+    class FakeSmbClient:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str]] = []
+
+        def register_session(self, host: str, username: str = "", password: str = "") -> None:
+            self.calls.append(("register_session", f"{host}|{username}|{password}"))
+
+        def mkdir(self, path: str) -> None:
+            self.calls.append(("mkdir", path))
+
+        def open_file(self, path: str, mode: str = "rb") -> FakeRemoteFile:
+            self.calls.append(("open_file", f"{path}|{mode}"))
+            return FakeRemoteFile()
+
+        def remove(self, path: str) -> None:
+            self.calls.append(("remove", path))
+
+        def rmdir(self, path: str) -> None:
+            self.calls.append(("rmdir", path))
+
+    fake_client = FakeSmbClient()
+    adapter = SmbTargetAdapter(
+        base_url="smb://nas/share/archive",
+        username="demo",
+        password="secret",
+        client_module=fake_client,
+    )
+    adapter.ensure_auth()
+    parent_id = adapter.ensure_target_dir("/photos/2026")
+    assert parent_id == "/photos/2026"
+    result = adapter.upload_local_file(local_file, parent_id, "demo.txt")
+    assert result["path"] == "/photos/2026/demo.txt"
+    assert adapter.remove_target_path("/photos/2026/demo.txt") is True
+    assert ("register_session", "nas|demo|secret") in fake_client.calls
+    assert ("mkdir", "\\\\nas\\share\\archive\\photos") in fake_client.calls
+    assert ("mkdir", "\\\\nas\\share\\archive\\photos\\2026") in fake_client.calls
+    assert ("open_file", "\\\\nas\\share\\archive\\photos\\2026\\demo.txt|wb") in fake_client.calls
+    assert ("remove", "\\\\nas\\share\\archive\\photos\\2026\\demo.txt") in fake_client.calls
+    adapter.close()
 
 
 def test_ftp_target_adapter_uses_basic_ftp_calls(tmp_path) -> None:
@@ -1061,7 +1165,7 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     payload = response.json()
     assert payload["active_target"] == "guangya"
     assert payload["driver_matrix"]["thunder"]["targetProfile"]["key"] == "guangya"
-    assert payload["implemented_targets"] == ["guangya", "openlist", "localfs", "webdav", "s3", "ftp", "sftp"]
+    assert payload["implemented_targets"] == ["guangya", "openlist", "localfs", "webdav", "s3", "ftp", "sftp", "smb"]
     assert payload["target_implementation_status"]["guangya"]["known_profile"] is True
     assert payload["target_implementation_status"]["guangya"]["implemented"] is True
     assert payload["target_implementation_status"]["guangya"]["selectable"] is True
@@ -1074,6 +1178,9 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     assert payload["target_implementation_status"]["s3"]["known_profile"] is True
     assert payload["target_implementation_status"]["s3"]["implemented"] is True
     assert payload["target_implementation_status"]["s3"]["selectable"] is True
+    assert payload["target_implementation_status"]["smb"]["known_profile"] is True
+    assert payload["target_implementation_status"]["smb"]["implemented"] is True
+    assert payload["target_implementation_status"]["smb"]["selectable"] is True
 
 
 def test_target_preflight_endpoint_reports_supported_target(tmp_path: Path) -> None:
@@ -2397,6 +2504,8 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["target_profiles"]["webdav"]["autoCreateDir"] is True
     assert payload["target_profiles"]["s3"]["authMode"] == "endpoint + bucket + access key/secret"
     assert payload["target_profiles"]["s3"]["autoCreateDir"] is True
+    assert payload["target_profiles"]["smb"]["authMode"] == "smb url + username/password"
+    assert payload["target_profiles"]["smb"]["autoCreateDir"] is True
     assert payload["target_profiles"]["ftp"]["authMode"] == "ftp url + username/password"
     assert payload["target_profiles"]["ftp"]["autoCreateDir"] is True
     assert payload["target_profiles"]["sftp"]["authMode"] == "sftp url + username/password"
