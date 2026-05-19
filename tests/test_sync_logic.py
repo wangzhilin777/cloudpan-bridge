@@ -331,6 +331,9 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     payload = response.json()
     assert payload["active_target"] == "guangya"
     assert payload["driver_matrix"]["thunder"]["targetProfile"]["key"] == "guangya"
+    assert payload["implemented_targets"] == ["guangya"]
+    assert payload["target_implementation_status"]["guangya"]["implemented"] is True
+    assert payload["target_implementation_status"]["guangya"]["selectable"] is True
 
 
 def test_state_supports_pending_and_queue_roundtrip() -> None:

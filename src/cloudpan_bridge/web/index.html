@@ -1227,6 +1227,7 @@
 
     function populateTargetOptions() {
       const targetProfiles = providerRegistryPayload?.target_profiles || {};
+      const implementationStatus = providerRegistryPayload?.target_implementation_status || {};
       const options = Object.values(targetProfiles).map((item) => ({
         value: String(item.key || ""),
         label: currentLang() === "en"
@@ -1234,7 +1235,8 @@
           : currentLang() === "mix"
             ? `${item.labelZh || item.label || item.key || "-"} / ${item.label || item.key || "-"}`
             : `${item.labelZh || item.label || item.key || "-"}`,
-      })).filter((item) => item.value);
+        selectable: Boolean(implementationStatus?.[String(item.key || "")]?.selectable),
+      })).filter((item) => item.value && item.selectable !== false);
       const currentValue = String(document.getElementById("target_key")?.value || configCache?.target_key || providerRegistryPayload?.active_target || "guangya");
       buildSelectOptions("target_key", currentLang() === "en" ? "Select target" : currentLang() === "mix" ? "选择目标端 / Select target" : "选择目标端", options, currentValue);
     }
@@ -1846,11 +1848,13 @@
       if (!targetProfiles.length) {
         targetRoot.textContent = currentLang() === "en" ? "No target profiles loaded." : currentLang() === "mix" ? "暂无目标端 profiles / No target profiles loaded." : "暂无目标端 profiles";
       } else {
+        const targetImplementationStatus = providerRegistryPayload?.target_implementation_status || {};
         targetRoot.innerHTML = targetProfiles.map((item) => `
           <div class="row-item">
             <div>
               <div>${escapeHtml(item.labelZh || item.label || item.key || "-")}</div>
               <div class="mono">key=${escapeHtml(item.key || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "implemented" : currentLang() === "mix" ? "已实现 / implemented" : "已实现"}=${targetImplementationStatus?.[item.key || ""]?.implemented ? "true" : "false"} | ${currentLang() === "en" ? "selectable" : currentLang() === "mix" ? "可选 / selectable" : "可选"}=${targetImplementationStatus?.[item.key || ""]?.selectable ? "true" : "false"}</div>
               <div class="mono">${currentLang() === "en" ? "auth mode" : currentLang() === "mix" ? "鉴权模式 / auth mode" : "鉴权模式"}=${escapeHtml(item.authMode || "-")}</div>
               <div class="mono">${currentLang() === "en" ? "token refresh" : currentLang() === "mix" ? "刷新方式 / token refresh" : "刷新方式"}=${escapeHtml(item.tokenRefresh || "-")}</div>
               <div class="mono">${currentLang() === "en" ? "auto create dir" : currentLang() === "mix" ? "自动建目录 / auto create dir" : "自动建目录"}=${item.autoCreateDir ? "true" : "false"}</div>

@@ -36,6 +36,7 @@ from .provider_registry import (
     list_target_profiles,
     render_driver_coverage_audit_markdown,
 )
+from .target_adapter import supported_target_keys
 from .syncer import (
     SyncRunner,
     build_source_miaochuan_payload,
@@ -975,12 +976,21 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.get("/api/provider/registry")
     def get_provider_registry() -> dict[str, Any]:
+        implemented_targets = supported_target_keys()
         return {
             "guides": list_driver_guides(),
             "source_profiles": list_source_profiles(),
             "target_profiles": list_target_profiles(),
             "driver_matrix": build_driver_capability_matrix(target=config.target_key),
             "active_target": config.target_key,
+            "implemented_targets": implemented_targets,
+            "target_implementation_status": {
+                key: {
+                    "implemented": key in implemented_targets,
+                    "selectable": key in implemented_targets,
+                }
+                for key in list_target_profiles().keys()
+            },
         }
 
     @app.get("/api/provider/capability")
