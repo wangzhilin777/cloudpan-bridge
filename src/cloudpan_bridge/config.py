@@ -60,6 +60,12 @@ class AppConfig:
     webdav_target_url: str = ""
     webdav_target_username: str = ""
     webdav_target_password: str = ""
+    s3_target_endpoint: str = ""
+    s3_target_bucket: str = ""
+    s3_target_prefix: str = ""
+    s3_target_access_key: str = ""
+    s3_target_secret_key: str = ""
+    s3_target_region: str = ""
     ftp_target_url: str = ""
     ftp_target_username: str = ""
     ftp_target_password: str = ""
@@ -122,6 +128,12 @@ class AppConfig:
             webdav_target_url=str(_pick(payload.get("webdav_target_url"), targets.get("webdav", {}).get("url"), default="")),
             webdav_target_username=str(_pick(payload.get("webdav_target_username"), targets.get("webdav", {}).get("username"), default="")),
             webdav_target_password=str(_pick(payload.get("webdav_target_password"), targets.get("webdav", {}).get("password"), default="")),
+            s3_target_endpoint=str(_pick(payload.get("s3_target_endpoint"), targets.get("s3", {}).get("endpoint"), default="")),
+            s3_target_bucket=str(_pick(payload.get("s3_target_bucket"), targets.get("s3", {}).get("bucket"), default="")),
+            s3_target_prefix=str(_pick(payload.get("s3_target_prefix"), targets.get("s3", {}).get("prefix"), default="")),
+            s3_target_access_key=str(_pick(payload.get("s3_target_access_key"), targets.get("s3", {}).get("access_key"), default="")),
+            s3_target_secret_key=str(_pick(payload.get("s3_target_secret_key"), targets.get("s3", {}).get("secret_key"), default="")),
+            s3_target_region=str(_pick(payload.get("s3_target_region"), targets.get("s3", {}).get("region"), default="")),
             ftp_target_url=str(_pick(payload.get("ftp_target_url"), targets.get("ftp", {}).get("url"), default="")),
             ftp_target_username=str(_pick(payload.get("ftp_target_username"), targets.get("ftp", {}).get("username"), default="")),
             ftp_target_password=str(_pick(payload.get("ftp_target_password"), targets.get("ftp", {}).get("password"), default="")),
@@ -177,6 +189,12 @@ class AppConfig:
             "webdav_target_url": self.webdav_target_url,
             "webdav_target_username": self.webdav_target_username,
             "webdav_target_password": self.webdav_target_password,
+            "s3_target_endpoint": self.s3_target_endpoint,
+            "s3_target_bucket": self.s3_target_bucket,
+            "s3_target_prefix": self.s3_target_prefix,
+            "s3_target_access_key": self.s3_target_access_key,
+            "s3_target_secret_key": self.s3_target_secret_key,
+            "s3_target_region": self.s3_target_region,
             "ftp_target_url": self.ftp_target_url,
             "ftp_target_username": self.ftp_target_username,
             "ftp_target_password": self.ftp_target_password,
@@ -245,6 +263,14 @@ class AppConfig:
                     "username": self.webdav_target_username,
                     "password": self.webdav_target_password,
                 },
+                "s3": {
+                    "endpoint": self.s3_target_endpoint,
+                    "bucket": self.s3_target_bucket,
+                    "prefix": self.s3_target_prefix,
+                    "access_key": self.s3_target_access_key,
+                    "secret_key": self.s3_target_secret_key,
+                    "region": self.s3_target_region,
+                },
                 "ftp": {
                     "url": self.ftp_target_url,
                     "username": self.ftp_target_username,
@@ -302,6 +328,12 @@ def write_example_config(path: Path) -> None:
         webdav_target_url="",
         webdav_target_username="",
         webdav_target_password="",
+        s3_target_endpoint="",
+        s3_target_bucket="",
+        s3_target_prefix="",
+        s3_target_access_key="",
+        s3_target_secret_key="",
+        s3_target_region="",
         ftp_target_url="",
         ftp_target_username="",
         ftp_target_password="",

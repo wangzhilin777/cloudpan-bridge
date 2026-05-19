@@ -9,6 +9,7 @@ description = "CloudPan Bridge: 基于 OpenList 的多源网盘到光鸭云盘�
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "boto3>=1.39.0",
   "fastapi>=0.115.0",
   "guangyaclient>=0.0.2",
   "paramiko>=3.5.0",

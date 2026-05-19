@@ -29,7 +29,7 @@ from cloudpan_bridge.syncer import (
     serialize_source_entry,
     summarize_source_entries,
 )
-from cloudpan_bridge.target_adapter import FtpTargetAdapter, GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, SftpTargetAdapter, WebDavTargetAdapter
+from cloudpan_bridge.target_adapter import FtpTargetAdapter, GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, S3TargetAdapter, SftpTargetAdapter, WebDavTargetAdapter
 from cloudpan_bridge.webapp import (
     build_pending_selected_execution_groups,
     compute_rate_limit_cooldown_ms,
@@ -142,6 +142,14 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
       "username": "dav-user",
       "password": "dav-pass"
     },
+    "s3": {
+      "endpoint": "https://s3.example.com",
+      "bucket": "archive-bucket",
+      "prefix": "cloudpan-bridge/archive",
+      "access_key": "AKIA_TEST",
+      "secret_key": "SECRET_TEST",
+      "region": "ap-southeast-1"
+    },
     "ftp": {
       "url": "ftp://ftp.example.com:21/root",
       "username": "ftp-user",
@@ -205,6 +213,12 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert cfg.webdav_target_url == "https://dav.example.com/root"
     assert cfg.webdav_target_username == "dav-user"
     assert cfg.webdav_target_password == "dav-pass"
+    assert cfg.s3_target_endpoint == "https://s3.example.com"
+    assert cfg.s3_target_bucket == "archive-bucket"
+    assert cfg.s3_target_prefix == "cloudpan-bridge/archive"
+    assert cfg.s3_target_access_key == "AKIA_TEST"
+    assert cfg.s3_target_secret_key == "SECRET_TEST"
+    assert cfg.s3_target_region == "ap-southeast-1"
     assert cfg.ftp_target_url == "ftp://ftp.example.com:21/root"
     assert cfg.ftp_target_username == "ftp-user"
     assert cfg.ftp_target_password == "ftp-pass"
@@ -220,6 +234,8 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert nested["sync"]["source_path"] == "/src"
     assert nested["targets"]["guangya"]["device_id"] == "device"
     assert nested["targets"]["webdav"]["url"] == "https://dav.example.com/root"
+    assert nested["targets"]["s3"]["endpoint"] == "https://s3.example.com"
+    assert nested["targets"]["s3"]["bucket"] == "archive-bucket"
     assert nested["targets"]["ftp"]["url"] == "ftp://ftp.example.com:21/root"
     assert nested["targets"]["sftp"]["url"] == "sftp://sftp.example.com:22/root"
     assert nested["source_session"]["provider_captures"]["quark"]["captured"]["cookie_header"] == "k=v"
@@ -244,6 +260,12 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
   "webdav_target_url": "https://dav.example.com/legacy",
   "webdav_target_username": "legacy-dav",
   "webdav_target_password": "legacy-pass",
+  "s3_target_endpoint": "https://legacy-s3.example.com",
+  "s3_target_bucket": "legacy-bucket",
+  "s3_target_prefix": "legacy-prefix",
+  "s3_target_access_key": "legacy-ak",
+  "s3_target_secret_key": "legacy-sk",
+  "s3_target_region": "cn-test-1",
   "ftp_target_url": "ftp://legacy.example.com/root",
   "ftp_target_username": "legacy-ftp",
   "ftp_target_password": "legacy-ftp-pass",
@@ -262,6 +284,9 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
     assert serialized["targets"]["localfs"]["root"] == str(Path(".exports/localfs"))
     assert serialized["targets"]["webdav"]["url"] == "https://dav.example.com/legacy"
     assert serialized["targets"]["webdav"]["username"] == "legacy-dav"
+    assert serialized["targets"]["s3"]["endpoint"] == "https://legacy-s3.example.com"
+    assert serialized["targets"]["s3"]["bucket"] == "legacy-bucket"
+    assert serialized["targets"]["s3"]["access_key"] == "legacy-ak"
     assert serialized["targets"]["ftp"]["url"] == "ftp://legacy.example.com/root"
     assert serialized["targets"]["ftp"]["username"] == "legacy-ftp"
     assert serialized["targets"]["sftp"]["url"] == "sftp://legacy.example.com/root"
@@ -507,6 +532,41 @@ def test_sync_runner_builds_webdav_target_adapter(tmp_path) -> None:
     adapter.close()
 
 
+def test_sync_runner_builds_s3_target_adapter(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst",
+                },
+                "targets": {
+                    "active_target": "s3",
+                    "s3": {
+                        "endpoint": "https://s3.example.com",
+                        "bucket": "archive-bucket",
+                        "prefix": "cloudpan-bridge/archive",
+                        "access_key": "AKIA_TEST",
+                        "secret_key": "SECRET_TEST",
+                        "region": "ap-southeast-1",
+                    },
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    adapter = runner._build_target_adapter(SyncState())
+    assert isinstance(adapter, S3TargetAdapter)
+    exported = adapter.export_state()
+    assert exported["endpoint"] == "https://s3.example.com"
+    assert exported["bucket"] == "archive-bucket"
+    assert exported["prefix"] == "cloudpan-bridge/archive"
+    adapter.close()
+
+
 def test_sync_runner_builds_ftp_target_adapter(tmp_path) -> None:
     path = tmp_path / "config.json"
     path.write_text(
@@ -623,6 +683,49 @@ def test_webdav_target_adapter_uses_basic_webdav_calls(tmp_path) -> None:
     assert "PUT" in methods
     assert "DELETE" in methods
     adapter.close()
+
+
+def test_s3_target_adapter_uses_basic_s3_calls(tmp_path) -> None:
+    local_file = tmp_path / "demo.txt"
+    local_file.write_text("hello", encoding="utf-8")
+
+    class FakeS3Client:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str, str]] = []
+            self.closed = False
+
+        def upload_file(self, local_path: str, bucket: str, key: str) -> None:
+            _ = Path(local_path).read_bytes()
+            self.calls.append(("upload_file", bucket, key))
+
+        def delete_object(self, Bucket: str, Key: str) -> None:  # noqa: N803
+            self.calls.append(("delete_object", Bucket, Key))
+
+        def close(self) -> None:
+            self.closed = True
+
+    fake_client = FakeS3Client()
+    adapter = S3TargetAdapter(
+        endpoint="https://s3.example.com",
+        bucket="archive-bucket",
+        access_key="AKIA_TEST",
+        secret_key="SECRET_TEST",
+        region="ap-southeast-1",
+        prefix="cloudpan-bridge/archive",
+        client_factory=lambda **kwargs: fake_client,
+    )
+    adapter.ensure_auth()
+    parent_id = adapter.ensure_target_dir("/photos/2026")
+    assert parent_id == "/photos/2026"
+    result = adapter.upload_local_file(local_file, parent_id, "demo.txt")
+    assert result["path"] == "/photos/2026/demo.txt"
+    assert result["bucket"] == "archive-bucket"
+    assert result["key"] == "cloudpan-bridge/archive/photos/2026/demo.txt"
+    assert adapter.remove_target_path("/photos/2026/demo.txt") is True
+    assert ("upload_file", "archive-bucket", "cloudpan-bridge/archive/photos/2026/demo.txt") in fake_client.calls
+    assert ("delete_object", "archive-bucket", "cloudpan-bridge/archive/photos/2026/demo.txt") in fake_client.calls
+    adapter.close()
+    assert fake_client.closed is True
 
 
 def test_ftp_target_adapter_uses_basic_ftp_calls(tmp_path) -> None:
@@ -958,7 +1061,7 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     payload = response.json()
     assert payload["active_target"] == "guangya"
     assert payload["driver_matrix"]["thunder"]["targetProfile"]["key"] == "guangya"
-    assert payload["implemented_targets"] == ["guangya", "openlist", "localfs", "webdav", "ftp", "sftp"]
+    assert payload["implemented_targets"] == ["guangya", "openlist", "localfs", "webdav", "s3", "ftp", "sftp"]
     assert payload["target_implementation_status"]["guangya"]["known_profile"] is True
     assert payload["target_implementation_status"]["guangya"]["implemented"] is True
     assert payload["target_implementation_status"]["guangya"]["selectable"] is True
@@ -968,6 +1071,9 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     assert payload["target_implementation_status"]["localfs"]["known_profile"] is True
     assert payload["target_implementation_status"]["localfs"]["implemented"] is True
     assert payload["target_implementation_status"]["localfs"]["selectable"] is True
+    assert payload["target_implementation_status"]["s3"]["known_profile"] is True
+    assert payload["target_implementation_status"]["s3"]["implemented"] is True
+    assert payload["target_implementation_status"]["s3"]["selectable"] is True
 
 
 def test_target_preflight_endpoint_reports_supported_target(tmp_path: Path) -> None:
@@ -2289,6 +2395,8 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["target_profiles"]["localfs"]["autoCreateDir"] is True
     assert payload["target_profiles"]["webdav"]["authMode"] == "webdav url + username/password"
     assert payload["target_profiles"]["webdav"]["autoCreateDir"] is True
+    assert payload["target_profiles"]["s3"]["authMode"] == "endpoint + bucket + access key/secret"
+    assert payload["target_profiles"]["s3"]["autoCreateDir"] is True
     assert payload["target_profiles"]["ftp"]["authMode"] == "ftp url + username/password"
     assert payload["target_profiles"]["ftp"]["autoCreateDir"] is True
     assert payload["target_profiles"]["sftp"]["authMode"] == "sftp url + username/password"

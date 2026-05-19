@@ -345,6 +345,133 @@ class WebDavTargetAdapter:
         return None
 
 
+class S3TargetAdapter:
+    def __init__(
+        self,
+        endpoint: str,
+        bucket: str,
+        access_key: str = "",
+        secret_key: str = "",
+        region: str = "",
+        prefix: str = "",
+        *,
+        client_factory: Callable[..., Any] | None = None,
+    ) -> None:
+        self.endpoint = str(endpoint or "").strip()
+        self.bucket = str(bucket or "").strip()
+        self.access_key = str(access_key or "").strip()
+        self.secret_key = str(secret_key or "").strip()
+        self.region = str(region or "").strip()
+        self.prefix = str(prefix or "").strip().strip("/")
+        self._client_factory = client_factory or self._default_client_factory
+        self.client: Any | None = None
+
+    def _default_client_factory(self, **kwargs: Any) -> Any:
+        try:
+            import boto3  # type: ignore[import-not-found]
+        except ImportError as exc:  # pragma: no cover - exercised through runtime selection
+            raise RuntimeError("S3 目标端需要先安装 boto3：pip install boto3") from exc
+        return boto3.client("s3", **kwargs)
+
+    def ensure_auth(self) -> None:
+        if not self.endpoint:
+            raise RuntimeError("S3 目标端未配置 endpoint。")
+        if not self.bucket:
+            raise RuntimeError("S3 目标端未配置 bucket。")
+        if self.client is not None:
+            return
+        kwargs: dict[str, Any] = {
+            "endpoint_url": self.endpoint,
+        }
+        if self.access_key:
+            kwargs["aws_access_key_id"] = self.access_key
+        if self.secret_key:
+            kwargs["aws_secret_access_key"] = self.secret_key
+        if self.region:
+            kwargs["region_name"] = self.region
+        self.client = self._client_factory(**kwargs)
+
+    def export_state(self) -> dict[str, str]:
+        return {
+            "endpoint": self.endpoint,
+            "bucket": self.bucket,
+            "prefix": self.prefix,
+            "region": self.region,
+        }
+
+    def close(self) -> None:
+        client = self.client
+        if client is not None and hasattr(client, "close"):
+            try:
+                client.close()
+            except Exception:
+                pass
+        self.client = None
+
+    def _normalize_path(self, path: str) -> str:
+        normalized = str(PurePosixPath("/" + str(path or "/").lstrip("/")))
+        return "/" if normalized == "." else normalized
+
+    def _build_key(self, path: str) -> str:
+        normalized = self._normalize_path(path)
+        path_part = normalized.lstrip("/")
+        if self.prefix and path_part:
+            return f"{self.prefix}/{path_part}"
+        if self.prefix:
+            return self.prefix
+        return path_part
+
+    def ensure_target_dir(self, path: str) -> str:
+        self.ensure_auth()
+        return self._normalize_path(path)
+
+    def delete_if_exists(self, parent_id: str, name: str) -> bool:
+        target_path = str(PurePosixPath(self._normalize_path(parent_id)) / name)
+        return self.remove_target_path(target_path)
+
+    def remove_target_path(self, path: str) -> bool:
+        self.ensure_auth()
+        assert self.client is not None
+        normalized = self._normalize_path(path)
+        if normalized == "/":
+            return False
+        key = self._build_key(normalized)
+        try:
+            self.client.delete_object(Bucket=self.bucket, Key=key)
+            return True
+        except Exception:
+            return False
+
+    def try_fast_upload(
+        self,
+        file_name: str,
+        file_size: int,
+        parent_id: str,
+        md5_hex: str = "",
+        gcid: str = "",
+    ) -> DirectImportResult:
+        return DirectImportResult(
+            success=False,
+            reason="S3 目标端当前只支持普通上传/覆盖，不支持元数据秒传。",
+        )
+
+    def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, Any]:
+        self.ensure_auth()
+        assert self.client is not None
+        target_path = str(PurePosixPath(self._normalize_path(target_parent_id)) / target_name)
+        key = self._build_key(target_path)
+        self.client.upload_file(str(local_path), self.bucket, key)
+        return {
+            "path": target_path,
+            "size": local_path.stat().st_size,
+            "bucket": self.bucket,
+            "key": key,
+        }
+
+    def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
+        return None
+
+
 class FtpTargetAdapter:
     def __init__(
         self,
@@ -604,7 +731,7 @@ class SftpTargetAdapter:
 
 
 def supported_target_keys() -> list[str]:
-    return ["guangya", "openlist", "localfs", "webdav", "ftp", "sftp"]
+    return ["guangya", "openlist", "localfs", "webdav", "s3", "ftp", "sftp"]
 
 
 def create_target_adapter(config: AppConfig, state: SyncState, target_key: str = "") -> TargetAdapter:
@@ -641,6 +768,15 @@ def create_target_adapter(config: AppConfig, state: SyncState, target_key: str =
             base_url=config.webdav_target_url,
             username=config.webdav_target_username,
             password=config.webdav_target_password,
+        )
+    if normalized == "s3":
+        return S3TargetAdapter(
+            endpoint=config.s3_target_endpoint,
+            bucket=config.s3_target_bucket,
+            access_key=config.s3_target_access_key,
+            secret_key=config.s3_target_secret_key,
+            region=config.s3_target_region,
+            prefix=config.s3_target_prefix,
         )
     if normalized == "ftp":
         return FtpTargetAdapter(

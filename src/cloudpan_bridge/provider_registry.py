@@ -738,6 +738,24 @@ TARGET_PROFILES: dict[str, dict[str, Any]] = {
             "en": "Useful as a unified target for NAS, private cloud, or third-party WebDAV storage. The current capability is still a conservative upload path rather than real cross-cloud fast upload.",
         },
     },
+    "s3": {
+        "key": "s3",
+        "label": "S3",
+        "label_zh": "S3 / 对象存储目标",
+        "auth_mode": "endpoint + bucket + access key/secret",
+        "token_refresh": "not required",
+        "auto_create_dir": True,
+        "fast_upload_hashes": [],
+        "fallback_modes": ["download_upload", "stream_upload"],
+        "description": {
+            "zh": "第七个正式可写目标端。用于把同步结果写入 S3 或兼容对象存储，当前只按普通对象上传/覆盖处理，不承诺元数据秒传。",
+            "en": "Seventh built-in writable target. It writes sync results into S3 or compatible object storage and currently uses normal object upload/overwrite only, without any metadata-based fast-upload promise.",
+        },
+        "research_notes": {
+            "zh": "适合作为对象存储桶、备份桶或云原生归档目标端；当前能力定位仍是保守上传链路，不宣传成跨盘秒传。",
+            "en": "Useful as a target for object-storage buckets, backup buckets, or cloud-native archives. The current capability remains a conservative upload path rather than cross-cloud fast upload.",
+        },
+    },
     "ftp": {
         "key": "ftp",
         "label": "FTP",
@@ -2031,7 +2049,7 @@ def build_driver_target_capability(
     target_profile = _serialize_target_profile(TARGET_PROFILES.get(target_key, TARGET_PROFILES["guangya"]))
     capability_to_targets = dict(source_profile.get("capabilityToTargets") or {})
     target_capability = dict(capability_to_targets.get(target_key) or {})
-    if not target_capability and target_key in {"openlist", "localfs", "webdav", "ftp", "sftp"}:
+    if not target_capability and target_key in {"openlist", "localfs", "webdav", "s3", "ftp", "sftp"}:
         if target_key == "openlist":
             target_capability = {
                 "level": "download_upload_only",
@@ -2060,6 +2078,16 @@ def build_driver_target_capability(
                 "notes": {
                     "zh": "适合作为 NAS、私有云或第三方 WebDAV 的统一目标端；如果你要真正秒传，仍应优先选择支持元数据导入的目标端。",
                     "en": "Use it as a unified target for NAS, private cloud, or third-party WebDAV storage. For true fast upload, still prefer a target with metadata-import support.",
+                },
+            }
+        elif target_key == "s3":
+            target_capability = {
+                "level": "download_upload_only",
+                "recommendedFlow": "当前组合可写入 S3 目标端，但只按普通对象上传/覆盖处理，不承诺跨盘秒传。",
+                "recommendedFlowEn": "This combination can write into the S3 target, but it only uses normal object upload/overwrite and does not promise any cross-cloud fast upload.",
+                "notes": {
+                    "zh": "适合作为对象存储桶、备份桶或云原生归档目标端；如果你要真正秒传，仍应优先选择支持元数据导入的目标端。",
+                    "en": "Use it as a target for object-storage buckets, backup buckets, or cloud-native archives. For true fast upload, still prefer a target with metadata-import support.",
                 },
             }
         elif target_key == "ftp":
