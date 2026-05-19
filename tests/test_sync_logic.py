@@ -778,6 +778,8 @@ def test_provider_coverage_audit_uses_real_capture_specs_instead_of_profile_alia
     assert row["hasCapture"] is False
     assert row["captureSpecKey"] == ""
     assert row["hasCapability"] is True
+    assert row["onboardingReady"] is True
+    assert row["onboardingStage"] == "ready_for_guide"
     assert row["missingItems"] == ["guide", "capture"]
     assert row["nextAction"] == "add_guide"
     assert audit["gapBuckets"]["missingCapture"] == 1
@@ -815,6 +817,8 @@ def test_provider_coverage_audit_endpoint_supports_filtered_view_export(tmp_path
     assert payload["totals"]["total"] == 1
     assert payload["rows"][0]["normalized"] == "unknowndrive"
     assert payload["backlog"][0]["normalized"] == "unknowndrive"
+    assert payload["rows"][0]["onboardingReady"] is False
+    assert payload["rows"][0]["onboardingStage"] == "needs_profile_bootstrap"
 
 
 def test_provider_coverage_audit_endpoint_supports_capability_and_profile_filters(tmp_path: Path) -> None:
@@ -848,6 +852,7 @@ def test_provider_coverage_audit_endpoint_supports_capability_and_profile_filter
     assert payload["rows"][0]["normalized"] == "aliyundriveopen"
     assert payload["rows"][0]["profileKey"] == "aliyundriveopen"
     assert payload["rows"][0]["capabilityLevel"] == "download_upload_only"
+    assert payload["rows"][0]["onboardingStage"] == "covered"
     assert payload["backlog"] == []
 
 
@@ -935,7 +940,44 @@ def test_provider_coverage_audit_marks_123open_capture_as_covered(tmp_path: Path
     assert row["hasCapture"] is True
     assert row["captureSpecKey"] == "123pan"
     assert row["captureMatchedAlias"] == "123open"
+    assert row["onboardingReady"] is False
+    assert row["onboardingStage"] == "covered"
     assert "capture" not in row["missingItems"]
+
+
+def test_provider_coverage_audit_supports_onboarding_ready_filter(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_profiles = provider_registry_module.SOURCE_PROVIDER_PROFILES
+    fake_profiles = {
+        **original_profiles,
+        "fakecapturegap": {
+            **dict(original_profiles["generic"]),
+            "key": "fakecapturegap",
+            "label": "Fake Capture Gap",
+            "label_zh": "假驱动抓取缺口",
+            "driver_aliases": ["FakeCaptureGap"],
+            "doc_links": [],
+            "capability_to_targets": {
+                "guangya": {
+                    "level": "download_upload_only",
+                    "recommended_flow": "仅用于测试 onboarding-ready 过滤。",
+                    "recommended_flow_en": "For onboarding-ready filter regression testing only.",
+                }
+            },
+        },
+    }
+    monkeypatch.setattr(provider_registry_module, "SOURCE_PROVIDER_PROFILES", fake_profiles)
+    audit = provider_registry_module.build_driver_coverage_audit(["UnknownDrive", "FakeCaptureGap"], target="guangya")
+    filtered = provider_registry_module.filter_driver_coverage_audit(
+        audit,
+        only_onboarding_ready=True,
+        onboarding_stage="ready_for_guide",
+    )
+    assert filtered["filters"]["onlyOnboardingReady"] is True
+    assert filtered["filters"]["onboardingStage"] == "ready_for_guide"
+    assert filtered["totals"]["total"] == 1
+    assert filtered["rows"][0]["normalized"] == "fakecapturegap"
+    assert filtered["rows"][0]["onboardingReady"] is True
+    assert filtered["backlog"][0]["normalized"] == "fakecapturegap"
 
 
 def test_provider_coverage_audit_markdown_endpoint_renders_backlog_report(tmp_path: Path) -> None:
@@ -993,10 +1035,12 @@ def test_provider_coverage_audit_markdown_endpoint_renders_filtered_view(tmp_pat
     assert response.status_code == 200
     text = response.text
     assert "- 只看缺口: `True`" in text
+    assert "- 只看可直接接入: `False`" in text
     assert "- 下一步动作: `add_profile_first`" in text
     assert "- 缺口类型: `profile`" in text
     assert "- 能力等级: `-`" in text
     assert "- Profile Key: `-`" in text
+    assert "- 接入阶段: `-`" in text
     assert "`UnknownDrive` | P1 | add_profile_first" in text
     assert "`AliyundriveOpen` | P99" not in text
 
@@ -1084,6 +1128,40 @@ def test_provider_coverage_audit_markdown_filtered_backlog_still_renders_after_p
     assert "- Profile Key: `fakecapturegap`" in text
     assert "- 能力等级: `download_upload_only`" in text
     assert "`FakeCaptureGap` | P2 | add_guide" in text
+
+
+def test_provider_coverage_audit_markdown_supports_onboarding_ready_filter(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_profiles = provider_registry_module.SOURCE_PROVIDER_PROFILES
+    fake_profiles = {
+        **original_profiles,
+        "fakecapturegap": {
+            **dict(original_profiles["generic"]),
+            "key": "fakecapturegap",
+            "label": "Fake Capture Gap",
+            "label_zh": "假驱动抓取缺口",
+            "driver_aliases": ["FakeCaptureGap"],
+            "doc_links": [],
+            "capability_to_targets": {
+                "guangya": {
+                    "level": "download_upload_only",
+                    "recommended_flow": "仅用于测试 onboarding-ready 过滤。",
+                    "recommended_flow_en": "For onboarding-ready filter regression testing only.",
+                }
+            },
+        },
+    }
+    monkeypatch.setattr(provider_registry_module, "SOURCE_PROVIDER_PROFILES", fake_profiles)
+    audit = provider_registry_module.build_driver_coverage_audit(["UnknownDrive", "FakeCaptureGap"], target="guangya")
+    filtered = provider_registry_module.filter_driver_coverage_audit(
+        audit,
+        only_onboarding_ready=True,
+        onboarding_stage="ready_for_guide",
+    )
+    text = provider_registry_module.render_driver_coverage_audit_markdown(filtered)
+    assert "- 只看可直接接入: `True`" in text
+    assert "- 接入阶段: `ready_for_guide`" in text
+    assert "`FakeCaptureGap` | P2 | add_guide" in text
+    assert "`UnknownDrive`" not in text
 
 
 def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Path) -> None:

@@ -159,9 +159,19 @@
   - 还支持按 `capability level` 与 `profileKey` 过滤
     - 例如只看 `download_upload_only`
     - 或只看某个具体 profile，如 `aliyundriveopen`
+  - 现在还支持一层“接入阶段”视图
+    - `needs_profile_bootstrap`
+    - `ready_for_guide`
+    - `ready_for_capture`
+    - `ready_for_capability`
+    - `covered`
+  - 并支持“只看可直接接入”
+    - 也就是已经有 profile，可直接进入补 guide / 补 capture / 补 capability 的驱动
   - 覆盖筛选条件会自动记住，下次进入页面继续延续
   - 导出结果会跟随当前筛选视图，不再固定导出全量
   - 每条审计记录现在还会展示：
+    - `onboardingReady`
+    - `onboardingStage`
     - `canonicalDriver`
     - `matchedGuide`
     - `profileKey`

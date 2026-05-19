@@ -999,10 +999,12 @@ def create_app(config_path: Path) -> FastAPI:
         return filter_driver_coverage_audit(
             audit,
             only_gaps=bool(payload.get("only_gaps")),
+            only_onboarding_ready=bool(payload.get("only_onboarding_ready")),
             next_action=str(payload.get("next_action") or ""),
             missing_item=str(payload.get("missing_item") or ""),
             capability_level=str(payload.get("capability_level") or ""),
             profile_key=str(payload.get("profile_key") or ""),
+            onboarding_stage=str(payload.get("onboarding_stage") or ""),
         )
 
     @app.post("/api/provider/coverage_audit_markdown")
@@ -1016,10 +1018,12 @@ def create_app(config_path: Path) -> FastAPI:
         audit = filter_driver_coverage_audit(
             audit,
             only_gaps=bool(payload.get("only_gaps")),
+            only_onboarding_ready=bool(payload.get("only_onboarding_ready")),
             next_action=str(payload.get("next_action") or ""),
             missing_item=str(payload.get("missing_item") or ""),
             capability_level=str(payload.get("capability_level") or ""),
             profile_key=str(payload.get("profile_key") or ""),
+            onboarding_stage=str(payload.get("onboarding_stage") or ""),
         )
         markdown = render_driver_coverage_audit_markdown(audit)
         return PlainTextResponse(markdown, media_type="text/markdown; charset=utf-8")

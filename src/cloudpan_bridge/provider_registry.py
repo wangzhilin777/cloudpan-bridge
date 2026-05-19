@@ -597,6 +597,14 @@ CAPABILITY_LEVEL_ORDER = [
     "unsupported",
 ]
 
+ONBOARDING_STAGE_ORDER = [
+    "needs_profile_bootstrap",
+    "ready_for_guide",
+    "ready_for_capture",
+    "ready_for_capability",
+    "covered",
+]
+
 
 def _normalize_key(value: str) -> str:
     return "".join(ch.lower() for ch in str(value or "") if ch.isalnum())
@@ -807,18 +815,23 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
         if not has_profile:
             next_action = "add_profile_first"
             priority_rank = 1
+            onboarding_stage = "needs_profile_bootstrap"
         elif not has_guide:
             next_action = "add_guide"
             priority_rank = 2
+            onboarding_stage = "ready_for_guide"
         elif not has_capture:
             next_action = "add_capture_spec"
             priority_rank = 3
+            onboarding_stage = "ready_for_capture"
         elif not has_capability:
             next_action = "assess_target_capability"
             priority_rank = 4
+            onboarding_stage = "ready_for_capability"
         else:
             next_action = "covered"
             priority_rank = 99
+            onboarding_stage = "covered"
         row = {
             "driver": driver,
             "normalized": normalized,
@@ -835,6 +848,8 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
             "captureLabel": str(capture_match.get("label") or ""),
             "hasCapability": has_capability,
             "capabilityLevel": capability_level or "unsupported",
+            "onboardingReady": onboarding_stage in {"ready_for_guide", "ready_for_capture", "ready_for_capability"},
+            "onboardingStage": onboarding_stage,
             "coverageScore": coverage_score,
             "docLinks": list(profile.get("docLinks") or []),
             "missingItems": missing_items,
@@ -851,6 +866,8 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
                     "profileKey": str(profile.get("key") or "generic"),
                     "matchedGuideKey": matched_guide_key,
                     "capabilityLevel": capability_level or "unsupported",
+                    "onboardingReady": onboarding_stage in {"ready_for_guide", "ready_for_capture", "ready_for_capability"},
+                    "onboardingStage": onboarding_stage,
                     "missingItems": missing_items,
                     "nextAction": next_action,
                     "priorityRank": priority_rank,
@@ -876,20 +893,25 @@ def filter_driver_coverage_audit(
     audit: dict[str, Any],
     *,
     only_gaps: bool = False,
+    only_onboarding_ready: bool = False,
     next_action: str = "",
     missing_item: str = "",
     capability_level: str = "",
     profile_key: str = "",
+    onboarding_stage: str = "",
 ) -> dict[str, Any]:
     normalized_next_action = str(next_action or "").strip()
     normalized_missing_item = str(missing_item or "").strip()
     normalized_capability_level = str(capability_level or "").strip()
     normalized_profile_key = str(profile_key or "").strip()
+    normalized_onboarding_stage = str(onboarding_stage or "").strip()
     rows = list(audit.get("rows") or [])
     filtered_rows = []
     for item in rows:
         missing_items = list(item.get("missingItems") or [])
         if only_gaps and not missing_items:
+            continue
+        if only_onboarding_ready and not bool(item.get("onboardingReady")):
             continue
         if normalized_next_action and str(item.get("nextAction") or "") != normalized_next_action:
             continue
@@ -898,6 +920,8 @@ def filter_driver_coverage_audit(
         if normalized_capability_level and str(item.get("capabilityLevel") or "") != normalized_capability_level:
             continue
         if normalized_profile_key and str(item.get("profileKey") or "") != normalized_profile_key:
+            continue
+        if normalized_onboarding_stage and str(item.get("onboardingStage") or "") != normalized_onboarding_stage:
             continue
         filtered_rows.append(item)
 
@@ -927,10 +951,12 @@ def filter_driver_coverage_audit(
         "backlog": filtered_backlog,
         "filters": {
             "onlyGaps": bool(only_gaps),
+            "onlyOnboardingReady": bool(only_onboarding_ready),
             "nextAction": normalized_next_action,
             "missingItem": normalized_missing_item,
             "capabilityLevel": normalized_capability_level,
             "profileKey": normalized_profile_key,
+            "onboardingStage": normalized_onboarding_stage,
         },
     }
 
@@ -956,10 +982,12 @@ def render_driver_coverage_audit_markdown(audit: dict[str, Any]) -> str:
         "## 当前筛选",
         "",
         f"- 只看缺口: `{bool(filters.get('onlyGaps'))}`",
+        f"- 只看可直接接入: `{bool(filters.get('onlyOnboardingReady'))}`",
         f"- 下一步动作: `{filters.get('nextAction', '') or '-'}`",
         f"- 缺口类型: `{filters.get('missingItem', '') or '-'}`",
         f"- 能力等级: `{filters.get('capabilityLevel', '') or '-'}`",
         f"- Profile Key: `{filters.get('profileKey', '') or '-'}`",
+        f"- 接入阶段: `{filters.get('onboardingStage', '') or '-'}`",
         "",
         "## 缺口汇总",
         "",
