@@ -290,7 +290,7 @@ def create_app(config_path: Path) -> FastAPI:
         raw_grouped = {
             key: value
             for key, value in raw_payload.items()
-            if isinstance(value, dict) and key not in flat_keys
+            if key not in flat_keys
         }
         return deep_merge_dicts(normalized, raw_grouped)
 

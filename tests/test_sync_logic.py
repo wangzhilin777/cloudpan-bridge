@@ -558,6 +558,32 @@ def test_config_endpoint_grouped_update_preserves_unknown_nested_sections(tmp_pa
     assert saved["extra_runtime"]["notes"]["owner"] == "demo"
 
 
+def test_config_endpoint_grouped_view_preserves_unknown_scalar_and_list_sections(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src"
+  },
+  "feature_switch": true,
+  "provider_order": ["quark", "189cloud"]
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/config")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["grouped_config"]["feature_switch"] is True
+    assert payload["grouped_config"]["provider_order"] == ["quark", "189cloud"]
+    assert "feature_switch" not in payload
+    assert "provider_order" not in payload
+
+
 def test_config_endpoint_accepts_grouped_partial_update(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
