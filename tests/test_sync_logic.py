@@ -332,8 +332,61 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     assert payload["active_target"] == "guangya"
     assert payload["driver_matrix"]["thunder"]["targetProfile"]["key"] == "guangya"
     assert payload["implemented_targets"] == ["guangya"]
+    assert payload["target_implementation_status"]["guangya"]["known_profile"] is True
     assert payload["target_implementation_status"]["guangya"]["implemented"] is True
     assert payload["target_implementation_status"]["guangya"]["selectable"] is True
+
+
+def test_target_preflight_endpoint_reports_supported_target(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "target_key": "guangya"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/target/preflight")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["target_key"] == "guangya"
+    assert payload["known_profile"] is True
+    assert payload["implemented"] is True
+    assert payload["selectable"] is True
+
+
+def test_target_preflight_endpoint_rejects_unknown_target(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "target_key": "quark"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/target/preflight")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["target_key"] == "quark"
+    assert payload["known_profile"] is False
+    assert payload["implemented"] is False
+    assert payload["selectable"] is False
+
+    sync_response = client.post("/api/sync/start", json={"mode": "dry_run"})
+    assert sync_response.status_code == 400
+    assert "目标端 quark 当前既没有内置档案，也没有实现可写入适配器" in sync_response.json()["detail"]
 
 
 def test_config_endpoint_returns_flat_and_grouped_views(tmp_path: Path) -> None:

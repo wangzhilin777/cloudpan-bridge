@@ -702,6 +702,7 @@
                 <input id="guangya_authorization" placeholder="Bearer ...">
               </div>
             </div>
+            <div class="notice" id="target-preflight-notice">等待目标端检查...</div>
             <div class="actions">
               <button class="accent" id="save-config-bottom" data-i18n="btn.save_all_config">保存全部配置</button>
             </div>
@@ -1546,6 +1547,7 @@
       driverGuideRegistry = data?.guides || {};
       populateTargetOptions();
       populateCoverageFilterOptions();
+      await refreshTargetPreflight();
       renderCapabilitySummary();
       renderAboutRegistry();
       await refreshCapabilityAssessment();
@@ -1600,6 +1602,26 @@
       }
       populateCoverageFilterOptions();
       renderAboutRegistry();
+    }
+
+    async function refreshTargetPreflight() {
+      const root = document.getElementById("target-preflight-notice");
+      if (!root) return;
+      try {
+        const payload = await call(`/api/target/preflight?target=${encodeURIComponent(activeTargetKey())}`);
+        const implemented = payload?.implemented ? "true" : "false";
+        const selectable = payload?.selectable ? "true" : "false";
+        root.innerHTML = `
+          <div class="mono">target=${escapeHtml(payload?.target_key || "-")} | implemented=${implemented} | selectable=${selectable}</div>
+          <div>${escapeHtml(payload?.message || "")}</div>
+        `;
+      } catch (error) {
+        root.textContent = currentLang() === "en"
+          ? `Target preflight failed: ${error.message}`
+          : currentLang() === "mix"
+            ? `目标端预检失败 / Target preflight failed: ${error.message}`
+            : `目标端预检失败: ${error.message}`;
+      }
     }
 
     function downloadTextFile(filename, text, mimeType = "text/plain;charset=utf-8") {
@@ -2494,6 +2516,7 @@
       };
       await loadProviderRegistry();
       await refreshCoverageAudit();
+      await refreshTargetPreflight();
       setNotice("sync-notice", "配置已保存");
       setNotice("dir-notice", "配置已保存");
     }
@@ -3202,6 +3225,7 @@
           ...(providerRegistryPayload || {}),
           active_target: nextTarget,
         };
+        await refreshTargetPreflight();
         renderCapabilitySummary();
         renderAboutRegistry();
         await refreshCapabilityAssessment();

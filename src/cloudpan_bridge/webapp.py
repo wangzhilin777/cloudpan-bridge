@@ -225,6 +225,33 @@ def create_app(config_path: Path) -> FastAPI:
             token=str(token if token is not None else config.openlist_token),
         )
 
+    def build_target_preflight(target_key: str = "") -> dict[str, Any]:
+        normalized = str(target_key or config.target_key or "guangya").strip().lower() or "guangya"
+        target_profiles = list_target_profiles()
+        implemented_targets = supported_target_keys()
+        known_profile = normalized in target_profiles
+        implemented = normalized in implemented_targets
+        selectable = known_profile and implemented
+        if selectable:
+            message = "当前目标端已实现，可继续执行同步任务。"
+        elif known_profile:
+            message = f"目标端 {normalized} 目前只有档案定义，还没有实现可写入适配器。"
+        else:
+            message = f"目标端 {normalized} 当前既没有内置档案，也没有实现可写入适配器。"
+        return {
+            "target_key": normalized,
+            "known_profile": known_profile,
+            "implemented": implemented,
+            "selectable": selectable,
+            "message": message,
+        }
+
+    def require_selectable_target(target_key: str = "") -> dict[str, Any]:
+        preflight = build_target_preflight(target_key)
+        if not preflight["selectable"]:
+            raise HTTPException(status_code=400, detail=preflight["message"])
+        return preflight
+
     def deep_merge_dicts(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
         merged = dict(base)
         for key, value in patch.items():
@@ -707,12 +734,13 @@ def create_app(config_path: Path) -> FastAPI:
     def start_sync(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         nonlocal config
         payload = payload or {}
+        config = AppConfig.load(config_path)
+        require_selectable_target(str(payload.get("target_key") or config.target_key or "guangya"))
         with sync_lock:
             if sync_state["running"]:
                 raise HTTPException(status_code=409, detail="同步任务正在运行")
             sync_state["running"] = True
             sync_state["last_error"] = ""
-        config = AppConfig.load(config_path)
         mode = str(payload.get("mode") or "dry_run")
         worker = Thread(
             target=run_sync_job,
@@ -765,6 +793,8 @@ def create_app(config_path: Path) -> FastAPI:
     def run_leaf_stream(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         nonlocal config
         payload = payload or {}
+        config = AppConfig.load(config_path)
+        require_selectable_target(str(payload.get("target_key") or config.target_key or "guangya"))
         root_path = str(payload.get("source_path") or config.source_path or "/").strip()
         normalized = "/" + root_path.lstrip("/")
         if normalized == "/":
@@ -783,6 +813,8 @@ def create_app(config_path: Path) -> FastAPI:
     def run_leaf_stream_full(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         nonlocal config
         payload = payload or {}
+        config = AppConfig.load(config_path)
+        require_selectable_target(str(payload.get("target_key") or config.target_key or "guangya"))
         root_path = str(payload.get("source_path") or config.source_path or "/").strip()
         normalized = "/" + root_path.lstrip("/")
         if normalized == "/":
@@ -800,6 +832,7 @@ def create_app(config_path: Path) -> FastAPI:
     @app.post("/api/pending/run_selected_stream")
     def run_pending_selected_stream(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         payload = payload or {}
+        require_selectable_target()
         selected_paths = list(payload.get("selected_paths") or [])
         if not selected_paths:
             raise HTTPException(status_code=400, detail="请先勾选至少一个待补传文件或目录。")
@@ -859,6 +892,7 @@ def create_app(config_path: Path) -> FastAPI:
             sync_state["running"] = True
             sync_state["last_error"] = ""
         config = AppConfig.load(config_path)
+        require_selectable_target(config.target_key)
         worker = Thread(
             target=run_sync_job,
             args=(
@@ -913,6 +947,7 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.post("/api/queue/run_all")
     def run_all_queue_items() -> dict[str, Any]:
+        require_selectable_target()
         with sync_lock:
             if sync_state["running"] or sync_state.get("queue_runner", {}).get("running"):
                 raise HTTPException(status_code=409, detail="同步任务或队列任务正在运行")
@@ -1004,21 +1039,27 @@ def create_app(config_path: Path) -> FastAPI:
     @app.get("/api/provider/registry")
     def get_provider_registry() -> dict[str, Any]:
         implemented_targets = supported_target_keys()
+        target_profiles = list_target_profiles()
         return {
             "guides": list_driver_guides(),
             "source_profiles": list_source_profiles(),
-            "target_profiles": list_target_profiles(),
+            "target_profiles": target_profiles,
             "driver_matrix": build_driver_capability_matrix(target=config.target_key),
             "active_target": config.target_key,
             "implemented_targets": implemented_targets,
             "target_implementation_status": {
                 key: {
+                    "known_profile": key in target_profiles,
                     "implemented": key in implemented_targets,
-                    "selectable": key in implemented_targets,
+                    "selectable": key in target_profiles and key in implemented_targets,
                 }
-                for key in list_target_profiles().keys()
+                for key in target_profiles.keys()
             },
         }
+
+    @app.get("/api/target/preflight")
+    def get_target_preflight(target: str = "") -> dict[str, Any]:
+        return build_target_preflight(target)
 
     @app.get("/api/provider/capability")
     def get_provider_capability(driver: str, target: str = "") -> dict[str, Any]:
