@@ -2357,10 +2357,13 @@
               <div>
                 <div>${escapeHtml(item.driver || "-")}</div>
                 <div class="mono">profile=${item.hasProfile ? "yes" : "no"} | guide=${item.hasGuide ? "yes" : "no"} | capture=${item.hasCapture ? "yes" : "no"} | capability=${item.hasCapability ? "yes" : "no"}</div>
+                <div class="mono">${currentLang() === "en" ? "inference" : currentLang() === "mix" ? "推断状态 / inference" : "推断状态"}=profile:${item.profileIsDynamic ? "dynamic" : "static"} | capture:${item.captureIsDynamic ? "dynamic" : "static"} | capability:${item.capabilityIsDynamic ? "dynamic" : "static"}</div>
                 <div class="mono">${currentLang() === "en" ? "level" : currentLang() === "mix" ? "等级 / level" : "等级"}=${escapeHtml(capabilityLevelText(item.capabilityLevel || "unsupported"))} | score=${item.coverageScore ?? 0}/4 | P${item.priorityRank ?? "-"}</div>
                 <div class="mono">onboardingReady=${item.onboardingReady ? "yes" : "no"} | onboardingStage=${escapeHtml(item.onboardingStage || "-")}</div>
                 <div class="mono">canonicalDriver=${escapeHtml(item.canonicalDriverKey || "generic")} | matchedGuide=${escapeHtml(item.matchedGuideKey || "-")}</div>
                 <div class="mono">profileKey=${escapeHtml(item.profileKey || "generic")}</div>
+                <div class="mono">${currentLang() === "en" ? "dynamic required keys" : currentLang() === "mix" ? "动态必需键 / dynamic required keys" : "动态必需键"}=${escapeHtml((item.dynamicRequiredKeys || []).join(", ") || "-")}</div>
+                <div class="mono">${currentLang() === "en" ? "dynamic matched fields" : currentLang() === "mix" ? "动态字段命中 / dynamic matched fields" : "动态字段命中"}=${escapeHtml((item.dynamicMatchedFields || []).join(", ") || "-")}</div>
                 <div class="mono">guideDoc=${escapeHtml(item.guideDocUrl || "-")}</div>
                 <div class="mono">captureSpec=${escapeHtml(item.captureSpecKey || "-")} | alias=${escapeHtml(item.captureMatchedAlias || "-")}</div>
                 <div class="mono">captureLogin=${escapeHtml(item.captureLoginUrl || "-")}</div>
