@@ -2323,6 +2323,58 @@ def test_provider_capture_prefill_accepts_grouped_provider_and_driver(tmp_path: 
     assert payload["missing_required"] == []
 
 
+def test_pending_run_selected_stream_accepts_grouped_selected_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  },
+  "targets": {
+    "active_target": "guangya"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge import webapp as webapp_module
+
+    seen: dict[str, object] = {}
+
+    class ImmediateThread:
+        def __init__(self, target: object, args: tuple[object, ...] = (), daemon: bool = False) -> None:
+            seen["thread_target"] = getattr(target, "__name__", str(target))
+            seen["thread_args"] = args
+
+        def start(self) -> None:
+            return None
+
+    monkeypatch.setattr(webapp_module, "Thread", ImmediateThread)
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.post(
+        "/api/pending/run_selected_stream",
+        json={
+            "grouped_config": {
+                "targets": {
+                    "active_target": "guangya"
+                },
+                "sync": {
+                    "selected_paths": [
+                        "folder/a.jpg",
+                        "/folder/b.jpg",
+                    ]
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["selected"] == 2
+    assert seen["thread_target"] == "run_pending_selected_stream_job"
+    assert seen["thread_args"] == (["/folder/a.jpg", "/folder/b.jpg"],)
+
+
 def test_openlist_storage_create_accepts_grouped_driver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(

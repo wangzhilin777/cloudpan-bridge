@@ -315,7 +315,12 @@ def create_app(config_path: Path) -> FastAPI:
             )
         )
         normalized["miaochuan_payload"] = str(resolve_payload_value(raw, "miaochuan_payload", default=raw.get("miaochuan_payload") or ""))
-        normalized["selected_paths"] = list(raw.get("selected_paths") or [])
+        selected_paths = resolve_payload_value(raw, "selected_paths", ("sync", "selected_paths"), raw.get("selected_paths") or [])
+        normalized["selected_paths"] = [
+            normalize_posix_path(path)
+            for path in list(selected_paths or [])
+            if str(path).strip()
+        ]
         return normalized
 
     def normalize_registry_payload(payload: dict[str, Any] | None, runtime_config: AppConfig) -> dict[str, Any]:
@@ -968,8 +973,10 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.post("/api/pending/run_selected_stream")
     def run_pending_selected_stream(payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        payload = payload or {}
-        require_selectable_target()
+        nonlocal config
+        config = AppConfig.load(config_path)
+        payload = normalize_sync_payload(payload, config)
+        require_selectable_target(str(payload.get("target_key") or config.target_key or "guangya"))
         selected_paths = list(payload.get("selected_paths") or [])
         if not selected_paths:
             raise HTTPException(status_code=400, detail="请先勾选至少一个待补传文件或目录。")
