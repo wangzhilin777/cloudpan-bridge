@@ -164,6 +164,9 @@
   - 直接显示哪些驱动已经具备 `profile / guide / capture / capability`
   - 并给出当前驱动的缺口项和建议下一步
   - 还会生成按优先级排序的 backlog，方便继续批量补驱动
+  - 现在还会额外生成“执行波次建议”
+    - 按 `add_profile_first / add_guide / add_capture_spec / assess_target_capability` 分波
+    - 每一波直接列出对应驱动、缺口类型与相关 profile
   - 支持导出 `JSON / Markdown` 审计结果，便于拆分后续任务
   - 支持页面内只看缺口、按下一步动作过滤
   - 还支持按缺口类型过滤，例如只看“缺 capture”的驱动

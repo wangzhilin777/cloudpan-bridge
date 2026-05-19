@@ -789,6 +789,7 @@
             </div>
             <div class="notice" id="about-coverage-backlog">等待载入...</div>
             <div class="notice" id="about-coverage-action-stats">等待载入...</div>
+            <div class="notice" id="about-coverage-plan">等待载入...</div>
             <div class="mount-list" id="about-coverage-audit">等待载入...</div>
           </div>
         </section>
@@ -1754,7 +1755,8 @@
       const coverageRoot = document.getElementById("about-coverage-audit");
       const coverageBacklogRoot = document.getElementById("about-coverage-backlog");
       const coverageActionStatsRoot = document.getElementById("about-coverage-action-stats");
-      if (!summaryRoot || !sourceRoot || !targetRoot || !matrixRoot || !coverageRoot || !coverageBacklogRoot || !coverageActionStatsRoot) return;
+      const coveragePlanRoot = document.getElementById("about-coverage-plan");
+      if (!summaryRoot || !sourceRoot || !targetRoot || !matrixRoot || !coverageRoot || !coverageBacklogRoot || !coverageActionStatsRoot || !coveragePlanRoot) return;
       const sourceProfiles = Object.values(providerRegistryPayload?.source_profiles || {});
       const targetProfiles = Object.values(providerRegistryPayload?.target_profiles || {});
       const driverMatrix = Object.values(providerRegistryPayload?.driver_matrix || {});
@@ -1836,6 +1838,7 @@
       const auditTotals = coverageAuditCache?.totals || {};
       const gapBuckets = coverageAuditCache?.gapBuckets || {};
       const backlog = Array.isArray(coverageAuditCache?.backlog) ? coverageAuditCache.backlog : [];
+      const executionPlan = coverageAuditCache?.executionPlan || {};
       const filters = currentCoverageFilters();
       const filteredAuditRows = auditRows.filter((item) => {
         if (filters.onlyGaps && (!Array.isArray(item.missingItems) || !item.missingItems.length)) return false;
@@ -1857,6 +1860,14 @@
         if (filters.onboardingStage && String(item.onboardingStage || "") !== filters.onboardingStage) return false;
         return true;
       });
+      const planWaves = Array.isArray(executionPlan?.waves) ? executionPlan.waves.filter((item) => {
+        if (filters.nextAction && String(item.nextAction || "") !== filters.nextAction) return false;
+        if (filters.onboardingStage && String(item.onboardingStage || "") !== filters.onboardingStage) return false;
+        if (filters.capabilityLevel && Array.isArray(item.capabilityLevels) && item.capabilityLevels.length && !item.capabilityLevels.includes(filters.capabilityLevel)) return false;
+        if (filters.profileKey && Array.isArray(item.profileKeys) && item.profileKeys.length && !item.profileKeys.includes(filters.profileKey)) return false;
+        if (filters.missingItem && Array.isArray(item.missingItems) && item.missingItems.length && !item.missingItems.includes(filters.missingItem)) return false;
+        return true;
+      }) : [];
       if (!auditRows.length) {
         coverageBacklogRoot.textContent = currentLang() === "en"
           ? "The prioritized backlog will appear after the OpenList driver list is loaded."
@@ -1873,6 +1884,11 @@
           : currentLang() === "mix"
             ? "驱动列表载入后，这里会显示覆盖审计结果。 / Coverage audit will appear after drivers are loaded."
             : "驱动列表载入后，这里会显示覆盖审计结果。";
+        coveragePlanRoot.textContent = currentLang() === "en"
+          ? "Execution waves will appear after the OpenList driver list is loaded."
+          : currentLang() === "mix"
+            ? "驱动列表载入后，这里会显示执行波次建议。 / Execution waves will appear after drivers are loaded."
+            : "驱动列表载入后，这里会显示执行波次建议。";
       } else {
         const actionCounts = filteredAuditRows.reduce((acc, item) => {
           const key = String(item.nextAction || "unknown");
@@ -1897,6 +1913,18 @@
             : currentLang() === "mix"
               ? "当前筛选条件下没有下一步动作统计。 / No next-action stats match the current filter."
               : "当前筛选条件下没有下一步动作统计。");
+        coveragePlanRoot.innerHTML = planWaves.length
+          ? planWaves.map((wave, index) => `
+              <div class="mono">${index + 1}. P${wave.priorityRank ?? "-"} | ${escapeHtml(coverageNextActionText(wave.nextAction || ""))} | ${escapeHtml(wave.onboardingStage || "-")} | ${currentLang() === "en" ? "count" : currentLang() === "mix" ? "数量 / count" : "数量"}=${wave.count ?? 0}</div>
+              <div class="mono">${currentLang() === "en" ? "drivers" : currentLang() === "mix" ? "驱动 / drivers" : "驱动"}=${escapeHtml((wave.drivers || []).join(", ") || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "missing items" : currentLang() === "mix" ? "缺口 / missing items" : "缺口"}=${escapeHtml((wave.missingItems || []).join(", ") || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "profiles" : currentLang() === "mix" ? "profiles / 档案" : "档案"}=${escapeHtml((wave.profileKeys || []).join(", ") || "-")}</div>
+            `).join("")
+          : (currentLang() === "en"
+            ? "No execution waves match the current filter."
+            : currentLang() === "mix"
+              ? "当前筛选条件下没有执行波次建议。 / No execution waves match the current filter."
+              : "当前筛选条件下没有执行波次建议。");
         coverageRoot.innerHTML = `
           <div class="subtle" style="margin-bottom:10px;">
             ${currentLang() === "en"

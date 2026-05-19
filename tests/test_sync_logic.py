@@ -763,10 +763,15 @@ def test_provider_coverage_audit_endpoint_reports_registry_and_capture_coverage(
     payload = response.json()
     rows = {item["normalized"]: item for item in payload["rows"]}
     backlog = payload["backlog"]
+    execution_plan = payload["executionPlan"]
     assert payload["totals"]["total"] == 4
     assert payload["gapBuckets"]["fullyCovered"] >= 1
     assert backlog[0]["normalized"] == "unknowndrive"
     assert backlog[0]["priorityRank"] == 1
+    assert execution_plan["totalBacklog"] == len(backlog)
+    assert execution_plan["waveCount"] >= 1
+    assert execution_plan["waves"][0]["nextAction"] == "add_profile_first"
+    assert "UnknownDrive" in execution_plan["waves"][0]["drivers"]
     assert rows["aliyundriveopen"]["hasProfile"] is True
     assert rows["aliyundriveopen"]["hasGuide"] is True
     assert rows["aliyundriveopen"]["canonicalDriverKey"] == "aliyundriveopen"
@@ -860,6 +865,7 @@ def test_provider_coverage_audit_endpoint_supports_filtered_view_export(tmp_path
     assert payload["totals"]["total"] == 1
     assert payload["rows"][0]["normalized"] == "unknowndrive"
     assert payload["backlog"][0]["normalized"] == "unknowndrive"
+    assert payload["executionPlan"]["waves"][0]["nextAction"] == "add_profile_first"
     assert payload["rows"][0]["onboardingReady"] is False
     assert payload["rows"][0]["onboardingStage"] == "needs_profile_bootstrap"
 
@@ -953,6 +959,7 @@ def test_provider_coverage_audit_filtered_backlog_keeps_capability_and_profile_m
     assert payload["backlog"][0]["normalized"] == "fakecapturegap"
     assert payload["backlog"][0]["profileKey"] == "fakecapturegap"
     assert payload["backlog"][0]["capabilityLevel"] == "download_upload_only"
+    assert payload["executionPlan"]["waves"][0]["profileKeys"] == ["fakecapturegap"]
 
 
 def test_provider_coverage_audit_marks_123open_capture_as_covered(tmp_path: Path) -> None:
@@ -1021,6 +1028,7 @@ def test_provider_coverage_audit_supports_onboarding_ready_filter(monkeypatch: p
     assert filtered["rows"][0]["normalized"] == "fakecapturegap"
     assert filtered["rows"][0]["onboardingReady"] is True
     assert filtered["backlog"][0]["normalized"] == "fakecapturegap"
+    assert filtered["executionPlan"]["waves"][0]["onboardingStage"] == "ready_for_guide"
 
 
 def test_provider_coverage_audit_markdown_endpoint_renders_backlog_report(tmp_path: Path) -> None:
@@ -1048,6 +1056,8 @@ def test_provider_coverage_audit_markdown_endpoint_renders_backlog_report(tmp_pa
     text = response.text
     assert "# CloudPan Bridge 驱动覆盖审计" in text
     assert "`UnknownDrive` | P1 | add_profile_first" in text
+    assert "## 执行波次建议" in text
+    assert "Wave P1 | `add_profile_first` | `needs_profile_bootstrap`" in text
     assert "| `AliyundriveOpen` | yes | yes | yes | yes | `download_upload_only` | 4/4 | `covered` | `aliyundriveopen` | - |" in text
 
 

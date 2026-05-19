@@ -973,12 +973,80 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
         totals["capture"] += int(has_capture)
         totals["capability"] += int(has_capability)
     backlog.sort(key=lambda item: (int(item["priorityRank"]), int(item["coverageScore"]), str(item["driver"]).lower()))
+    execution_plan = build_driver_coverage_execution_plan(rows, backlog)
     return {
         "target": target,
         "rows": rows,
         "totals": totals,
         "gapBuckets": gap_buckets,
         "backlog": backlog,
+        "executionPlan": execution_plan,
+    }
+
+
+def build_driver_coverage_execution_plan(rows: list[dict[str, Any]], backlog: list[dict[str, Any]]) -> dict[str, Any]:
+    row_by_driver = {
+        str(item.get("driver") or ""): item
+        for item in rows
+        if str(item.get("driver") or "").strip()
+    }
+    grouped: dict[str, dict[str, Any]] = {}
+    for item in backlog:
+        driver = str(item.get("driver") or "").strip()
+        if not driver:
+            continue
+        row = row_by_driver.get(driver, {})
+        priority_rank = int(item.get("priorityRank") or 99)
+        next_action = str(item.get("nextAction") or "")
+        onboarding_stage = str(item.get("onboardingStage") or "")
+        key = f"{priority_rank}:{next_action}:{onboarding_stage}"
+        bucket = grouped.setdefault(
+            key,
+            {
+                "key": key,
+                "priorityRank": priority_rank,
+                "nextAction": next_action,
+                "onboardingStage": onboarding_stage,
+                "drivers": [],
+                "profileKeys": [],
+                "missingItems": [],
+                "guideDocUrls": [],
+                "captureLoginUrls": [],
+                "capabilityLevels": [],
+            },
+        )
+        bucket["drivers"].append(driver)
+        profile_key = str(item.get("profileKey") or row.get("profileKey") or "").strip()
+        if profile_key and profile_key not in bucket["profileKeys"]:
+            bucket["profileKeys"].append(profile_key)
+        for missing in list(item.get("missingItems") or []):
+            value = str(missing or "").strip()
+            if value and value not in bucket["missingItems"]:
+                bucket["missingItems"].append(value)
+        for url in [str(row.get("guideDocUrl") or "")] + list(row.get("docLinks") or []):
+            value = str(url or "").strip()
+            if value and value not in bucket["guideDocUrls"]:
+                bucket["guideDocUrls"].append(value)
+        capture_login = str(row.get("captureLoginUrl") or "").strip()
+        if capture_login and capture_login not in bucket["captureLoginUrls"]:
+            bucket["captureLoginUrls"].append(capture_login)
+        capability_level = str(item.get("capabilityLevel") or row.get("capabilityLevel") or "").strip()
+        if capability_level and capability_level not in bucket["capabilityLevels"]:
+            bucket["capabilityLevels"].append(capability_level)
+
+    waves = []
+    for bucket in sorted(grouped.values(), key=lambda item: (int(item["priorityRank"]), str(item["nextAction"]), str(item["onboardingStage"]))):
+        waves.append(
+            {
+                **bucket,
+                "count": len(bucket["drivers"]),
+                "drivers": sorted(bucket["drivers"], key=str.lower),
+            }
+        )
+    return {
+        "totalBacklog": len(backlog),
+        "waveCount": len(waves),
+        "waves": waves,
     }
 
 
@@ -1036,12 +1104,14 @@ def filter_driver_coverage_audit(
         "missingCapability": sum(1 for item in filtered_rows if "capability" in list(item.get("missingItems") or [])),
         "fullyCovered": sum(1 for item in filtered_rows if not list(item.get("missingItems") or [])),
     }
+    execution_plan = build_driver_coverage_execution_plan(filtered_rows, filtered_backlog)
     return {
         "target": str(audit.get("target") or "guangya"),
         "rows": filtered_rows,
         "totals": totals,
         "gapBuckets": gap_buckets,
         "backlog": filtered_backlog,
+        "executionPlan": execution_plan,
         "filters": {
             "onlyGaps": bool(only_gaps),
             "onlyOnboardingReady": bool(only_onboarding_ready),
@@ -1059,6 +1129,7 @@ def render_driver_coverage_audit_markdown(audit: dict[str, Any]) -> str:
     totals = dict(audit.get("totals") or {})
     gap_buckets = dict(audit.get("gapBuckets") or {})
     backlog = list(audit.get("backlog") or [])
+    execution_plan = dict(audit.get("executionPlan") or {})
     rows = list(audit.get("rows") or [])
     filters = dict(audit.get("filters") or {})
 
@@ -1102,6 +1173,22 @@ def render_driver_coverage_audit_markdown(audit: dict[str, Any]) -> str:
             )
     else:
         lines.append("- 当前已加载驱动都已覆盖。")
+
+    lines.extend(["", "## 执行波次建议", ""])
+    waves = list(execution_plan.get("waves") or [])
+    if waves:
+        for wave in waves:
+            driver_list = ", ".join(f"`{item}`" for item in list(wave.get("drivers") or [])) or "-"
+            lines.append(
+                f"- Wave P{wave.get('priorityRank', '-')} | `{wave.get('nextAction', '-')}` | `{wave.get('onboardingStage', '-')}` | "
+                f"数量: `{wave.get('count', 0)}` | 驱动: {driver_list}"
+            )
+            lines.append(
+                f"  - 缺口: `{', '.join(list(wave.get('missingItems') or [])) or '-'}` | "
+                f"Profile: `{', '.join(list(wave.get('profileKeys') or [])) or '-'}`"
+            )
+    else:
+        lines.append("- 当前筛选结果下没有待执行波次。")
 
     lines.extend(["", "## 全量明细", ""])
     if rows:
