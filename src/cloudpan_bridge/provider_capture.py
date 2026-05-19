@@ -102,6 +102,7 @@ class ProviderCaptureSpec:
     label: str
     login_url: str
     session_dir: str
+    capture_mode: str = "browser"
     recommended_drivers: list[str] = field(default_factory=list)
     domains: list[str] = field(default_factory=list)
     required_keys: list[str] = field(default_factory=list)
@@ -235,6 +236,7 @@ def build_driver_capture_spec(driver: str, fields: list[OpenListDriverField], lo
         label=f"{display_name} 通用抓取",
         login_url=final_login_url,
         session_dir=f"driver-{_slugify_provider_key(display_name)}",
+        capture_mode="browser",
         recommended_drivers=[display_name],
         domains=[],
         required_keys=required,
@@ -462,6 +464,76 @@ def default_provider_specs() -> dict[str, ProviderCaptureSpec]:
             """,
             description="优先抓取 Dropbox 的 refresh_token / access_token；如果使用自己的应用参数，再按驱动说明补 App Key / Secret。",
         ),
+        "webdav": ProviderCaptureSpec(
+            key="webdav",
+            label="WebDAV",
+            login_url="https://doc.oplist.org/guide/drivers/webdav",
+            session_dir="webdav",
+            capture_mode="manual",
+            recommended_drivers=["WebDav"],
+            domains=[],
+            required_keys=["url", "username", "password"],
+            header_aliases=[],
+            storage_aliases=["url", "username", "password"],
+            page_probe="return {};",
+            description="WebDAV 更适合手动凭证模式，按驱动说明填写服务地址、用户名和密码即可。",
+        ),
+        "s3": ProviderCaptureSpec(
+            key="s3",
+            label="S3",
+            login_url="https://doc.oplist.org/guide/drivers/s3",
+            session_dir="s3",
+            capture_mode="manual",
+            recommended_drivers=["S3"],
+            domains=[],
+            required_keys=["endpoint", "access_key_id", "secret_access_key", "bucket"],
+            header_aliases=[],
+            storage_aliases=["endpoint", "access_key_id", "secret_access_key", "bucket", "region"],
+            page_probe="return {};",
+            description="S3 类存储走手动凭证模式，按驱动说明填写 endpoint、bucket、Access Key 和 Secret Key。",
+        ),
+        "ftp": ProviderCaptureSpec(
+            key="ftp",
+            label="FTP",
+            login_url="https://doc.oplist.org/guide/drivers/ftp",
+            session_dir="ftp",
+            capture_mode="manual",
+            recommended_drivers=["FTP"],
+            domains=[],
+            required_keys=["host", "username", "password"],
+            header_aliases=[],
+            storage_aliases=["host", "port", "username", "password"],
+            page_probe="return {};",
+            description="FTP 走手动凭证模式，按驱动说明填写主机、端口、用户名和密码即可。",
+        ),
+        "sftp": ProviderCaptureSpec(
+            key="sftp",
+            label="SFTP",
+            login_url="https://doc.oplist.org/guide/drivers/sftp",
+            session_dir="sftp",
+            capture_mode="manual",
+            recommended_drivers=["SFTP"],
+            domains=[],
+            required_keys=["host", "username", "password"],
+            header_aliases=[],
+            storage_aliases=["host", "port", "username", "password", "private_key"],
+            page_probe="return {};",
+            description="SFTP 走手动凭证模式，按驱动说明填写主机、认证方式和账号信息。",
+        ),
+        "seafile": ProviderCaptureSpec(
+            key="seafile",
+            label="Seafile",
+            login_url="https://doc.oplist.org/guide/drivers/seafile",
+            session_dir="seafile",
+            capture_mode="manual",
+            recommended_drivers=["Seafile"],
+            domains=[],
+            required_keys=["url", "username", "password"],
+            header_aliases=[],
+            storage_aliases=["url", "username", "password", "library"],
+            page_probe="return {};",
+            description="Seafile 更适合手动凭证模式，按说明填写服务地址、账号、密码和库信息。",
+        ),
         "pikpak": ProviderCaptureSpec(
             key="pikpak",
             label="PikPak",
@@ -595,6 +667,7 @@ class ProviderCaptureManager:
                 {
                     "key": spec.key,
                     "label": spec.label,
+                    "capture_mode": spec.capture_mode,
                     "login_url": spec.login_url,
                     "recommended_drivers": list(spec.recommended_drivers),
                     "required_keys": list(spec.required_keys),
@@ -628,6 +701,14 @@ class ProviderCaptureManager:
             raise RuntimeError(f"不支持的 provider: {provider}")
         if spec is None:
             spec = self.specs[key]
+        if str(spec.capture_mode or "browser").lower() != "browser":
+            with self.lock:
+                self.snapshots_map[key] = CaptureSnapshot(
+                    provider=key,
+                    status="manual",
+                    message=f"{spec.label} 当前使用手动凭证模式，请按说明填写: {', '.join(spec.required_keys) or '必要字段'}",
+                )
+            return
         with self.lock:
             current = self.snapshots_map.get(key)
             if current and current.status == "running":

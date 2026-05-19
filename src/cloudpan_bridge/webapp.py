@@ -1203,6 +1203,7 @@ def create_app(config_path: Path) -> FastAPI:
         return {
             "key": spec.key,
             "label": spec.label,
+            "capture_mode": spec.capture_mode,
             "login_url": spec.login_url,
             "recommended_drivers": list(spec.recommended_drivers),
             "required_keys": list(spec.required_keys),
@@ -1469,7 +1470,11 @@ def create_app(config_path: Path) -> FastAPI:
                 )
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        logger.info(f"已启动 {provider_name} 登录抓取")
+        snapshot = provider_capture.snapshot(provider)
+        if str(snapshot.get("status") or "") == "manual":
+            logger.info(f"{provider_name} 已切换为手动凭证模式")
+        else:
+            logger.info(f"已启动 {provider_name} 登录抓取")
         return {"ok": True, "provider": provider}
 
     @app.post("/api/provider/capture/prefill")

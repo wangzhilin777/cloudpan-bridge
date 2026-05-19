@@ -1247,7 +1247,7 @@ def test_build_storage_payload_serializes_addition_and_types() -> None:
 
 def test_default_provider_specs_cover_major_sources() -> None:
     specs = default_provider_specs()
-    assert {"guangya", "quark", "123pan", "189cloud", "baidu", "thunder", "aliyundriveopen", "onedrive", "googledrive", "dropbox", "pikpak", "115", "139yun"} <= set(specs)
+    assert {"guangya", "quark", "123pan", "189cloud", "baidu", "thunder", "aliyundriveopen", "onedrive", "googledrive", "dropbox", "webdav", "s3", "ftp", "sftp", "seafile", "pikpak", "115", "139yun"} <= set(specs)
     assert "cookie_header" in specs["quark"].required_keys
     assert "bdstoken" in specs["baidu"].required_keys
     assert "authorization" in specs["thunder"].required_keys
@@ -1255,6 +1255,11 @@ def test_default_provider_specs_cover_major_sources() -> None:
     assert "refresh_token" in specs["onedrive"].required_keys
     assert "refresh_token" in specs["googledrive"].required_keys
     assert "refresh_token" in specs["dropbox"].required_keys
+    assert specs["webdav"].capture_mode == "manual"
+    assert specs["s3"].capture_mode == "manual"
+    assert specs["ftp"].capture_mode == "manual"
+    assert specs["sftp"].capture_mode == "manual"
+    assert specs["seafile"].capture_mode == "manual"
     assert "refresh_token" in specs["pikpak"].required_keys
     assert "cookie_header" in specs["115"].required_keys
     assert "authorization" in specs["139yun"].required_keys
@@ -1270,6 +1275,11 @@ def test_capture_alias_registry_resolves_real_spec_keys() -> None:
     assert alias_map["googledrive"] == "googledrive"
     assert alias_map["dropbox"] == "dropbox"
     assert alias_map["115share"] == "115"
+    assert alias_map["webdav"] == "webdav"
+    assert alias_map["s3"] == "s3"
+    assert alias_map["ftp"] == "ftp"
+    assert alias_map["sftp"] == "sftp"
+    assert alias_map["seafile"] == "seafile"
     assert "quarkopen" in supported
     assert "googlephotos" in supported
 
@@ -1311,6 +1321,14 @@ def test_driver_guide_supports_profile_and_alias_resolution() -> None:
     guide_115 = provider_registry_module.get_driver_guide("115Share")
     assert guide_115 is not None
     assert guide_115["docUrl"].endswith("/115")
+
+    guide_webdav = provider_registry_module.get_driver_guide("WebDav")
+    assert guide_webdav is not None
+    assert guide_webdav["docUrl"].endswith("/webdav")
+
+    guide_s3 = provider_registry_module.get_driver_guide("S3")
+    assert guide_s3 is not None
+    assert guide_s3["docUrl"].endswith("/s3")
 
 
 def test_unknown_driver_guide_returns_generic_fallback_without_claiming_full_coverage() -> None:
@@ -1518,12 +1536,16 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     payload = response.json()
     assert payload["guides"]["aliyundriveopen"]["docUrl"] == "https://doc.oplist.org/guide/drivers/aliyundrive_open"
     assert payload["guides"]["googledrive"]["docUrl"] == "https://doc.oplist.org/guide/drivers/google_drive"
+    assert payload["guides"]["webdav"]["docUrl"] == "https://doc.oplist.org/guide/drivers/webdav"
+    assert payload["guides"]["s3"]["docUrl"] == "https://doc.oplist.org/guide/drivers/s3"
     assert payload["guides"]["quark"]["defaults"]["web_proxy"] == "true"
     assert payload["source_profiles"]["189cloud"]["recommendedRateProfile"] == "safe"
     assert payload["source_profiles"]["189cloud"]["loginMode"] == "cookie + sessionKey style fields"
     assert payload["source_profiles"]["googledrive"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/google_drive"
     assert payload["source_profiles"]["dropbox"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/dropbox"
     assert payload["source_profiles"]["115"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/115"
+    assert payload["source_profiles"]["webdav"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/webdav"
+    assert payload["source_profiles"]["s3"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/s3"
     assert payload["source_profiles"]["quark"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/quark.html"
     assert payload["source_profiles"]["thunder"]["hashFieldsSupported"] == ["gcid"]
     assert payload["target_profiles"]["guangya"]["fastUploadHashes"] == ["md5", "gcid"]
@@ -1554,6 +1576,11 @@ def test_provider_captures_endpoint_includes_complex_driver_specs(tmp_path: Path
     assert providers["onedrive"]["required_keys"] == ["refresh_token"]
     assert providers["googledrive"]["required_keys"] == ["refresh_token"]
     assert providers["dropbox"]["required_keys"] == ["refresh_token"]
+    assert providers["webdav"]["capture_mode"] == "manual"
+    assert providers["s3"]["capture_mode"] == "manual"
+    assert providers["ftp"]["capture_mode"] == "manual"
+    assert providers["sftp"]["capture_mode"] == "manual"
+    assert providers["seafile"]["capture_mode"] == "manual"
     assert providers["115"]["required_keys"] == ["cookie_header"]
     assert providers["pikpak"]["login_url"] == "https://mypikpak.com/drive/all"
     assert providers["139yun"]["required_keys"] == ["authorization"]
@@ -1565,6 +1592,37 @@ def test_provider_captures_endpoint_includes_complex_driver_specs(tmp_path: Path
     assert providers["googledrive"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/google_drive"
     assert providers["115"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/115"
     assert providers["139yun"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/139.html"
+
+
+def test_manual_provider_capture_switches_to_manual_snapshot(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/capture/start",
+        json={
+            "provider": "webdav",
+            "driver": "WebDav",
+        },
+    )
+    assert response.status_code == 200
+    captures = client.get("/api/provider/captures")
+    assert captures.status_code == 200
+    providers = {item["key"]: item for item in captures.json()["providers"]}
+    snapshots = captures.json()["snapshots"]
+    assert providers["webdav"]["capture_mode"] == "manual"
+    assert snapshots["webdav"]["status"] == "manual"
+    assert "url" in snapshots["webdav"]["message"]
 
 
 def test_provider_capability_endpoint_returns_driver_to_guangya_matrix(tmp_path: Path) -> None:
@@ -1684,6 +1742,45 @@ def test_provider_coverage_audit_marks_google_dropbox_115_as_covered(tmp_path: P
     assert rows["115share"]["hasGuide"] is True
     assert rows["115share"]["hasCapture"] is True
     assert rows["115share"]["hasCapability"] is True
+
+
+def test_provider_coverage_audit_marks_manual_protocol_drivers_as_covered(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_audit",
+        json={
+            "drivers": ["WebDav", "S3", "FTP", "SFTP", "Seafile"],
+            "target": "guangya",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    rows = {item["normalized"]: item for item in payload["rows"]}
+    assert rows["webdav"]["hasProfile"] is True
+    assert rows["webdav"]["hasGuide"] is True
+    assert rows["webdav"]["hasCapture"] is True
+    assert rows["webdav"]["hasCapability"] is True
+    assert rows["webdav"]["capabilityLevel"] == "download_upload_only"
+    assert rows["s3"]["hasProfile"] is True
+    assert rows["s3"]["hasGuide"] is True
+    assert rows["s3"]["hasCapture"] is True
+    assert rows["s3"]["hasCapability"] is True
+    assert rows["ftp"]["hasProfile"] is True
+    assert rows["sftp"]["hasProfile"] is True
+    assert rows["seafile"]["hasProfile"] is True
+    assert rows["seafile"]["capabilityLevel"] == "fast_upload_partial"
 
 
 def test_provider_coverage_audit_can_infer_dynamic_profile_capture_and_capability() -> None:

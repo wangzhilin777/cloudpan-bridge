@@ -2604,6 +2604,7 @@
       currentProviderGuide = getGuideForProviderDefinition(definition);
       const snapshot = providerSnapshots?.[provider] || {};
       const captured = snapshot.captured || {};
+      const captureMode = String(definition?.capture_mode || "browser");
       const requiredKeys = Array.isArray(definition?.required_keys) ? definition.required_keys : [];
       const recommended = Array.isArray(definition?.recommended_drivers) && definition.recommended_drivers.length
         ? definition.recommended_drivers
@@ -2634,9 +2635,20 @@
       if (loginUrlInput) {
         loginUrlInput.value = definition?.login_url || "";
       }
+      const startButton = document.getElementById("start-provider-capture");
+      if (startButton) {
+        startButton.textContent = captureMode === "manual"
+          ? (currentLang() === "en"
+            ? "Open guide / manual credentials"
+            : currentLang() === "mix"
+              ? "查看说明并手动填写 / Open guide"
+              : "查看说明并手动填写")
+          : t("btn.start_provider_capture");
+      }
       document.getElementById("provider-capture-summary").innerHTML = `
         <div class="badge">${escapeHtml(snapshot.status || "idle")}</div>
         <div class="mono">${escapeHtml(snapshot.message || "")}</div>
+        <div class="mono">${currentLang() === "en" ? "Capture mode" : currentLang() === "mix" ? "接入模式 / Capture mode" : "接入模式"}: ${escapeHtml(captureMode === "manual" ? (currentLang() === "en" ? "manual credentials" : currentLang() === "mix" ? "手动凭证 / manual credentials" : "手动凭证") : (currentLang() === "en" ? "browser capture" : currentLang() === "mix" ? "网页登录抓取 / browser capture" : "网页登录抓取"))}</div>
         ${lines}
         ${captured.cookie_header ? `<div class="mono">cookie_header: ${escapeHtml(maskValue(captured.cookie_header))}</div>` : ""}
       `;
@@ -3769,6 +3781,8 @@
       document.getElementById("start-provider-capture").onclick = withBusy("start-provider-capture", "抓取中...", async () => {
         const provider = document.getElementById("provider-select").value;
         const loginUrl = document.getElementById("provider-login-url").value;
+        const definition = [...providerDefinitions, ...(driverCaptureBlueprint ? [driverCaptureBlueprint] : [])].find((item) => item.key === provider);
+        const captureMode = String(definition?.capture_mode || "browser");
         await call("/api/provider/capture/start", {
           method: "POST",
           body: JSON.stringify({
@@ -3777,11 +3791,20 @@
             login_url: loginUrl,
           }),
         });
-        setNotice("driver-notice", currentLang() === "en"
-          ? `Opened login capture for ${provider}. Finish login in the browser window, then return here.`
-          : currentLang() === "mix"
-            ? `已打开 ${provider} 登录抓取窗口 / Finish login in the browser window, then return here.`
-            : `已打开 ${provider} 登录抓取窗口，请在浏览器里完成登录后回到这里。`);
+        if (captureMode === "manual") {
+          if (loginUrl) window.open(loginUrl, "_blank", "noopener,noreferrer");
+          setNotice("driver-notice", currentLang() === "en"
+            ? `This provider uses manual credentials. Opened the guide link if available; fill the required fields manually in the mount form.`
+            : currentLang() === "mix"
+              ? `该来源使用手动凭证模式，已尝试打开说明链接，请按要求手动填写挂载字段。 / Manual credential mode.`
+              : `该来源使用手动凭证模式，已尝试打开说明链接，请按要求手动填写挂载字段。`);
+        } else {
+          setNotice("driver-notice", currentLang() === "en"
+            ? `Opened login capture for ${provider}. Finish login in the browser window, then return here.`
+            : currentLang() === "mix"
+              ? `已打开 ${provider} 登录抓取窗口 / Finish login in the browser window, then return here.`
+              : `已打开 ${provider} 登录抓取窗口，请在浏览器里完成登录后回到这里。`);
+        }
         await refreshStatus();
       });
       document.getElementById("apply-provider-fields").onclick = withBusy("apply-provider-fields", "回填中...", async () => {

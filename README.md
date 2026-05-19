@@ -50,6 +50,7 @@
   - `OneDrive`：优先抓 `refresh_token / access_token`
   - `Google Drive`：优先抓 `refresh_token / access_token`
   - `Dropbox`：优先抓 `refresh_token / access_token`
+  - `WebDAV / S3 / FTP / SFTP / Seafile`：走手动凭证模式
   - `PikPak`：优先抓 `refresh_token / access_token`
   - `115 网盘`：优先抓 `Cookie / token`
   - `139 云盘`：优先抓 `Authorization`
@@ -65,6 +66,11 @@
   - `OneDrive`
   - `GoogleDrive`
   - `Dropbox`
+  - `WebDav`
+  - `S3`
+  - `FTP`
+  - `SFTP`
+  - `Seafile`
   - `PikPak`
   - `115`
   - `139Yun`
@@ -272,6 +278,10 @@
 - 可一键尝试写入当前 OpenList 挂载表单，减少手工复制字段
 - 如果当前驱动不在预置网盘列表里，页面还会按当前 OpenList 驱动字段自动生成一个“通用抓取”方案
 - 可手动调整 `Login URL` 后再启动抓取，作为更多 OpenList 驱动的兜底入口
+- 对 `WebDav / S3 / FTP / SFTP / Seafile` 这类更适合手动凭证的驱动
+  - 抓取面板现在会明确切到“手动凭证模式”
+  - 不再假装去做浏览器自动抓取
+  - 会直接提示你按说明填写 URL / host / bucket / username / password / key 等字段
 - 现在在这个面板里也可以直接点“查看该网盘接入流程”
   - 不需要先切到“新增挂载”区域
   - 会直接复用内置的复杂驱动说明与官方文档入口

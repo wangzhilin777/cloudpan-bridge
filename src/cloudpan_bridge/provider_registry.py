@@ -243,6 +243,116 @@ DRIVER_GUIDES: dict[str, dict[str, Any]] = {
         },
         "defaults": {},
     },
+    "webdav": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/webdav",
+        "summary": {
+            "zh": "WebDAV 更偏传统凭证型驱动，不需要浏览器抓 token。通常只要服务地址、用户名、密码，以及必要时的根目录参数就能挂载。",
+            "en": "WebDAV is a classic credential-oriented driver and usually does not require browser token capture. In most cases you only need the service URL, username, password, and optionally a root directory path.",
+        },
+        "steps": {
+            "zh": [
+                "先确认目标服务端本身支持标准 WebDAV，并且你已经有可用的 URL、账号和密码。",
+                "优先先手动填写 URL / username / password，必要时再补根目录、TLS 或只读等参数。",
+                "挂载成功后先用一个小目录验证列目录和下载，不要一开始就拿整个站点做大扫描。",
+                "如果后续确实能稳定返回 MD5，再考虑是否提升能力判断；默认先按保守补传处理。"
+            ],
+            "en": [
+                "Confirm that the target server really exposes standard WebDAV and that you already have a valid URL, username, and password.",
+                "Fill URL / username / password first, then add root-path, TLS, or read-only related options only when needed.",
+                "After mounting, validate listing and download with a small directory instead of scanning the entire site immediately.",
+                "Only upgrade the capability level later if MD5 is proven to be stable. Default to conservative fallback upload first."
+            ],
+        },
+        "defaults": {},
+    },
+    "s3": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/s3",
+        "summary": {
+            "zh": "S3 驱动本质上是手动凭证模式。重点是 endpoint、bucket、region，以及 Access Key / Secret Key 的正确组合。",
+            "en": "The S3 driver is fundamentally a manual-credential driver. The key pieces are endpoint, bucket, region, and the correct Access Key / Secret Key pair.",
+        },
+        "steps": {
+            "zh": [
+                "先确认你用的是哪一类 S3 兼容服务，以及 endpoint、region、bucket 名称是否准确。",
+                "手动填写 endpoint、bucket、Access Key、Secret Key，再根据服务端差异补 path style、SSL、region 等参数。",
+                "如果对象存储里有大量分片上传对象，要谨慎对待 ETag，把它当成稳定 MD5 前先做小范围验证。",
+                "默认先按下载补传或保守中转思路规划，不要直接把 S3 来源宣传成 Guangya 秒传来源。"
+            ],
+            "en": [
+                "Confirm which S3-compatible service you are using and verify the endpoint, region, and bucket name first.",
+                "Fill endpoint, bucket, Access Key, and Secret Key manually, then add path-style, SSL, or region options according to the backend.",
+                "If the object store contains many multipart-uploaded objects, treat ETag carefully and validate before interpreting it as stable MD5.",
+                "Default to conservative fallback upload planning rather than presenting S3 as a Guangya fast-upload source."
+            ],
+        },
+        "defaults": {},
+    },
+    "ftp": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/ftp",
+        "summary": {
+            "zh": "FTP 驱动也是手动凭证模式，核心是 host、port、username、password，以及是否走被动模式等连接细节。",
+            "en": "FTP is also a manual-credential driver. The core fields are host, port, username, password, and connection details such as passive mode.",
+        },
+        "steps": {
+            "zh": [
+                "先确认 FTP 服务端地址、端口和账号信息是否可用，并确认 OpenList 所在环境能连通该服务。",
+                "优先手动填写 host、port、username、password，再按实际环境补 passive mode、TLS 等参数。",
+                "先挂一个小目录验证列目录、中文文件名和下载稳定性。",
+                "默认按保守补传处理，不要在没有源分析结果时直接期待它能提供适合 Guangya 秒传的稳定哈希。"
+            ],
+            "en": [
+                "Confirm the FTP server address, port, and account details first, and make sure the OpenList host can reach it.",
+                "Fill host, port, username, and password manually, then add passive-mode or TLS related options according to the environment.",
+                "Validate listing, non-ASCII filenames, and download stability on a small directory first.",
+                "Treat it conservatively by default instead of expecting stable fast-upload-ready hashes without source analysis evidence."
+            ],
+        },
+        "defaults": {},
+    },
+    "sftp": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/sftp",
+        "summary": {
+            "zh": "SFTP 也是手动凭证型驱动，通常需要主机、端口、用户名和密码，或私钥认证信息。",
+            "en": "SFTP is also a manual-credential driver and typically needs host, port, username, password, or private-key based authentication.",
+        },
+        "steps": {
+            "zh": [
+                "先确认 SFTP 服务端地址、端口和认证方式，尤其是密码认证还是私钥认证。",
+                "手动填写 host、port、username、password 或 private key 相关字段。",
+                "先用一个小目录验证列目录与下载，再扩大到大目录。",
+                "默认先按下载补传处理，除非你已经通过源分析确认当前驱动能稳定返回可快传指纹。"
+            ],
+            "en": [
+                "Confirm the SFTP server address, port, and authentication method first, especially whether it uses password or private-key authentication.",
+                "Fill host, port, username, password, or private-key related fields manually.",
+                "Validate listing and download with a small directory first before scaling to larger trees.",
+                "Default to fallback upload unless source analysis proves the current driver can expose stable fast-upload-ready fingerprints."
+            ],
+        },
+        "defaults": {},
+    },
+    "seafile": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/seafile",
+        "summary": {
+            "zh": "Seafile 更适合手动凭证模式，通常要填写服务地址、账号、密码，以及库或目录相关参数。",
+            "en": "Seafile is better treated as a manual-credential driver. You usually need the service URL, username, password, and library or folder related parameters.",
+        },
+        "steps": {
+            "zh": [
+                "先确认 Seafile 服务地址、账号和库信息都准确可用。",
+                "手动填写 URL、username、password、library 等参数，再先挂一个小库验证列目录和下载。",
+                "如果后续需要跑大目录，先做源分析确认当前驱动是否真的返回 MD5。",
+                "默认按保守补传处理，不把它直接规划成 Guangya 秒传来源。"
+            ],
+            "en": [
+                "Confirm the Seafile service URL, account, and library information first.",
+                "Fill URL, username, password, library, and related fields manually, then validate listing and download on a small library first.",
+                "Before scaling to large trees, analyze the source and confirm whether the current driver really exposes MD5.",
+                "Treat it conservatively by default rather than assuming it is a Guangya fast-upload source."
+            ],
+        },
+        "defaults": {},
+    },
     "pikpak": {
         "doc_url": "https://doc.oplist.org/guide/drivers/pikpak.html",
         "summary": {
@@ -674,6 +784,156 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
                 "notes": {
                     "zh": "如果后续确认当前 OpenList 驱动能稳定补出 MD5，再考虑提升能力等级；默认先按保守补传处理。",
                     "en": "Only upgrade this capability later if the current OpenList driver is proven to expose stable MD5 values. Default to conservative fallback upload first.",
+                },
+            }
+        },
+    },
+    "webdav": {
+        "key": "webdav",
+        "label": "WebDAV",
+        "label_zh": "WebDAV",
+        "driver_aliases": ["webdav"],
+        "login_mode": "manual url + username + password",
+        "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "stable",
+        "capture_strategy": "优先手动填写服务地址、用户名和密码，浏览器抓取不是主路径。",
+        "capture_strategy_en": "Fill service URL, username, and password manually first. Browser capture is not the primary path here.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/webdav"],
+        "default_mount_values": {},
+        "recommended_rate_profile": "balanced",
+        "risk_notes": {
+            "zh": "除非你已经验证当前 WebDAV 来源能稳定给出 MD5，否则默认按保守补传处理。",
+            "en": "Unless the current WebDAV source is proven to expose stable MD5 values, treat it conservatively by default.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先验证列目录和下载，再按补传链路推进，不默认承诺秒传。",
+                "recommended_flow_en": "Validate listing and download first, then proceed via fallback upload without promising fast upload by default.",
+                "notes": {
+                    "zh": "WebDAV 的哈希表现取决于后端实现，未验证前不要把它当作 Guangya 秒传来源。",
+                    "en": "WebDAV hash behavior depends on the backend implementation, so do not present it as a Guangya fast-upload source before verification.",
+                },
+            }
+        },
+    },
+    "s3": {
+        "key": "s3",
+        "label": "S3",
+        "label_zh": "S3 / 对象存储",
+        "driver_aliases": ["s3"],
+        "login_mode": "manual endpoint + bucket + access key",
+        "likely_hashes": ["etag"],
+        "hash_fields_supported": ["etag"],
+        "download_link_supported": "stable",
+        "capture_strategy": "手动填写 endpoint、bucket、Access Key、Secret Key，再结合实际服务端补 path style / region 等参数。",
+        "capture_strategy_en": "Fill endpoint, bucket, Access Key, and Secret Key manually, then add path-style or region options according to the backend.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/s3"],
+        "default_mount_values": {},
+        "recommended_rate_profile": "balanced",
+        "risk_notes": {
+            "zh": "S3 的 ETag 不一定等于稳定 MD5，尤其是分片上传对象，默认按保守补传处理。",
+            "en": "S3 ETag is not always stable MD5, especially for multipart objects, so default to conservative fallback upload.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先按小目录验证对象列表和下载，再走补传路径，不默认承诺秒传。",
+                "recommended_flow_en": "Validate object listing and download first on a small bucket path, then use fallback upload rather than promising fast upload.",
+                "notes": {
+                    "zh": "只有确认当前对象确实给出可用 MD5 时，才适合后续再提升能力等级。",
+                    "en": "Only upgrade this capability later if the current objects are proven to expose usable MD5 values.",
+                },
+            }
+        },
+    },
+    "ftp": {
+        "key": "ftp",
+        "label": "FTP",
+        "label_zh": "FTP",
+        "driver_aliases": ["ftp"],
+        "login_mode": "manual host + username + password",
+        "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "conditional",
+        "capture_strategy": "手动填写 host、port、username、password，再按环境补 passive mode / TLS 等参数。",
+        "capture_strategy_en": "Fill host, port, username, and password manually, then add passive-mode or TLS options if needed.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/ftp"],
+        "default_mount_values": {},
+        "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "FTP 更偏传统文件传输，不应在没有源分析时默认承诺 Guangya 秒传。",
+            "en": "FTP is a classic file-transfer source and should not promise Guangya fast upload without source-analysis evidence.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "优先小目录验证和保守补传，不默认承诺秒传。",
+                "recommended_flow_en": "Prefer small-directory validation plus conservative fallback upload instead of promising fast upload.",
+                "notes": {
+                    "zh": "如果后续源分析证明确有稳定 MD5，再考虑提升能力等级。",
+                    "en": "Only upgrade the capability later if source analysis proves stable MD5 is really available.",
+                },
+            }
+        },
+    },
+    "sftp": {
+        "key": "sftp",
+        "label": "SFTP",
+        "label_zh": "SFTP",
+        "driver_aliases": ["sftp"],
+        "login_mode": "manual host + username + password/private key",
+        "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "stable",
+        "capture_strategy": "手动填写 host、port、username、password 或 private key 相关字段。",
+        "capture_strategy_en": "Fill host, port, username, password, or private-key fields manually.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/sftp"],
+        "default_mount_values": {},
+        "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "SFTP 侧重点在连通性和认证方式，哈希能力要靠实际源分析确认。",
+            "en": "For SFTP, connectivity and authentication are the main concerns. Hash capability should be confirmed by real source analysis.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先确认认证和下载稳定，再按补传路径推进。",
+                "recommended_flow_en": "Confirm authentication and download stability first, then continue through fallback upload.",
+                "notes": {
+                    "zh": "未确认 MD5 / GCID 前，不应把它默认规划成秒传来源。",
+                    "en": "Do not treat it as a fast-upload source before MD5 / GCID is actually confirmed.",
+                },
+            }
+        },
+    },
+    "seafile": {
+        "key": "seafile",
+        "label": "Seafile",
+        "label_zh": "Seafile",
+        "driver_aliases": ["seafile"],
+        "login_mode": "manual url + username + password",
+        "likely_hashes": ["md5"],
+        "hash_fields_supported": ["md5"],
+        "download_link_supported": "stable",
+        "capture_strategy": "优先手动填写 URL、账号、密码和库信息，再做小目录验证。",
+        "capture_strategy_en": "Fill URL, account, password, and library information manually first, then validate with a small directory.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/seafile"],
+        "default_mount_values": {},
+        "recommended_rate_profile": "balanced",
+        "risk_notes": {
+            "zh": "只有确认当前 Seafile 驱动确实返回 MD5 时，才适合考虑元数据秒传路径。",
+            "en": "Only consider metadata-first fast upload after confirming the current Seafile driver truly returns MD5.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "fast_upload_partial",
+                "recommended_flow": "先分析小目录的 MD5 覆盖率，命中高时再优先元数据同步，否则按待补传树推进。",
+                "recommended_flow_en": "Analyze MD5 coverage on a small library first. Use metadata sync only when the hit rate is good; otherwise continue via the pending tree.",
+                "notes": {
+                    "zh": "Seafile 在部分场景下可能给出 MD5，但仍建议先做小目录分析验证。",
+                    "en": "Seafile may expose MD5 in some environments, but you should still validate on a small library first.",
                 },
             }
         },
