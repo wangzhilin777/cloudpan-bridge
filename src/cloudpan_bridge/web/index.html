@@ -833,8 +833,10 @@
     ];
     const PANEL_STATE_KEY = "cloudpan-bridge-panel-state";
     const LEGACY_PANEL_STATE_KEYS = ["cloud2guangya-tabs"];
-    const UI_LANGUAGE_KEY = "cloud2guangya-ui-language";
-    const AUTO_GUANGYA_CAPTURE_KEY = "cloud2guangya-auto-guangya-capture";
+    const UI_LANGUAGE_KEY = "cloudpan-bridge-ui-language";
+    const LEGACY_UI_LANGUAGE_KEYS = ["cloud2guangya-ui-language"];
+    const AUTO_GUANGYA_CAPTURE_KEY = "cloudpan-bridge-auto-guangya-capture";
+    const LEGACY_AUTO_GUANGYA_CAPTURE_KEYS = ["cloud2guangya-auto-guangya-capture"];
     const COVERAGE_FILTERS_KEY = "cloudpan-bridge-coverage-filters";
     const RATE_PRESETS = {
       default: { openlist_page_size: 100, openlist_request_interval_ms: 800, queue_interval_ms: 3000 },
@@ -1148,7 +1150,30 @@
     };
     let driverGuideRegistry = {};
     let providerRegistryPayload = { guides: {}, source_profiles: {}, target_profiles: {}, driver_matrix: {} };
-    const currentLang = () => localStorage.getItem(UI_LANGUAGE_KEY) || "zh";
+    function getStorageValue(primaryKey, legacyKeys = []) {
+      const direct = localStorage.getItem(primaryKey);
+      if (direct !== null) return direct;
+      for (const legacyKey of legacyKeys) {
+        const legacyValue = localStorage.getItem(legacyKey);
+        if (legacyValue === null) continue;
+        localStorage.setItem(primaryKey, legacyValue);
+        return legacyValue;
+      }
+      return null;
+    }
+
+    function getSessionStorageValue(primaryKey, legacyKeys = []) {
+      const direct = sessionStorage.getItem(primaryKey);
+      if (direct !== null) return direct;
+      for (const legacyKey of legacyKeys) {
+        const legacyValue = sessionStorage.getItem(legacyKey);
+        if (legacyValue === null) continue;
+        sessionStorage.setItem(primaryKey, legacyValue);
+        return legacyValue;
+      }
+      return null;
+    }
+    const currentLang = () => getStorageValue(UI_LANGUAGE_KEY, LEGACY_UI_LANGUAGE_KEYS) || "zh";
     let configCache = {};
     let currentDirectoryPath = "/";
     let currentParentPath = null;
@@ -2792,7 +2817,7 @@
         document.getElementById("guangya_device_id").value,
       ].map((item) => String(item || "").trim());
       const hasAll = values.every(Boolean);
-      if (hasAll || sessionStorage.getItem(AUTO_GUANGYA_CAPTURE_KEY) === "1") return false;
+      if (hasAll || getSessionStorageValue(AUTO_GUANGYA_CAPTURE_KEY, LEGACY_AUTO_GUANGYA_CAPTURE_KEYS) === "1") return false;
       try {
         await call("/api/guangya/capture/start", { method: "POST" });
         sessionStorage.setItem(AUTO_GUANGYA_CAPTURE_KEY, "1");
