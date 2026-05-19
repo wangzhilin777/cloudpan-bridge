@@ -1556,6 +1556,33 @@ def test_provider_coverage_audit_endpoint_reports_registry_and_capture_coverage(
     assert rows["unknowndrive"]["priorityRank"] == 1
 
 
+def test_provider_coverage_audit_can_infer_dynamic_profile_capture_and_capability() -> None:
+    live_fields = {
+        "unknowndrive": [
+            OpenListDriverField(name="refresh_token", required=True),
+            OpenListDriverField(name="root_folder_id", default="root"),
+            OpenListDriverField(name="use_online_api", default="true"),
+        ]
+    }
+    audit = provider_registry_module.build_driver_coverage_audit(
+        ["UnknownDrive"],
+        target="guangya",
+        live_driver_fields_map=live_fields,
+    )
+    row = audit["rows"][0]
+    assert row["canonicalDriverKey"] == "dynamic_unknowndrive"
+    assert row["hasProfile"] is True
+    assert row["profileIsDynamic"] is True
+    assert row["hasCapture"] is True
+    assert row["captureIsDynamic"] is True
+    assert row["hasCapability"] is True
+    assert row["capabilityIsDynamic"] is True
+    assert row["capabilityLevel"] == "download_upload_only"
+    assert row["dynamicRequiredKeys"] == ["refresh_token"]
+    assert row["nextAction"] == "add_guide"
+    assert row["missingItems"] == ["guide"]
+
+
 def test_provider_coverage_audit_uses_real_capture_specs_instead_of_profile_aliases(monkeypatch: pytest.MonkeyPatch) -> None:
     original_profiles = provider_registry_module.SOURCE_PROVIDER_PROFILES
     fake_profiles = {
@@ -2204,6 +2231,47 @@ def test_provider_capability_assess_without_analysis_requires_probe_first(tmp_pa
     assert payload["strategy"]["shouldAnalyzeFirst"] is True
 
 
+def test_provider_capability_assess_can_use_dynamic_live_driver_fields(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "targets": {
+    "active_target": "guangya"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge import webapp as webapp_module
+
+    info = OpenListDriverInfo(
+        name="UnknownDrive",
+        common=[OpenListDriverField(name="refresh_token", required=True)],
+        additional=[OpenListDriverField(name="root_folder_id", default="root")],
+        config={},
+    )
+    monkeypatch.setattr(webapp_module.OpenListAdminClient, "driver_info", lambda self, driver: info)
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.post(
+        "/api/provider/capability_assess",
+        json={
+            "driver": "UnknownDrive",
+            "grouped_config": {
+                "targets": {
+                    "active_target": "guangya"
+                }
+            },
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sourceProfile"]["isDynamicInference"] is True
+    assert payload["level"] == "download_upload_only"
+    assert payload["isDynamicCapability"] is True
+    assert payload["strategy"]["recommendedMode"] == "analyze_first"
+
+
 def test_provider_capability_assess_download_only_prefers_pending_tree(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
@@ -2293,6 +2361,13 @@ def test_provider_coverage_audit_uses_live_openlist_drivers_when_missing(tmp_pat
     from cloudpan_bridge import webapp as webapp_module
 
     monkeypatch.setattr(webapp_module.OpenListAdminClient, "driver_names", lambda self: ["Thunder", "UnknownDrive"])
+    info = OpenListDriverInfo(
+        name="UnknownDrive",
+        common=[OpenListDriverField(name="refresh_token", required=True)],
+        additional=[OpenListDriverField(name="root_folder_id", default="root")],
+        config={},
+    )
+    monkeypatch.setattr(webapp_module.OpenListAdminClient, "driver_info", lambda self, driver: info if driver == "UnknownDrive" else OpenListDriverInfo(name="Thunder", common=[], additional=[], config={}))
     client = TestClient(webapp_module.create_app(config_path))
     response = client.post(
         "/api/provider/coverage_audit",
@@ -2306,9 +2381,13 @@ def test_provider_coverage_audit_uses_live_openlist_drivers_when_missing(tmp_pat
     )
     assert response.status_code == 200
     payload = response.json()
-    drivers = {item["driver"] for item in payload["rows"]}
-    assert "Thunder" in drivers
-    assert "UnknownDrive" in drivers
+    rows = {item["driver"]: item for item in payload["rows"]}
+    assert "Thunder" in rows
+    assert "UnknownDrive" in rows
+    assert rows["UnknownDrive"]["profileIsDynamic"] is True
+    assert rows["UnknownDrive"]["captureIsDynamic"] is True
+    assert rows["UnknownDrive"]["capabilityIsDynamic"] is True
+    assert rows["UnknownDrive"]["nextAction"] == "add_guide"
 
 
 def test_provider_coverage_scaffold_markdown_uses_live_openlist_drivers_when_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2326,6 +2405,13 @@ def test_provider_coverage_scaffold_markdown_uses_live_openlist_drivers_when_mis
     from cloudpan_bridge import webapp as webapp_module
 
     monkeypatch.setattr(webapp_module.OpenListAdminClient, "driver_names", lambda self: ["UnknownDrive"])
+    info = OpenListDriverInfo(
+        name="UnknownDrive",
+        common=[OpenListDriverField(name="refresh_token", required=True)],
+        additional=[OpenListDriverField(name="root_folder_id", default="root")],
+        config={},
+    )
+    monkeypatch.setattr(webapp_module.OpenListAdminClient, "driver_info", lambda self, driver: info)
     client = TestClient(webapp_module.create_app(config_path))
     response = client.post(
         "/api/provider/coverage_scaffold_markdown",
@@ -2341,6 +2427,7 @@ def test_provider_coverage_scaffold_markdown_uses_live_openlist_drivers_when_mis
     text = response.text
     assert "# CloudPan Bridge 驱动补全任务" in text
     assert "`UnknownDrive`" in text
+    assert "### `add_guide`" in text
 
 
 def test_provider_capture_prefill_accepts_grouped_provider_and_driver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

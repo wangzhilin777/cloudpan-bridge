@@ -179,6 +179,10 @@
   - 如果本次没有手工传 `drivers`
     - 会直接读取当前 OpenList 返回的驱动列表来做审计
     - 更适合在 OpenList 新增网盘后直接扫一遍看缺口
+  - 如果某个驱动仓库里还没有专用 profile / capture
+    - 现在会尽量根据当前 OpenList live driver fields 自动推断一份动态档案
+    - 自动补出保守的登录模式、推荐默认值、抓取需求和 `download_upload_only` 级别能力判断
+    - 这类动态档案不会冒充“已人工验证完成的专用支持”，页面和审计链路仍按保守策略展示
   - 支持页面内只看缺口、按下一步动作过滤
   - 还支持按缺口类型过滤，例如只看“缺 capture”的驱动
   - 还支持按 `capability level` 与 `profileKey` 过滤

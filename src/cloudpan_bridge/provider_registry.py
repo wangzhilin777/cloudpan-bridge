@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from .provider_capture import build_capture_supported_driver_aliases, resolve_capture_spec_for_driver
+from .openlist_admin import OpenListDriverField
+from .provider_capture import (
+    build_capture_supported_driver_aliases,
+    build_driver_capture_spec,
+    derive_capture_requirements_from_fields,
+    guess_login_url_for_driver,
+    resolve_capture_spec_for_driver,
+)
 
 
 DRIVER_GUIDES: dict[str, dict[str, Any]] = {
@@ -610,6 +617,116 @@ def _normalize_key(value: str) -> str:
     return "".join(ch.lower() for ch in str(value or "") if ch.isalnum())
 
 
+def _safe_dynamic_profile_key(driver: str) -> str:
+    normalized = _normalize_key(driver)
+    return f"dynamic_{normalized or 'driver'}"
+
+
+def _extract_dynamic_default_mount_values(fields: list[OpenListDriverField]) -> dict[str, str]:
+    allowlist = {
+        "root_folder_id",
+        "root_folder_path",
+        "use_online_api",
+        "api_url",
+        "web_proxy",
+        "webdav_policy",
+        "proxy_range",
+        "chunk_size",
+        "cloud_drive_type",
+        "livp_download_format",
+        "disable_media_link",
+    }
+    result: dict[str, str] = {}
+    for field in fields:
+        name = str(field.name or "").strip()
+        if not name:
+            continue
+        normalized = str(name).lower()
+        if normalized not in allowlist:
+            continue
+        default = str(field.default or "").strip()
+        if default:
+            result[name] = default
+    return result
+
+
+def _infer_dynamic_login_mode(requirements: dict[str, Any]) -> str:
+    required = {str(item or "").strip().lower() for item in list(requirements.get("required_keys") or [])}
+    if "refresh_token" in required:
+        return "refresh token oriented"
+    if "cookie_header" in required and "authorization" in required:
+        return "cookie + authorization"
+    if "authorization" in required:
+        return "authorization header oriented"
+    if "cookie_header" in required:
+        return "cookie focused"
+    return "dynamic driver form"
+
+
+def build_dynamic_source_profile(driver: str, fields: list[OpenListDriverField], target: str = "guangya") -> dict[str, Any]:
+    display_name = str(driver or "").strip() or "UnknownDriver"
+    requirements = derive_capture_requirements_from_fields(fields)
+    matched_fields = [str(item or "") for item in list(requirements.get("matched_fields") or []) if str(item or "").strip()]
+    required_keys = [str(item or "") for item in list(requirements.get("required_keys") or []) if str(item or "").strip()]
+    login_mode = _infer_dynamic_login_mode(requirements)
+    default_mount_values = _extract_dynamic_default_mount_values(fields)
+    has_refresh = "refresh_token" in {item.lower() for item in required_keys}
+    has_auth = "authorization" in {item.lower() for item in required_keys}
+    has_cookie = "cookie_header" in {item.lower() for item in required_keys}
+    rate_profile = "safe" if has_cookie or has_auth else "balanced" if has_refresh else "safe"
+    login_url = guess_login_url_for_driver(display_name)
+    capability_level = "download_upload_only"
+    capability_notes_zh = (
+        "该能力是根据当前 OpenList live 驱动字段动态推断出的保守结论，默认只承诺目录读取 + 下载补传，不承诺秒传。"
+    )
+    capability_notes_en = (
+        "This capability is a conservative inference from the current live OpenList driver fields. It only promises listing plus download-upload fallback, not fast upload."
+    )
+    doc_links = [login_url] if login_url else []
+    profile = {
+        "key": _safe_dynamic_profile_key(display_name),
+        "label": f"{display_name} (Dynamic)",
+        "label_zh": f"{display_name}（动态推断）",
+        "driver_aliases": [display_name],
+        "login_mode": login_mode,
+        "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "inferred_from_live_driver",
+        "capture_strategy": (
+            "根据当前 OpenList live driver 字段自动推断登录参数和挂载默认值，先完成挂载与小目录验证，再逐步补专用档案。"
+        ),
+        "capture_strategy_en": (
+            "Infer auth fields and mount defaults from the live OpenList driver definition first, validate with a small directory, and then promote to a dedicated profile later."
+        ),
+        "doc_links": doc_links,
+        "default_mount_values": default_mount_values,
+        "recommended_rate_profile": rate_profile,
+        "risk_notes": {
+            "zh": (
+                "当前还是动态推断档案，不应把它当成已人工验证完成的专用驱动支持。优先小目录、低频率、先验证下载链路。"
+            ),
+            "en": (
+                "This is still a dynamically inferred profile, not a fully human-verified dedicated driver profile. Prefer small directories, low frequency, and download-path validation first."
+            ),
+        },
+        "capability_to_targets": {
+            str(target or "guangya").strip().lower() or "guangya": {
+                "level": capability_level,
+                "recommended_flow": "先用小目录验证挂载、列表和下载，再决定是否放量补传。",
+                "recommended_flow_en": "Validate mount, listing, and download on a small directory first, then scale fallback uploads gradually.",
+                "notes": {
+                    "zh": capability_notes_zh,
+                    "en": capability_notes_en,
+                },
+            }
+        },
+        "is_dynamic_inference": True,
+        "dynamic_required_keys": required_keys,
+        "dynamic_matched_fields": matched_fields,
+    }
+    return _serialize_source_profile(profile)
+
+
 def _guess_driver_doc_urls(driver: str) -> list[str]:
     raw = str(driver or "").strip()
     normalized = _normalize_key(raw)
@@ -792,6 +909,9 @@ def _serialize_source_profile(profile: dict[str, Any]) -> dict[str, Any]:
         "recommendedRateProfile": str(profile.get("recommended_rate_profile") or "safe"),
         "riskNotes": dict(profile.get("risk_notes") or {}),
         "capabilityToTargets": capability_to_targets,
+        "isDynamicInference": bool(profile.get("is_dynamic_inference", False)),
+        "dynamicRequiredKeys": list(profile.get("dynamic_required_keys") or []),
+        "dynamicMatchedFields": list(profile.get("dynamic_matched_fields") or []),
     }
 
 
@@ -830,8 +950,16 @@ def get_source_profile_by_key_or_alias(value: str) -> dict[str, Any]:
     return _serialize_source_profile(SOURCE_PROVIDER_PROFILES["generic"])
 
 
-def build_driver_target_capability(driver: str, target: str = "guangya") -> dict[str, Any]:
+def build_driver_target_capability(
+    driver: str,
+    target: str = "guangya",
+    live_driver_fields_map: dict[str, list[OpenListDriverField]] | None = None,
+) -> dict[str, Any]:
     source_profile = get_source_profile_by_driver(driver)
+    normalized_driver = _normalize_key(driver)
+    live_fields = list((live_driver_fields_map or {}).get(normalized_driver) or [])
+    if str(source_profile.get("key") or "") == "generic" and live_fields:
+        source_profile = build_dynamic_source_profile(driver, live_fields, target=target)
     target_key = str(target or "guangya").strip().lower() or "guangya"
     target_profile = _serialize_target_profile(TARGET_PROFILES.get(target_key, TARGET_PROFILES["guangya"]))
     target_capability = dict(source_profile.get("capabilityToTargets") or {}).get(target_key, {})
@@ -846,19 +974,31 @@ def build_driver_target_capability(driver: str, target: str = "guangya") -> dict
         "recommendedFlow": str(target_capability.get("recommendedFlow") or ""),
         "recommendedFlowEn": str(target_capability.get("recommendedFlowEn") or ""),
         "notes": dict(target_capability.get("notes") or {}),
+        "isDynamicCapability": bool(source_profile.get("isDynamicInference", False)),
     }
 
 
-def build_driver_capability_matrix(target: str = "guangya") -> dict[str, dict[str, Any]]:
+def build_driver_capability_matrix(
+    target: str = "guangya",
+    live_driver_fields_map: dict[str, list[OpenListDriverField]] | None = None,
+) -> dict[str, dict[str, Any]]:
     matrix: dict[str, dict[str, Any]] = {}
     for profile in SOURCE_PROVIDER_PROFILES.values():
         for alias in list(profile.get("driver_aliases") or []):
-            matrix[_normalize_key(alias)] = build_driver_target_capability(alias, target=target)
+            matrix[_normalize_key(alias)] = build_driver_target_capability(
+                alias,
+                target=target,
+                live_driver_fields_map=live_driver_fields_map,
+            )
     return matrix
 
 
-def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> dict[str, Any]:
-    matrix = build_driver_capability_matrix(target=target)
+def build_driver_coverage_audit(
+    drivers: list[str],
+    target: str = "guangya",
+    live_driver_fields_map: dict[str, list[OpenListDriverField]] | None = None,
+) -> dict[str, Any]:
+    matrix = build_driver_capability_matrix(target=target, live_driver_fields_map=live_driver_fields_map)
     capture_supported_aliases = build_capture_supported_driver_aliases()
 
     rows: list[dict[str, Any]] = []
@@ -880,15 +1020,41 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
     for driver in sorted({str(item or "").strip() for item in drivers if str(item or "").strip()}, key=lambda item: item.lower()):
         normalized = _normalize_key(driver)
         profile = get_source_profile_by_driver(driver)
+        live_fields = list((live_driver_fields_map or {}).get(normalized) or [])
+        profile_is_dynamic = False
+        if str(profile.get("key") or "") == "generic" and live_fields:
+            profile = build_dynamic_source_profile(driver, live_fields, target=target)
+            profile_is_dynamic = True
         has_profile = str(profile.get("key") or "") != "generic"
         guide = get_driver_guide(driver)
         has_guide = guide is not None and not bool((guide or {}).get("isGenericFallback"))
         matched_guide_key, _matched_guide = _resolve_guide_key(driver)
         capture_match = resolve_capture_spec_for_driver(driver)
-        has_capture = bool(capture_match.get("specKey")) and normalized in capture_supported_aliases
+        capture_is_dynamic = False
+        if (not bool(capture_match.get("specKey")) or normalized not in capture_supported_aliases) and live_fields:
+            dynamic_spec = build_driver_capture_spec(driver, live_fields)
+            capture_match = {
+                "driver": driver,
+                "normalized": normalized,
+                "specKey": dynamic_spec.key,
+                "matchedAlias": normalized,
+                "label": dynamic_spec.label,
+                "loginUrl": dynamic_spec.login_url,
+            }
+            capture_is_dynamic = True
+        has_capture = bool(capture_match.get("specKey")) and (
+            normalized in capture_supported_aliases or capture_is_dynamic
+        )
         capability = matrix.get(normalized)
+        if capability is None and live_fields:
+            capability = build_driver_target_capability(
+                driver,
+                target=target,
+                live_driver_fields_map=live_driver_fields_map,
+            )
         capability_level = str((capability or {}).get("level") or "")
         has_capability = bool(capability_level and capability_level != "unsupported")
+        capability_is_dynamic = bool((capability or {}).get("isDynamicCapability"))
         coverage_score = int(has_profile) + int(has_guide) + int(has_capture) + int(has_capability)
         missing_items: list[str] = []
         if not has_profile:
@@ -931,20 +1097,25 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
             "canonicalDriverKey": str(profile.get("key") or "generic"),
             "profileKey": str(profile.get("key") or "generic"),
             "hasProfile": has_profile,
+            "profileIsDynamic": profile_is_dynamic,
             "hasGuide": has_guide,
             "matchedGuideKey": matched_guide_key,
             "guideDocUrl": str((guide or {}).get("docUrl") or ""),
             "hasCapture": has_capture,
+            "captureIsDynamic": capture_is_dynamic,
             "captureSpecKey": str(capture_match.get("specKey") or ""),
             "captureMatchedAlias": str(capture_match.get("matchedAlias") or ""),
             "captureLoginUrl": str(capture_match.get("loginUrl") or ""),
             "captureLabel": str(capture_match.get("label") or ""),
             "hasCapability": has_capability,
+            "capabilityIsDynamic": capability_is_dynamic,
             "capabilityLevel": capability_level or "unsupported",
             "onboardingReady": onboarding_stage in {"ready_for_guide", "ready_for_capture", "ready_for_capability"},
             "onboardingStage": onboarding_stage,
             "coverageScore": coverage_score,
             "docLinks": list(profile.get("docLinks") or []),
+            "dynamicRequiredKeys": list(profile.get("dynamicRequiredKeys") or []),
+            "dynamicMatchedFields": list(profile.get("dynamicMatchedFields") or []),
             "missingItems": missing_items,
             "nextAction": next_action,
             "priorityRank": priority_rank,
@@ -957,8 +1128,10 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
                     "normalized": normalized,
                     "canonicalDriverKey": str(profile.get("key") or "generic"),
                     "profileKey": str(profile.get("key") or "generic"),
+                    "profileIsDynamic": profile_is_dynamic,
                     "matchedGuideKey": matched_guide_key,
                     "capabilityLevel": capability_level or "unsupported",
+                    "capabilityIsDynamic": capability_is_dynamic,
                     "onboardingReady": onboarding_stage in {"ready_for_guide", "ready_for_capture", "ready_for_capability"},
                     "onboardingStage": onboarding_stage,
                     "missingItems": missing_items,
@@ -1334,8 +1507,9 @@ def assess_driver_target_capability(
     driver: str,
     analysis_summary: dict[str, Any] | None = None,
     target: str = "guangya",
+    live_driver_fields_map: dict[str, list[OpenListDriverField]] | None = None,
 ) -> dict[str, Any]:
-    capability = build_driver_target_capability(driver, target=target)
+    capability = build_driver_target_capability(driver, target=target, live_driver_fields_map=live_driver_fields_map)
     summary = dict(analysis_summary or {})
     total = int(summary.get("total") or 0)
     fast_ready = int(summary.get("fast_upload_ready") or 0)

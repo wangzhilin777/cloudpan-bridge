@@ -371,6 +371,25 @@ def create_app(config_path: Path) -> FastAPI:
             return live_drivers
         raise HTTPException(status_code=400, detail="缺少 drivers，且当前 OpenList 也没有返回可审计的驱动列表")
 
+    def build_live_driver_fields_map(drivers: list[str]) -> dict[str, list[Any]]:
+        result: dict[str, list[Any]] = {}
+        if not drivers:
+            return result
+        try:
+            with build_admin_client() as client:
+                for driver in drivers:
+                    try:
+                        info = client.driver_info(driver)
+                    except Exception:
+                        continue
+                    fields = [*list(info.common or []), *list(info.additional or [])]
+                    normalized = "".join(ch.lower() for ch in str(driver or "") if ch.isalnum())
+                    if normalized and fields:
+                        result[normalized] = fields
+        except Exception:
+            return {}
+        return result
+
     def load_config_payload() -> dict[str, Any]:
         normalized = AppConfig.load(config_path)
         payload = normalized.to_flat_dict()
@@ -1229,7 +1248,7 @@ def create_app(config_path: Path) -> FastAPI:
         payload = normalize_registry_payload(payload, config)
         drivers = resolve_registry_drivers(payload)
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
-        audit = build_driver_coverage_audit(drivers, target=target)
+        audit = build_driver_coverage_audit(drivers, target=target, live_driver_fields_map=build_live_driver_fields_map(drivers))
         return filter_driver_coverage_audit(
             audit,
             only_gaps=bool(payload.get("only_gaps")),
@@ -1246,7 +1265,7 @@ def create_app(config_path: Path) -> FastAPI:
         payload = normalize_registry_payload(payload, config)
         drivers = resolve_registry_drivers(payload)
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
-        audit = build_driver_coverage_audit(drivers, target=target)
+        audit = build_driver_coverage_audit(drivers, target=target, live_driver_fields_map=build_live_driver_fields_map(drivers))
         audit = filter_driver_coverage_audit(
             audit,
             only_gaps=bool(payload.get("only_gaps")),
@@ -1265,7 +1284,7 @@ def create_app(config_path: Path) -> FastAPI:
         payload = normalize_registry_payload(payload, config)
         drivers = resolve_registry_drivers(payload)
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
-        audit = build_driver_coverage_audit(drivers, target=target)
+        audit = build_driver_coverage_audit(drivers, target=target, live_driver_fields_map=build_live_driver_fields_map(drivers))
         audit = filter_driver_coverage_audit(
             audit,
             only_gaps=bool(payload.get("only_gaps")),
@@ -1283,7 +1302,7 @@ def create_app(config_path: Path) -> FastAPI:
         payload = normalize_registry_payload(payload, config)
         drivers = resolve_registry_drivers(payload)
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
-        audit = build_driver_coverage_audit(drivers, target=target)
+        audit = build_driver_coverage_audit(drivers, target=target, live_driver_fields_map=build_live_driver_fields_map(drivers))
         audit = filter_driver_coverage_audit(
             audit,
             only_gaps=bool(payload.get("only_gaps")),
@@ -1306,7 +1325,12 @@ def create_app(config_path: Path) -> FastAPI:
         if not driver:
             raise HTTPException(status_code=400, detail="缺少 driver")
         summary = payload.get("analysis_summary") if isinstance(payload.get("analysis_summary"), dict) else {}
-        return assess_driver_target_capability(driver, analysis_summary=summary, target=target)
+        return assess_driver_target_capability(
+            driver,
+            analysis_summary=summary,
+            target=target,
+            live_driver_fields_map=build_live_driver_fields_map([driver]),
+        )
 
     @app.get("/api/openlist/storages")
     def get_openlist_storages(page: int = 1, per_page: int = 200) -> dict[str, Any]:
