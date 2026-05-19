@@ -459,6 +459,7 @@ Guangya 是当前已完成最多的目标端，必须继续保留并增强。
   - 覆盖审计已修正为按真实 capture spec 判断，不再把 source profile 误当作已具备抓取支持
   - 审计结果现在还能追踪 `guideDocUrl / captureSpecKey / captureMatchedAlias / captureLoginUrl`
   - guide 查询已支持 canonical key / alias 归一，`123Open / BaiduNetdisk / 189Cloud` 这类别名不再误报缺 guide
+  - 当前这批重点驱动的已知显式缺口已清空，后续主要剩全 OpenList 驱动的继续扩面
 - `Phase 6`
   - 已有静态能力矩阵与基于目录分析结果的动态策略建议
   - 覆盖审计已支持 `nextAction / missingItem / capabilityLevel / profileKey` 高级筛选，且 backlog/导出保持一致
@@ -466,7 +467,6 @@ Guangya 是当前已完成最多的目标端，必须继续保留并增强。
 仍未完成的重点：
 
 - OpenList 全驱动 profile / guide / capture / capability 逐项补齐
-  - 当前重点驱动里仍剩 `123Open` 明确缺 `capture`
 - Guangya 之外的目标端适配器继续扩展
 - 更完整的 README 场景建议与最终验收清单收口
 - 配置结构虽然已支持新分组存储，但页面与接口层仍处于平面字段兼容过渡期

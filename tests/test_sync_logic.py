@@ -438,6 +438,7 @@ def test_capture_alias_registry_resolves_real_spec_keys() -> None:
     assert alias_map["aliyundriveopen"] == "aliyundriveopen"
     assert alias_map["alipan"] == "aliyundriveopen"
     assert alias_map["baidunetdisk"] == "baidu"
+    assert alias_map["123open"] == "123pan"
     assert "quarkopen" in supported
 
     resolved = resolve_capture_spec_for_driver("AliyunDriveOpen")
@@ -850,7 +851,30 @@ def test_provider_coverage_audit_endpoint_supports_capability_and_profile_filter
     assert payload["backlog"] == []
 
 
-def test_provider_coverage_audit_filtered_backlog_keeps_capability_and_profile_metadata(tmp_path: Path) -> None:
+def test_provider_coverage_audit_filtered_backlog_keeps_capability_and_profile_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_profiles = provider_registry_module.SOURCE_PROVIDER_PROFILES
+    fake_profiles = {
+        **original_profiles,
+        "fakecapturegap": {
+            **dict(original_profiles["generic"]),
+            "key": "fakecapturegap",
+            "label": "Fake Capture Gap",
+            "label_zh": "假驱动抓取缺口",
+            "driver_aliases": ["FakeCaptureGap"],
+            "doc_links": [],
+            "capability_to_targets": {
+                "guangya": {
+                    "level": "download_upload_only",
+                    "recommended_flow": "仅用于测试 backlog 过滤。",
+                    "recommended_flow_en": "For backlog filtering regression testing only.",
+                }
+            },
+        },
+    }
+    monkeypatch.setattr(provider_registry_module, "SOURCE_PROVIDER_PROFILES", fake_profiles)
     config_path = tmp_path / "config.json"
     config_path.write_text(
         """
@@ -867,20 +891,51 @@ def test_provider_coverage_audit_filtered_backlog_keeps_capability_and_profile_m
     response = client.post(
         "/api/provider/coverage_audit",
         json={
-            "drivers": ["AliyundriveOpen", "OneDrive", "UnknownDrive", "Thunder", "123Open"],
+            "drivers": ["AliyundriveOpen", "OneDrive", "UnknownDrive", "FakeCaptureGap"],
             "target": "guangya",
             "only_gaps": True,
-            "capability_level": "fast_upload_partial",
-            "profile_key": "123pan",
+            "capability_level": "download_upload_only",
+            "profile_key": "fakecapturegap",
         },
     )
     assert response.status_code == 200
     payload = response.json()
     assert payload["totals"]["total"] == 1
-    assert payload["rows"][0]["normalized"] == "123open"
-    assert payload["backlog"][0]["normalized"] == "123open"
-    assert payload["backlog"][0]["profileKey"] == "123pan"
-    assert payload["backlog"][0]["capabilityLevel"] == "fast_upload_partial"
+    assert payload["rows"][0]["normalized"] == "fakecapturegap"
+    assert payload["backlog"][0]["normalized"] == "fakecapturegap"
+    assert payload["backlog"][0]["profileKey"] == "fakecapturegap"
+    assert payload["backlog"][0]["capabilityLevel"] == "download_upload_only"
+
+
+def test_provider_coverage_audit_marks_123open_capture_as_covered(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_audit",
+        json={
+            "drivers": ["123Open"],
+            "target": "guangya",
+        },
+    )
+    assert response.status_code == 200
+    row = response.json()["rows"][0]
+    assert row["normalized"] == "123open"
+    assert row["profileKey"] == "123pan"
+    assert row["hasCapture"] is True
+    assert row["captureSpecKey"] == "123pan"
+    assert row["captureMatchedAlias"] == "123open"
+    assert "capture" not in row["missingItems"]
 
 
 def test_provider_coverage_audit_markdown_endpoint_renders_backlog_report(tmp_path: Path) -> None:
@@ -977,7 +1032,30 @@ def test_provider_coverage_audit_markdown_endpoint_renders_capability_and_profil
     assert "| `Thunder` |" not in text
 
 
-def test_provider_coverage_audit_markdown_filtered_backlog_still_renders_after_profile_filter(tmp_path: Path) -> None:
+def test_provider_coverage_audit_markdown_filtered_backlog_still_renders_after_profile_filter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_profiles = provider_registry_module.SOURCE_PROVIDER_PROFILES
+    fake_profiles = {
+        **original_profiles,
+        "fakecapturegap": {
+            **dict(original_profiles["generic"]),
+            "key": "fakecapturegap",
+            "label": "Fake Capture Gap",
+            "label_zh": "假驱动抓取缺口",
+            "driver_aliases": ["FakeCaptureGap"],
+            "doc_links": [],
+            "capability_to_targets": {
+                "guangya": {
+                    "level": "download_upload_only",
+                    "recommended_flow": "仅用于测试 backlog 过滤。",
+                    "recommended_flow_en": "For backlog filtering regression testing only.",
+                }
+            },
+        },
+    }
+    monkeypatch.setattr(provider_registry_module, "SOURCE_PROVIDER_PROFILES", fake_profiles)
     config_path = tmp_path / "config.json"
     config_path.write_text(
         """
@@ -994,18 +1072,18 @@ def test_provider_coverage_audit_markdown_filtered_backlog_still_renders_after_p
     response = client.post(
         "/api/provider/coverage_audit_markdown",
         json={
-            "drivers": ["AliyundriveOpen", "OneDrive", "UnknownDrive", "Thunder", "123Open"],
+            "drivers": ["AliyundriveOpen", "OneDrive", "UnknownDrive", "FakeCaptureGap"],
             "target": "guangya",
             "only_gaps": True,
-            "capability_level": "fast_upload_partial",
-            "profile_key": "123pan",
+            "capability_level": "download_upload_only",
+            "profile_key": "fakecapturegap",
         },
     )
     assert response.status_code == 200
     text = response.text
-    assert "- Profile Key: `123pan`" in text
-    assert "- 能力等级: `fast_upload_partial`" in text
-    assert "`123Open` | P3 | add_capture_spec" in text
+    assert "- Profile Key: `fakecapturegap`" in text
+    assert "- 能力等级: `download_upload_only`" in text
+    assert "`FakeCaptureGap` | P2 | add_guide" in text
 
 
 def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Path) -> None:

@@ -299,7 +299,7 @@ def default_provider_specs() -> dict[str, ProviderCaptureSpec]:
             label="123 网盘",
             login_url="https://www.123pan.com/",
             session_dir="123pan",
-            recommended_drivers=["123Pan"],
+            recommended_drivers=["123Pan", "123Open"],
             domains=["123pan.com", "123pan.cn", "123684.cn"],
             required_keys=["cookie_header"],
             header_aliases=["authorization", "cookie"],
