@@ -678,10 +678,8 @@
             <h2 data-i18n="panel.guangya_auth">光鸭登录信息</h2>
             <div class="panel-grid">
               <div>
-                <label data-i18n="label.target_key">当前目标端</label>
-                <select id="target_key">
-                  <option value="guangya">guangya</option>
-                </select>
+              <label data-i18n="label.target_key">当前目标端</label>
+                <select id="target_key"></select>
               </div>
               <div>
                 <label data-i18n="label.guangya_phone">光鸭手机号</label>
@@ -740,14 +738,7 @@
             <div class="actions">
               <label class="checkbox-inline"><input type="checkbox" id="coverage-only-gaps"> 只看有缺口</label>
               <label class="checkbox-inline"><input type="checkbox" id="coverage-only-onboarding-ready"> 只看可直接接入</label>
-              <select id="coverage-next-action-filter" style="width:auto;min-width:220px;">
-                <option value="">全部下一步</option>
-                <option value="add_profile_first">先补 source profile</option>
-                <option value="add_guide">补接入流程说明</option>
-                <option value="add_capture_spec">补登录抓取定义</option>
-                <option value="assess_target_capability">补目标能力判断</option>
-                <option value="covered">当前已覆盖</option>
-              </select>
+              <select id="coverage-next-action-filter" style="width:auto;min-width:220px;"></select>
               <select id="coverage-missing-item-filter" style="width:auto;min-width:220px;">
                 <option value="">全部缺口类型</option>
                 <option value="profile">缺 profile</option>
@@ -755,35 +746,9 @@
                 <option value="capture">缺 capture</option>
                 <option value="capability">缺 capability</option>
               </select>
-              <select id="coverage-capability-level-filter" style="width:auto;min-width:220px;">
-                <option value="">全部能力等级</option>
-                <option value="fast_upload_supported">fast_upload_supported</option>
-                <option value="fast_upload_partial">fast_upload_partial</option>
-                <option value="relay_supported">relay_supported</option>
-                <option value="download_upload_only">download_upload_only</option>
-                <option value="unsupported">unsupported</option>
-              </select>
-              <select id="coverage-profile-key-filter" style="width:auto;min-width:220px;">
-                <option value="">全部 profile key</option>
-                <option value="generic">generic</option>
-                <option value="189cloud">189cloud</option>
-                <option value="quark">quark</option>
-                <option value="123pan">123pan</option>
-                <option value="baidu">baidu</option>
-                <option value="thunder">thunder</option>
-                <option value="aliyundriveopen">aliyundriveopen</option>
-                <option value="onedrive">onedrive</option>
-                <option value="pikpak">pikpak</option>
-                <option value="139yun">139yun</option>
-              </select>
-              <select id="coverage-onboarding-stage-filter" style="width:auto;min-width:220px;">
-                <option value="">全部接入阶段</option>
-                <option value="needs_profile_bootstrap">needs_profile_bootstrap</option>
-                <option value="ready_for_guide">ready_for_guide</option>
-                <option value="ready_for_capture">ready_for_capture</option>
-                <option value="ready_for_capability">ready_for_capability</option>
-                <option value="covered">covered</option>
-              </select>
+              <select id="coverage-capability-level-filter" style="width:auto;min-width:220px;"></select>
+              <select id="coverage-profile-key-filter" style="width:auto;min-width:220px;"></select>
+              <select id="coverage-onboarding-stage-filter" style="width:auto;min-width:220px;"></select>
               <button class="secondary" id="export-coverage-json" data-i18n="btn.export_coverage_json">导出覆盖审计 JSON</button>
               <button class="secondary" id="export-coverage-md" data-i18n="btn.export_coverage_md">导出覆盖审计 Markdown</button>
             </div>
@@ -1239,6 +1204,88 @@
       if (profileKey && typeof state.profileKey === "string") profileKey.value = state.profileKey;
       if (onboardingStage && typeof state.onboardingStage === "string") onboardingStage.value = state.onboardingStage;
     }
+
+    function uniqueSorted(values) {
+      return [...new Set((values || []).map((item) => String(item || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"));
+    }
+
+    function buildSelectOptions(selectId, emptyLabel, options, currentValue = "") {
+      const select = document.getElementById(selectId);
+      if (!select) return;
+      const normalizedOptions = Array.isArray(options) ? options : [];
+      select.innerHTML = [
+        `<option value="">${escapeHtml(emptyLabel)}</option>`,
+        ...normalizedOptions.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`),
+      ].join("");
+      const fallbackValue = String(currentValue || "");
+      if (fallbackValue && normalizedOptions.some((item) => String(item.value) === fallbackValue)) {
+        select.value = fallbackValue;
+      } else if (fallbackValue === "") {
+        select.value = "";
+      }
+    }
+
+    function populateTargetOptions() {
+      const targetProfiles = providerRegistryPayload?.target_profiles || {};
+      const options = Object.values(targetProfiles).map((item) => ({
+        value: String(item.key || ""),
+        label: currentLang() === "en"
+          ? `${item.label || item.key || "-"}`
+          : currentLang() === "mix"
+            ? `${item.labelZh || item.label || item.key || "-"} / ${item.label || item.key || "-"}`
+            : `${item.labelZh || item.label || item.key || "-"}`,
+      })).filter((item) => item.value);
+      const currentValue = String(document.getElementById("target_key")?.value || configCache?.target_key || providerRegistryPayload?.active_target || "guangya");
+      buildSelectOptions("target_key", currentLang() === "en" ? "Select target" : currentLang() === "mix" ? "选择目标端 / Select target" : "选择目标端", options, currentValue);
+    }
+
+    function populateCoverageFilterOptions() {
+      const sourceProfiles = providerRegistryPayload?.source_profiles || {};
+      const auditRows = Array.isArray(coverageAuditCache?.rows) ? coverageAuditCache.rows : [];
+      const backlog = Array.isArray(coverageAuditCache?.backlog) ? coverageAuditCache.backlog : [];
+      const profileKeys = uniqueSorted([
+        ...Object.keys(sourceProfiles || {}),
+        ...auditRows.map((item) => item.profileKey),
+        ...backlog.map((item) => item.profileKey),
+      ]);
+      const nextActions = uniqueSorted([
+        ...auditRows.map((item) => item.nextAction),
+        ...backlog.map((item) => item.nextAction),
+      ]);
+      const capabilityLevels = uniqueSorted([
+        ...auditRows.map((item) => item.capabilityLevel),
+        ...backlog.map((item) => item.capabilityLevel),
+      ]);
+      const onboardingStages = uniqueSorted([
+        ...auditRows.map((item) => item.onboardingStage),
+        ...backlog.map((item) => item.onboardingStage),
+      ]);
+      buildSelectOptions(
+        "coverage-profile-key-filter",
+        currentLang() === "en" ? "All profile keys" : currentLang() === "mix" ? "全部 profile key / All profile keys" : "全部 profile key",
+        profileKeys.map((item) => ({ value: item, label: item })),
+        String(document.getElementById("coverage-profile-key-filter")?.value || getCoverageFilterState().profileKey || "")
+      );
+      buildSelectOptions(
+        "coverage-next-action-filter",
+        currentLang() === "en" ? "All next steps" : currentLang() === "mix" ? "全部下一步 / All next steps" : "全部下一步",
+        nextActions.map((item) => ({ value: item, label: coverageNextActionText(item) })),
+        String(document.getElementById("coverage-next-action-filter")?.value || getCoverageFilterState().nextAction || "")
+      );
+      buildSelectOptions(
+        "coverage-capability-level-filter",
+        currentLang() === "en" ? "All capability levels" : currentLang() === "mix" ? "全部能力等级 / All capability levels" : "全部能力等级",
+        capabilityLevels.map((item) => ({ value: item, label: item })),
+        String(document.getElementById("coverage-capability-level-filter")?.value || getCoverageFilterState().capabilityLevel || "")
+      );
+      buildSelectOptions(
+        "coverage-onboarding-stage-filter",
+        currentLang() === "en" ? "All onboarding stages" : currentLang() === "mix" ? "全部接入阶段 / All onboarding stages" : "全部接入阶段",
+        onboardingStages.map((item) => ({ value: item, label: item })),
+        String(document.getElementById("coverage-onboarding-stage-filter")?.value || getCoverageFilterState().onboardingStage || "")
+      );
+      applySavedCoverageFilters();
+    }
     const PROVIDER_DRIVER_HINTS = {
       "189cloud": ["189Cloud", "189CloudPC", "189CloudTV"],
       "quark": ["Quark", "QuarkOpen", "QuarkTV"],
@@ -1375,6 +1422,8 @@
         const key = document.getElementById("log-drawer").classList.contains("hidden") ? "btn.toggle_logs_show" : "btn.toggle_logs_hide";
         toggleLogs.textContent = t(key);
       }
+      populateTargetOptions();
+      populateCoverageFilterOptions();
       if (storageRecords.length) populateMountedSources(storageRecords);
       if (providerDefinitions.length) {
         renderProviderOptions(providerDefinitions);
@@ -1457,6 +1506,8 @@
       const data = await call("/api/provider/registry");
       providerRegistryPayload = data || providerRegistryPayload;
       driverGuideRegistry = data?.guides || {};
+      populateTargetOptions();
+      populateCoverageFilterOptions();
       renderCapabilitySummary();
       renderAboutRegistry();
       await refreshCapabilityAssessment();
@@ -1509,6 +1560,7 @@
       } catch (_error) {
         coverageAuditCache = null;
       }
+      populateCoverageFilterOptions();
       renderAboutRegistry();
     }
 

@@ -173,6 +173,8 @@
   - 还支持按 `capability level` 与 `profileKey` 过滤
     - 例如只看 `download_upload_only`
     - 或只看某个具体 profile，如 `aliyundriveopen`
+  - 这些筛选项现在会按当前 registry / 审计结果动态生成
+    - 不再把 profile key、执行阶段之类的选项写死在前端
   - 现在还支持一层“接入阶段”视图
     - `needs_profile_bootstrap`
     - `ready_for_guide`
@@ -263,6 +265,7 @@
 - `targets.active_target` 当前默认是 `guangya`
 - 配置页里已经有“当前目标端”选择点
 - 当前切换目标端后，页面里的能力矩阵、覆盖审计与导出都会立即跟随这个选择刷新
+- 目标端下拉现在会按内置 `target_profiles` 动态生成，后续扩目标端时不需要再手改前端选项
 - 但现阶段正式可用、真正接通写入链路的目标端仍只有 `guangya`
 - 当前活动 Tab、日志抽屉显隐等页面状态会同步写入 `ui.panel_open_states`
 - 老版本本地缓存键也会自动迁移到新的 `CloudPan Bridge` 命名空间
