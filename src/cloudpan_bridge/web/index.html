@@ -816,6 +816,7 @@
       </div>
       <div class="notice" id="driver-guide-summary">等待选择驱动。</div>
       <div class="guide-steps" id="driver-guide-steps"></div>
+      <div class="notice" id="driver-guide-doc-candidates">等待文档候选...</div>
       <div class="actions">
         <button class="secondary" id="open-driver-doc" data-i18n="btn.open_driver_doc">打开官方文档</button>
         <button class="accent" id="apply-driver-defaults-dialog" data-i18n="btn.apply_driver_defaults">套用推荐默认值</button>
@@ -1960,12 +1961,21 @@
       return null;
     }
 
+    function guideDocCandidates(guide) {
+      const list = Array.isArray(guide?.docUrlCandidates) ? guide.docUrlCandidates : [];
+      const merged = [];
+      if (guide?.docUrl) merged.push(guide.docUrl);
+      merged.push(...list);
+      return [...new Set(merged.map((item) => String(item || "").trim()).filter(Boolean))];
+    }
+
     function renderGuideIntoDialog(guide, titleText) {
       currentDriverGuide = guide;
       const summary = document.getElementById("driver-guide-summary");
       const stepsRoot = document.getElementById("driver-guide-steps");
       const title = document.getElementById("driver-guide-title");
       const openDocButton = document.getElementById("open-driver-doc");
+      const candidatesRoot = document.getElementById("driver-guide-doc-candidates");
       if (!guide) {
         const empty = currentLang() === "en"
           ? "This provider currently has no built-in special guide. You can still use the captured fields and the official docs manually."
@@ -1974,6 +1984,11 @@
             : "当前 provider 暂无内置专属流程说明，可先用抓取结果与动态字段，再手动参考官方文档。";
         if (summary) summary.textContent = empty;
         if (stepsRoot) stepsRoot.innerHTML = "";
+        if (candidatesRoot) candidatesRoot.textContent = currentLang() === "en"
+          ? "No official doc candidates yet."
+          : currentLang() === "mix"
+            ? "当前没有官方文档候选链路。 / No official doc candidates yet."
+            : "当前没有官方文档候选链路。";
         if (title) title.textContent = titleText || (currentLang() === "en" ? "Provider Access Guide" : currentLang() === "mix" ? "网盘接入流程 / Provider Access Guide" : "网盘接入流程");
         if (openDocButton) openDocButton.disabled = true;
         return;
@@ -1991,7 +2006,20 @@
           </div>
         `).join("");
       }
-      if (openDocButton) openDocButton.disabled = !(guide.docUrl || "");
+      const candidates = guideDocCandidates(guide);
+      if (candidatesRoot) {
+        candidatesRoot.innerHTML = candidates.length
+          ? `
+            <div style="margin-bottom:8px;">${currentLang() === "en" ? "Official doc candidates" : currentLang() === "mix" ? "官方文档候选 / Official doc candidates" : "官方文档候选"}</div>
+            ${candidates.map((item, index) => `<div class="mono"><a href="${escapeHtml(item)}" target="_blank" rel="noopener noreferrer">${escapeHtml(index === 0 ? item : `${index + 1}. ${item}`)}</a></div>`).join("")}
+          `
+          : (currentLang() === "en"
+            ? "No official doc candidates yet."
+            : currentLang() === "mix"
+              ? "当前没有官方文档候选链路。 / No official doc candidates yet."
+              : "当前没有官方文档候选链路。");
+      }
+      if (openDocButton) openDocButton.disabled = !candidates.length;
     }
 
     function renderDriverGuide(driver) {
@@ -3244,7 +3272,8 @@
         downloadTextFile("cloudpan-bridge-coverage-audit.md", markdown, "text/markdown;charset=utf-8");
       };
       document.getElementById("open-driver-doc").onclick = () => {
-        if (currentDriverGuide?.docUrl) window.open(currentDriverGuide.docUrl, "_blank", "noopener,noreferrer");
+        const candidates = guideDocCandidates(currentDriverGuide);
+        if (candidates.length) window.open(candidates[0], "_blank", "noopener,noreferrer");
       };
       document.getElementById("apply-driver-defaults").onclick = () => applyDriverGuideDefaults();
       document.getElementById("apply-driver-defaults-dialog").onclick = () => applyDriverGuideDefaults();
