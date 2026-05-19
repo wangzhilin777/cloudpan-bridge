@@ -158,6 +158,14 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     }
   },
   "ui": {
+    "language": "mix",
+    "coverage_filters": {
+      "onlyGaps": true
+    },
+    "browser": {
+      "current_path": "/browse",
+      "mounted_source": "/mount"
+    },
     "panel_open_states": {
       "basic_config": true
     }
@@ -179,13 +187,19 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert cfg.target_key == "guangya"
     assert cfg.guangya_refresh_token == "refresh"
     assert cfg.provider_captures["quark"]["captured"]["cookie_header"] == "k=v"
+    assert cfg.ui_language == "mix"
+    assert cfg.coverage_filters["onlyGaps"] is True
+    assert cfg.browser_state["current_path"] == "/browse"
     nested = cfg.to_dict()
     assert nested["sync"]["source_path"] == "/src"
     assert nested["targets"]["guangya"]["device_id"] == "device"
     assert nested["source_session"]["provider_captures"]["quark"]["captured"]["cookie_header"] == "k=v"
+    assert nested["ui"]["language"] == "mix"
+    assert nested["ui"]["browser"]["mounted_source"] == "/mount"
     flat = cfg.to_flat_dict()
     assert flat["bind_port"] == 9876
     assert flat["openlist_password"] == "demo"
+    assert flat["ui_language"] == "mix"
 
 
 def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> None:
