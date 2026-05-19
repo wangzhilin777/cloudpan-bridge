@@ -1,0 +1,14 @@
+services:
+  cloudpan-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cloudpan-bridge
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./.work:/app/.work
+      - ./.state:/app/.state
+      - ./.runtime:/app/.runtime
+      - ./.exports:/app/.exports
+    restart: unless-stopped

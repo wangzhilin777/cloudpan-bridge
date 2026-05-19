@@ -8,19 +8,22 @@
 
 - `docs/cloudpan-bridge-master-plan.md`
 - 历史计划：`docs/cloud2guangya-rebuild-plan.md`
+- 后续 TODO：`docs/cloudpan-bridge-todo.md`
 
 当前主路线：
 
 - 源端统一走 `OpenList`
-- 目标端当前已内置 `Guangya`、`OpenList`、`LocalFS`、`WebDAV`、`S3`、`SMB`、`FTP` 与 `SFTP`
+- 目标端当前已内置 `Guangya`、`OpenList`、`LocalFS`、`WebDAV`、`S3`、`Seafile`、`SMB`、`FTP`、`SFTP` 与 `Azure Blob`
 - 其中 `Guangya` 仍是当前唯一支持元数据秒传/秒传 JSON 直导的正式目标端
 - `OpenList` 目标端已经可写入，但按普通上传/覆盖链路处理，不宣传跨盘秒传
 - `LocalFS` 目标端已经可写入，但只负责把结果落到本地目录，不宣传成跨盘秒传目标
 - `WebDAV` 目标端已经可写入，适合 NAS / 私有云 / 第三方 WebDAV 存储，但当前同样只走普通上传/覆盖
 - `S3` 目标端已经可写入，适合作为对象存储桶 / 备份桶 / 云原生归档目标，但当前同样只走普通对象上传/覆盖
+- `Seafile` 目标端已经可写入，适合作为团队资料库 / 私有云文档库目标，但当前同样只走普通上传/覆盖
 - `SMB` 目标端已经可写入，适合作为 NAS / 局域网共享 / Windows 文件服务器目标，但当前同样只走普通上传/覆盖
 - `FTP` 目标端已经可写入，适合作为传统 NAS / 主机面板 / 轻量服务器目录型目标，但当前同样只走普通上传/覆盖
 - `SFTP` 目标端已经可写入，适合作为 Linux 主机 / NAS / 云服务器目录型目标，但当前同样只走普通上传/覆盖
+- `Azure Blob` 目标端已经可写入，适合作为 Azure 对象存储 / 归档容器目标，但当前同样只走普通对象上传/覆盖
 - 优先做 `MD5 / etag / GCID` 秒传
 - 未命中再进入自动补传或待补传目录树
 
@@ -709,6 +712,12 @@ cloudpan-bridge init-config --path .work/openlist-config.json
 cloudpan-bridge serve --config .work/openlist-config.json
 ```
 
+如果要覆盖监听地址和端口：
+
+```powershell
+cloudpan-bridge serve --config .work/openlist-config.json --host 0.0.0.0 --port 8765
+```
+
 直接同步：
 
 ```powershell
@@ -732,6 +741,78 @@ cloudpan-bridge sync --config .work/openlist-config.json --yes-download-upload
 ```powershell
 cloudpan-bridge sync --config .work/openlist-config.json --no-download-upload
 ```
+
+### Docker
+
+构建镜像：
+
+```powershell
+docker build -t cloudpan-bridge:local .
+```
+
+直接运行：
+
+```powershell
+docker run --rm -p 8765:8765 ^
+  -v ${PWD}/.work:/app/.work ^
+  -v ${PWD}/.state:/app/.state ^
+  -v ${PWD}/.runtime:/app/.runtime ^
+  -v ${PWD}/.exports:/app/.exports ^
+  cloudpan-bridge:local
+```
+
+或使用 `docker-compose.yml`：
+
+```powershell
+docker compose up -d --build
+```
+
+容器版当前建议用途：
+
+- 适合跑 Web 控制台
+- 适合跑普通同步、覆盖、目录分析、覆盖审计
+- 适合放在 NAS / 轻量服务器 / Linux 主机上做长期运行
+
+容器版当前不建议过度依赖的场景：
+
+- 页面内浏览器自动登录抓取
+- 需要本机可见浏览器窗口辅助登录的流程
+
+也就是说，Docker 版本当前更偏“服务端运行版”，而不是“桌面浏览器抓取版”。
+
+### GitHub 自动打包
+
+仓库已补：
+
+- `Dockerfile`
+- `docker-compose.yml`
+- `.github/workflows/build.yml`
+
+当前 GitHub Actions 行为：
+
+- push 到 `main`
+- push `v*` tag
+- pull request
+- 手动 `workflow_dispatch`
+
+会自动执行：
+
+- `python -m compileall src tests`
+- `pytest -q`
+- 构建 Python 包
+- 构建 Docker 镜像
+- 上传 Python 包产物
+- 上传 Docker 镜像 tar 产物
+
+在非 PR 场景下，还会自动尝试把镜像推送到：
+
+- `ghcr.io/<你的仓库路径>`
+
+如果后面你要继续做正式 release，可以直接在这个 workflow 基础上再加：
+
+- GitHub Release 附件上传
+- tag 版语义版本号
+- 多架构镜像
 
 ## 状态与续跑
 

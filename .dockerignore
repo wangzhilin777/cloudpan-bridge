@@ -1,0 +1,14 @@
+.git
+.gitignore
+.venv
+.pytest_cache
+.runtime
+.state
+.work
+.exports
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+tests
+docs

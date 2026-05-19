@@ -6,6 +6,7 @@ import pytest
 
 import cloudpan_bridge.provider_registry as provider_registry_module
 from cloudpan_bridge.config import AppConfig
+from cloudpan_bridge.cli import build_parser
 from cloudpan_bridge.guangya_direct import GuangyaMiaochuanImporter
 from cloudpan_bridge.guangya import GuangyaService
 from cloudpan_bridge.models import DirectImportResult, PendingFileState, QueueItemState, SourceEntry, SyncFileState, SyncPlanItem, SyncState, normalize_posix_path
@@ -40,6 +41,14 @@ from cloudpan_bridge.webapp import (
 def test_normalize_posix_path() -> None:
     assert normalize_posix_path("abc/def.txt") == "/abc/def.txt"
     assert normalize_posix_path("/abc/../abc/def.txt") == "/abc/def.txt"
+
+
+def test_cli_serve_parser_accepts_host_and_port() -> None:
+    parser = build_parser()
+    args = parser.parse_args(["serve", "--config", ".work/openlist-config.json", "--host", "0.0.0.0", "--port", "8765"])
+    assert args.command == "serve"
+    assert args.host == "0.0.0.0"
+    assert args.port == 8765
 
 
 def test_build_plan_marks_new_and_changed_entries() -> None:

@@ -23,6 +23,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     serve_parser = subparsers.add_parser("serve", help="启动本地页面控制台")
     serve_parser.add_argument("--config", default=default_config, help="配置文件路径")
+    serve_parser.add_argument("--host", default="", help="覆盖监听地址")
+    serve_parser.add_argument("--port", type=int, default=0, help="覆盖监听端口")
     return parser
 
 
@@ -46,8 +48,8 @@ def main() -> None:
 
         uvicorn.run(
             create_app(config_path),
-            host=config.bind_host,
-            port=config.bind_port,
+            host=args.host or config.bind_host,
+            port=args.port or config.bind_port,
         )
         return
 

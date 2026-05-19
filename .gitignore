@@ -3,6 +3,7 @@
 .state/
 .work/
 .runtime/
+dist/
 
 __pycache__/
 *.py[cod]
