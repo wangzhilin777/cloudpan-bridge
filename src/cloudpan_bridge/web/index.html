@@ -1325,7 +1325,7 @@
       const normalizedOptions = Array.isArray(options) ? options : [];
       select.innerHTML = [
         `<option value="">${escapeHtml(emptyLabel)}</option>`,
-        ...normalizedOptions.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`),
+        ...normalizedOptions.map((item) => `<option value="${escapeHtml(item.value)}" ${item.disabled ? "disabled" : ""}>${escapeHtml(item.label)}</option>`),
       ].join("");
       const fallbackValue = String(currentValue || "");
       if (fallbackValue && normalizedOptions.some((item) => String(item.value) === fallbackValue)) {
@@ -1479,16 +1479,29 @@
     function populateTargetOptions() {
       const targetProfiles = providerRegistryPayload?.target_profiles || {};
       const implementationStatus = providerRegistryPayload?.target_implementation_status || {};
-      const options = Object.values(targetProfiles).map((item) => ({
-        value: String(item.key || ""),
-        label: currentLang() === "en"
-          ? `${item.label || item.key || "-"}`
-          : currentLang() === "mix"
-            ? `${item.labelZh || item.label || item.key || "-"} / ${item.label || item.key || "-"}`
-            : `${item.labelZh || item.label || item.key || "-"}`,
-        selectable: Boolean(implementationStatus?.[String(item.key || "")]?.selectable),
-      })).filter((item) => item.value && item.selectable !== false);
       const currentValue = String(document.getElementById("target_key")?.value || configCache?.target_key || providerRegistryPayload?.active_target || "guangya");
+      const options = Object.values(targetProfiles).map((item) => {
+        const key = String(item.key || "");
+        const selectable = Boolean(implementationStatus?.[key]?.selectable);
+        const isCurrent = key === currentValue;
+        const baseLabel = currentLang() === "en"
+          ? `${item.label || key || "-"}`
+          : currentLang() === "mix"
+            ? `${item.labelZh || item.label || key || "-"} / ${item.label || key || "-"}`
+            : `${item.labelZh || item.label || key || "-"}`;
+        const suffix = selectable
+          ? ""
+          : (currentLang() === "en"
+            ? " [profile only]"
+            : currentLang() === "mix"
+              ? " [仅档案 / profile only]"
+              : " [仅档案]");
+        return {
+          value: key,
+          label: `${baseLabel}${suffix}`,
+          disabled: !selectable && !isCurrent,
+        };
+      }).filter((item) => item.value);
       buildSelectOptions("target_key", currentLang() === "en" ? "Select target" : currentLang() === "mix" ? "选择目标端 / Select target" : "选择目标端", options, currentValue);
     }
 
