@@ -1418,6 +1418,66 @@ def test_provider_coverage_scaffold_endpoint_respects_filters(tmp_path: Path) ->
     assert payload["items"][0]["driver"] == "UnknownDrive"
 
 
+def test_provider_coverage_scaffold_markdown_endpoint_renders_task_groups(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_scaffold_markdown",
+        json={
+            "drivers": ["UnknownDrive", "AliyundriveOpen"],
+            "target": "guangya",
+        },
+    )
+    assert response.status_code == 200
+    text = response.text
+    assert "# CloudPan Bridge 驱动补全任务" in text
+    assert "### `add_profile_first`" in text
+    assert "`UnknownDrive` | P1" in text
+    assert "缺口: `profile, guide, capture, capability`" in text
+
+
+def test_provider_coverage_scaffold_markdown_endpoint_respects_filters(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_scaffold_markdown",
+        json={
+            "drivers": ["UnknownDrive", "AliyundriveOpen", "Thunder"],
+            "target": "guangya",
+            "next_action": "add_profile_first",
+            "missing_item": "profile",
+            "only_gaps": True,
+        },
+    )
+    assert response.status_code == 200
+    text = response.text
+    assert "### `add_profile_first`" in text
+    assert "`UnknownDrive`" in text
+    assert "`Thunder`" not in text
+
+
 def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(

@@ -752,7 +752,8 @@
               <select id="coverage-onboarding-stage-filter" style="width:auto;min-width:220px;"></select>
               <button class="secondary" id="export-coverage-json" data-i18n="btn.export_coverage_json">导出覆盖审计 JSON</button>
               <button class="secondary" id="export-coverage-md" data-i18n="btn.export_coverage_md">导出覆盖审计 Markdown</button>
-              <button class="secondary" id="export-coverage-scaffold">导出待补 Scaffold JSON</button>
+              <button class="secondary" id="export-coverage-scaffold" data-i18n="btn.export_coverage_scaffold_json">导出待补 Scaffold JSON</button>
+              <button class="secondary" id="export-coverage-scaffold-md" data-i18n="btn.export_coverage_scaffold_md">导出补全任务 Markdown</button>
             </div>
             <div class="notice" id="about-coverage-backlog">等待载入...</div>
             <div class="notice" id="about-coverage-action-stats">等待载入...</div>
@@ -939,6 +940,8 @@
         "desc.coverage_audit": "这里会把当前 OpenList 实际驱动列表和内置 registry 对比，直接看出哪些驱动已经具备 profile、guide、capture、capability，方便后续继续补全。",
         "btn.export_coverage_json": "导出覆盖审计 JSON",
         "btn.export_coverage_md": "导出覆盖审计 Markdown",
+        "btn.export_coverage_scaffold_json": "导出待补 Scaffold JSON",
+        "btn.export_coverage_scaffold_md": "导出补全任务 Markdown",
         "option.openlist_mode.external": "外部模式",
         "option.openlist_mode.managed": "托管模式",
         "option.rate_limit_mode.safe": "稳妥",
@@ -1065,6 +1068,8 @@
         "desc.coverage_audit": "This compares the live OpenList driver list with the built-in registry so you can see which drivers already have profiles, guides, capture, and capability coverage.",
         "btn.export_coverage_json": "Export Coverage JSON",
         "btn.export_coverage_md": "Export Coverage Markdown",
+        "btn.export_coverage_scaffold_json": "Export Scaffold JSON",
+        "btn.export_coverage_scaffold_md": "Export Task Markdown",
         "option.openlist_mode.external": "External",
         "option.openlist_mode.managed": "Managed",
         "option.rate_limit_mode.safe": "Safe",
@@ -3489,6 +3494,28 @@
           }),
         });
         downloadTextFile("cloudpan-bridge-coverage-scaffold.json", JSON.stringify(scaffold, null, 2), "application/json;charset=utf-8");
+      };
+      document.getElementById("export-coverage-scaffold-md").onclick = async () => {
+        if (!Array.isArray(driversCache) || !driversCache.length) {
+          await loadDrivers();
+        }
+        const filters = currentCoverageFilters();
+        const markdown = await call("/api/provider/coverage_scaffold_markdown", {
+          method: "POST",
+          body: JSON.stringify({
+            drivers: driversCache,
+            target: activeTargetKey(),
+            only_gaps: filters.onlyGaps,
+            only_onboarding_ready: filters.onlyOnboardingReady,
+            next_action: filters.nextAction,
+            missing_item: filters.missingItem,
+            capability_level: filters.capabilityLevel,
+            profile_key: filters.profileKey,
+            onboarding_stage: filters.onboardingStage,
+          }),
+          headers: { "content-type": "application/json" },
+        });
+        downloadTextFile("cloudpan-bridge-coverage-scaffold.md", markdown, "text/markdown;charset=utf-8");
       };
       document.getElementById("open-driver-doc").onclick = () => {
         const candidates = guideDocCandidates(currentDriverGuide);

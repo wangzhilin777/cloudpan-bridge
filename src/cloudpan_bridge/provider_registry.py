@@ -1261,6 +1261,75 @@ def build_driver_coverage_scaffold(audit: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def render_driver_coverage_scaffold_markdown(scaffold: dict[str, Any]) -> str:
+    target = str(scaffold.get("target") or "guangya")
+    filters = dict(scaffold.get("filters") or {})
+    summary = dict(scaffold.get("summary") or {})
+    by_next_action = dict(scaffold.get("byNextAction") or {})
+    execution_plan = dict(scaffold.get("executionPlan") or {})
+
+    lines = [
+        "# CloudPan Bridge 驱动补全任务",
+        "",
+        f"- 目标端: `{target}`",
+        f"- 待补驱动数: `{summary.get('totalBacklog', 0)}`",
+        f"- 动作分组数: `{summary.get('actionCount', 0)}`",
+        "",
+        "## 当前筛选",
+        "",
+        f"- 只看缺口: `{bool(filters.get('onlyGaps'))}`",
+        f"- 只看可直接接入: `{bool(filters.get('onlyOnboardingReady'))}`",
+        f"- 下一步动作: `{filters.get('nextAction', '') or '-'}`",
+        f"- 缺口类型: `{filters.get('missingItem', '') or '-'}`",
+        f"- 能力等级: `{filters.get('capabilityLevel', '') or '-'}`",
+        f"- Profile Key: `{filters.get('profileKey', '') or '-'}`",
+        f"- 接入阶段: `{filters.get('onboardingStage', '') or '-'}`",
+        "",
+        "## 执行建议",
+        "",
+    ]
+
+    waves = list(execution_plan.get("waves") or [])
+    if waves:
+        for wave in waves:
+            lines.append(
+                f"- Wave P{wave.get('priorityRank', '-')} | `{wave.get('nextAction', '-')}` | "
+                f"`{wave.get('onboardingStage', '-')}` | 数量: `{wave.get('count', 0)}`"
+            )
+    else:
+        lines.append("- 当前筛选结果下没有待执行波次。")
+
+    lines.extend(["", "## 分组任务清单", ""])
+    if not by_next_action:
+        lines.append("- 当前筛选结果下没有待补驱动。")
+        lines.append("")
+        return "\n".join(lines)
+
+    for action, items in by_next_action.items():
+        lines.append(f"### `{action or 'unknown'}`")
+        lines.append("")
+        for index, item in enumerate(list(items or []), start=1):
+            missing_items = ", ".join(list(item.get("missingItems") or [])) or "-"
+            doc_links = list(item.get("docLinks") or [])
+            guide_doc_url = str(item.get("guideDocUrl") or "")
+            capture_login_url = str(item.get("captureLoginUrl") or "")
+            lines.append(
+                f"{index}. `{item.get('driver', '-')}` | P{item.get('priorityRank', '-')} | "
+                f"`{item.get('onboardingStage', '-') or '-'}` | "
+                f"`{item.get('capabilityLevel', '-') or '-'}`"
+            )
+            lines.append(f"   - 缺口: `{missing_items}`")
+            lines.append(f"   - Profile: `{item.get('profileKey', '-') or '-'}`")
+            lines.append(f"   - Canonical: `{item.get('canonicalDriverKey', '-') or '-'}`")
+            lines.append(f"   - Capture Spec: `{item.get('captureSpecKey', '-') or '-'}`")
+            lines.append(f"   - 登录入口: `{capture_login_url or '-'}`")
+            lines.append(f"   - 主文档: `{guide_doc_url or '-'}`")
+            doc_candidates = ", ".join(str(link) for link in doc_links) if doc_links else "-"
+            lines.append(f"   - 文档候选: `{doc_candidates}`")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def assess_driver_target_capability(
     driver: str,
     analysis_summary: dict[str, Any] | None = None,

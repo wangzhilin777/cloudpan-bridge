@@ -172,6 +172,9 @@
   - 现在还支持导出“待补 Scaffold JSON”
     - 会把当前筛选结果整理成可继续补驱动的结构化清单
     - 包含 driver、nextAction、missingItems、guideDocUrl、captureLoginUrl 等信息
+  - 现在也支持导出“补全任务 Markdown”
+    - 会按 `nextAction` 分组输出待补驱动任务
+    - 适合直接拿去继续拆分计划、外包补驱动，或作为后续批量实施的任务书
   - 支持导出 `JSON / Markdown` 审计结果，便于拆分后续任务
   - 支持页面内只看缺口、按下一步动作过滤
   - 还支持按缺口类型过滤，例如只看“缺 capture”的驱动
