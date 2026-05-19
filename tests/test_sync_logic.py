@@ -2235,6 +2235,51 @@ def test_provider_coverage_audit_accepts_grouped_filters(tmp_path: Path) -> None
     assert all(item["nextAction"] == "add_profile_first" for item in payload["backlog"])
 
 
+def test_provider_capture_prefill_accepts_grouped_provider_and_driver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_session": {
+    "provider_captures": {
+      "quark": {
+        "provider": "quark",
+        "status": "captured",
+        "message": "from config",
+        "captured": {
+          "cookie_header": "sid=1; token=2"
+        }
+      }
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge import webapp as webapp_module
+
+    info = OpenListDriverInfo(
+        name="Quark",
+        common=[OpenListDriverField(name="cookie", required=True)],
+        additional=[],
+        config={},
+    )
+    monkeypatch.setattr(webapp_module.OpenListAdminClient, "driver_info", lambda self, driver: info)
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.post(
+        "/api/provider/capture/prefill",
+        json={
+            "grouped_config": {},
+            "provider": "quark",
+            "driver": "Quark",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["values"]["cookie"] == "sid=1; token=2"
+    assert payload["missing_required"] == []
+
+
 def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
@@ -2399,6 +2444,49 @@ def test_miaochuan_import_rejects_non_guangya_target(tmp_path: Path) -> None:
     )
     assert response.status_code == 400
     assert "当前秒传 JSON 直导仅支持 guangya" in response.json()["detail"]
+
+
+def test_miaochuan_diagnose_accepts_grouped_payload(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/miaochuan/diagnose",
+        json={
+            "grouped_config": {
+                "sync": {}
+            },
+            "miaochuan_payload": json.dumps(
+                {
+                    "files": [
+                        {
+                            "path": "/demo.zip",
+                            "size": "123",
+                            "etag": "ABCDEF0123456789ABCDEF0123456789",
+                            "provider": "189cloud",
+                            "hashType": "md5",
+                        }
+                    ]
+                }
+            ),
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert payload["provider_counts"] == {"189cloud": 1}
 
 
 def test_serialize_and_summarize_source_entries() -> None:

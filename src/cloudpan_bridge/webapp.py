@@ -331,6 +331,14 @@ def create_app(config_path: Path) -> FastAPI:
         normalized["onboarding_stage"] = str(resolve_payload_value(raw, "onboarding_stage", ("ui", "coverage_filters", "onboardingStage"), raw.get("onboarding_stage") or ""))
         return normalized
 
+    def normalize_provider_capture_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
+        raw = dict(payload or {})
+        normalized = dict(raw)
+        normalized["provider"] = str(resolve_payload_value(raw, "provider", default="")).strip().lower()
+        normalized["driver"] = str(resolve_payload_value(raw, "driver", default="")).strip()
+        normalized["login_url"] = str(resolve_payload_value(raw, "login_url", default="")).strip()
+        return normalized
+
     def load_config_payload() -> dict[str, Any]:
         normalized = AppConfig.load(config_path)
         payload = normalized.to_flat_dict()
@@ -857,7 +865,8 @@ def create_app(config_path: Path) -> FastAPI:
         nonlocal config
         payload = payload or {}
         config = AppConfig.load(config_path)
-        require_miaochuan_target(str(resolve_payload_value(payload, "target_key", ("targets", "active_target"), config.target_key or "guangya")))
+        payload = normalize_sync_payload(payload, config)
+        require_miaochuan_target(str(payload.get("target_key") or config.target_key or "guangya"))
         miaochuan_payload = str(payload.get("miaochuan_payload") or "").strip()
         if not miaochuan_payload:
             raise HTTPException(status_code=400, detail="请先粘贴秒传 JSON。")
@@ -889,8 +898,8 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.post("/api/miaochuan/diagnose")
     def diagnose_miaochuan_payload(payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        payload = payload or {}
-        miaochuan_payload = str(payload.get("miaochuan_payload") or "").strip()
+        payload = dict(payload or {})
+        miaochuan_payload = str(resolve_payload_value(payload, "miaochuan_payload", default=payload.get("miaochuan_payload") or "")).strip()
         if not miaochuan_payload:
             raise HTTPException(status_code=400, detail="请先粘贴秒传 JSON。")
         try:
@@ -1384,8 +1393,8 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.post("/api/provider/capture/start")
     def start_provider_capture(payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        payload = payload or {}
-        provider = str(resolve_payload_value(payload, "provider", default="")).strip().lower()
+        payload = normalize_provider_capture_payload(payload)
+        provider = str(payload.get("provider") or "").strip().lower()
         driver = str(payload.get("driver") or "").strip()
         login_url = str(payload.get("login_url") or "").strip()
         if not provider:
@@ -1412,8 +1421,8 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.post("/api/provider/capture/prefill")
     def provider_capture_prefill(payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        payload = payload or {}
-        provider = str(resolve_payload_value(payload, "provider", default="")).strip().lower()
+        payload = normalize_provider_capture_payload(payload)
+        provider = str(payload.get("provider") or "").strip().lower()
         driver = str(payload.get("driver") or "").strip()
         return build_provider_prefill(provider, driver)
 
