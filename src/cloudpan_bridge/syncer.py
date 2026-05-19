@@ -7,10 +7,9 @@ from pathlib import Path, PurePosixPath
 from typing import Callable
 
 from .config import AppConfig
-from .guangya import extract_access_token
 from .models import PendingFileState, QueueItemState, SourceEntry, SyncFileState, SyncPlanItem, SyncState, normalize_posix_path
 from .openlist import OpenListClient
-from .target_adapter import GuangyaTargetAdapter, TargetAdapter
+from .target_adapter import TargetAdapter, create_target_adapter
 
 LogFn = Callable[[str], None]
 
@@ -204,20 +203,8 @@ class SyncRunner:
         )
         self.log = log or print
 
-    def _guangya_access_token(self, state: SyncState) -> str:
-        return (
-            state.guangya_tokens.get("access_token", "")
-            or self.config.guangya_access_token
-            or extract_access_token(getattr(self.config, "guangya_authorization", ""))
-        )
-
     def _build_target_adapter(self, state: SyncState) -> TargetAdapter:
-        return GuangyaTargetAdapter(
-            access_token=self._guangya_access_token(state),
-            refresh_token=state.guangya_tokens.get("refresh_token", "") or self.config.guangya_refresh_token,
-            device_id=state.guangya_tokens.get("device_id", "") or self.config.guangya_device_id,
-            phone_number=self.config.guangya_phone,
-        )
+        return create_target_adapter(self.config, state, self.config.target_key)
 
     def run(self, allow_download_upload: bool | None = None, dry_run: bool = False) -> SyncSummary:
         self.config.ensure_parent_dirs()

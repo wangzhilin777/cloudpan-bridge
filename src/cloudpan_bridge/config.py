@@ -51,6 +51,7 @@ class AppConfig:
     openlist_username: str = ""
     openlist_password: str = ""
     guangya_phone: str = ""
+    target_key: str = "guangya"
     guangya_authorization: str = ""
     guangya_access_token: str = ""
     guangya_refresh_token: str = ""
@@ -97,6 +98,7 @@ class AppConfig:
             openlist_username=str(_pick(payload.get("openlist_username"), openlist.get("username"), default="")),
             openlist_password=str(_pick(payload.get("openlist_password"), openlist.get("password"), default="")),
             guangya_phone=str(_pick(payload.get("guangya_phone"), guangya.get("phone"), default="")),
+            target_key=str(_pick(payload.get("target_key"), targets.get("active_target"), default="guangya")),
             guangya_authorization=str(_pick(payload.get("guangya_authorization"), guangya.get("authorization"), default="")),
             guangya_access_token=str(_pick(payload.get("guangya_access_token"), guangya.get("access_token"), default="")),
             guangya_refresh_token=str(_pick(payload.get("guangya_refresh_token"), guangya.get("refresh_token"), default="")),
@@ -136,6 +138,7 @@ class AppConfig:
             "openlist_username": self.openlist_username,
             "openlist_password": self.openlist_password,
             "guangya_phone": self.guangya_phone,
+            "target_key": self.target_key,
             "guangya_authorization": self.guangya_authorization,
             "guangya_access_token": self.guangya_access_token,
             "guangya_refresh_token": self.guangya_refresh_token,
@@ -179,6 +182,7 @@ class AppConfig:
                 "provider_captures": dict(self.provider_captures or {}),
             },
             "targets": {
+                "active_target": self.target_key,
                 "guangya": {
                     "phone": self.guangya_phone,
                     "authorization": self.guangya_authorization,
@@ -223,6 +227,7 @@ def write_example_config(path: Path) -> None:
         openlist_username="admin",
         openlist_password="",
         guangya_phone="+86 13800138000",
+        target_key="guangya",
         guangya_authorization="",
         guangya_access_token="",
         guangya_refresh_token="",

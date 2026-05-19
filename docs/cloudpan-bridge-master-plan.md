@@ -454,6 +454,7 @@ Guangya 是当前已完成最多的目标端，必须继续保留并增强。
   - 已有统一指纹模型与 OpenList 哈希字段标准化入口
 - `Phase 4`
   - Guangya 已抽出目标端适配器基础结构
+  - 已新增 `target_key`、目标端工厂与页面目标端选择点，当前默认仍为 `guangya`
 - `Phase 5`
   - 页面已具备驱动覆盖审计、按缺口过滤、导出 JSON/Markdown、优先级 backlog
   - 覆盖审计已修正为按真实 capture spec 判断，不再把 source profile 误当作已具备抓取支持

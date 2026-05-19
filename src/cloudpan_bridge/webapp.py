@@ -979,20 +979,22 @@ def create_app(config_path: Path) -> FastAPI:
             "guides": list_driver_guides(),
             "source_profiles": list_source_profiles(),
             "target_profiles": list_target_profiles(),
-            "driver_matrix": build_driver_capability_matrix(target="guangya"),
+            "driver_matrix": build_driver_capability_matrix(target=config.target_key),
+            "active_target": config.target_key,
         }
 
     @app.get("/api/provider/capability")
-    def get_provider_capability(driver: str, target: str = "guangya") -> dict[str, Any]:
+    def get_provider_capability(driver: str, target: str = "") -> dict[str, Any]:
         if not driver.strip():
             raise HTTPException(status_code=400, detail="缺少 driver")
-        return build_driver_target_capability(driver, target=target)
+        effective_target = str(target or config.target_key or "guangya").strip() or "guangya"
+        return build_driver_target_capability(driver, target=effective_target)
 
     @app.post("/api/provider/coverage_audit")
     def post_provider_coverage_audit(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         payload = payload or {}
         drivers = payload.get("drivers")
-        target = str(payload.get("target") or "guangya").strip() or "guangya"
+        target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
         if not isinstance(drivers, list):
             raise HTTPException(status_code=400, detail="缺少 drivers")
         audit = build_driver_coverage_audit([str(item or "") for item in drivers], target=target)
@@ -1011,7 +1013,7 @@ def create_app(config_path: Path) -> FastAPI:
     def post_provider_coverage_audit_markdown(payload: dict[str, Any] | None = None) -> PlainTextResponse:
         payload = payload or {}
         drivers = payload.get("drivers")
-        target = str(payload.get("target") or "guangya").strip() or "guangya"
+        target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
         if not isinstance(drivers, list):
             raise HTTPException(status_code=400, detail="缺少 drivers")
         audit = build_driver_coverage_audit([str(item or "") for item in drivers], target=target)
@@ -1032,7 +1034,7 @@ def create_app(config_path: Path) -> FastAPI:
     def post_provider_capability_assess(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         payload = payload or {}
         driver = str(payload.get("driver") or "").strip()
-        target = str(payload.get("target") or "guangya").strip() or "guangya"
+        target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
         if not driver:
             raise HTTPException(status_code=400, detail="缺少 driver")
         summary = payload.get("analysis_summary") if isinstance(payload.get("analysis_summary"), dict) else {}

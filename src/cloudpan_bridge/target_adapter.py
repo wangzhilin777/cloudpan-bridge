@@ -5,6 +5,8 @@ from typing import Any, Protocol
 
 from .guangya import GuangyaService
 from .models import DirectImportResult
+from .config import AppConfig
+from .models import SyncState
 
 
 class TargetAdapter(Protocol):
@@ -70,3 +72,26 @@ class GuangyaTargetAdapter:
 
     def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
         self.service.verify_local_md5(local_path, md5_hex)
+
+
+def supported_target_keys() -> list[str]:
+    return ["guangya"]
+
+
+def create_target_adapter(config: AppConfig, state: SyncState, target_key: str = "") -> TargetAdapter:
+    normalized = str(target_key or config.target_key or "guangya").strip().lower() or "guangya"
+    if normalized == "guangya":
+        access_token = (
+            state.guangya_tokens.get("access_token", "")
+            or config.guangya_access_token
+            or ""
+        )
+        from .guangya import extract_access_token
+
+        return GuangyaTargetAdapter(
+            access_token=access_token or extract_access_token(getattr(config, "guangya_authorization", "")),
+            refresh_token=state.guangya_tokens.get("refresh_token", "") or config.guangya_refresh_token,
+            device_id=state.guangya_tokens.get("device_id", "") or config.guangya_device_id,
+            phone_number=config.guangya_phone,
+        )
+    raise NotImplementedError(f"目标端暂未实现: {normalized}")

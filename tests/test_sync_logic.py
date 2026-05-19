@@ -129,6 +129,7 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     }
   },
   "targets": {
+    "active_target": "guangya",
     "guangya": {
       "phone": "+86 13800138000",
       "authorization": "Bearer abc",
@@ -175,6 +176,7 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert cfg.source_path == "/src"
     assert cfg.target_path == "/dst"
     assert cfg.openlist_password == "demo"
+    assert cfg.target_key == "guangya"
     assert cfg.guangya_refresh_token == "refresh"
     assert cfg.provider_captures["quark"]["captured"]["cookie_header"] == "k=v"
     nested = cfg.to_dict()
@@ -193,6 +195,7 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
 {
   "source_path": "/src",
   "target_path": "/dst",
+  "target_key": "guangya",
   "openlist_password": "legacy-pass",
   "guangya_refresh_token": "legacy-refresh"
 }
@@ -202,6 +205,7 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
     cfg = AppConfig.load(path)
     serialized = cfg.to_dict()
     assert serialized["sync"]["source_path"] == "/src"
+    assert serialized["targets"]["active_target"] == "guangya"
     assert serialized["targets"]["guangya"]["refresh_token"] == "legacy-refresh"
     assert "source_path" not in serialized
 
@@ -305,6 +309,28 @@ def test_sync_runner_builds_guangya_target_adapter(tmp_path) -> None:
     assert isinstance(adapter, GuangyaTargetAdapter)
     assert adapter.phone_number == "+86 13800138000"
     adapter.close()
+
+
+def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "target_key": "guangya"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/provider/registry")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["active_target"] == "guangya"
+    assert payload["driver_matrix"]["thunder"]["targetProfile"]["key"] == "guangya"
 
 
 def test_state_supports_pending_and_queue_roundtrip() -> None:

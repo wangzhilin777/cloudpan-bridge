@@ -678,6 +678,12 @@
             <h2 data-i18n="panel.guangya_auth">光鸭登录信息</h2>
             <div class="panel-grid">
               <div>
+                <label data-i18n="label.target_key">当前目标端</label>
+                <select id="target_key">
+                  <option value="guangya">guangya</option>
+                </select>
+              </div>
+              <div>
                 <label data-i18n="label.guangya_phone">光鸭手机号</label>
                 <input id="guangya_phone">
               </div>
@@ -821,7 +827,7 @@
     const CONFIG_FIELDS = [
       "source_path", "target_path", "openlist_mode", "managed_openlist_bin", "managed_openlist_data_dir",
       "managed_openlist_port", "openlist_url", "openlist_token", "openlist_username", "openlist_password",
-      "guangya_phone", "guangya_authorization", "guangya_access_token", "guangya_refresh_token",
+      "target_key", "guangya_phone", "guangya_authorization", "guangya_access_token", "guangya_refresh_token",
       "guangya_device_id", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
       "auto_download_threshold_mb", "rate_limit_mode", "log_file", "temp_dir", "state_file"
     ];
@@ -938,6 +944,7 @@
         "label.log_file": "日志文件",
         "label.temp_dir": "临时下载目录",
         "label.state_file": "状态文件",
+        "label.target_key": "当前目标端",
         "label.openlist_page_size": "OpenList 每页数",
         "label.openlist_request_interval_ms": "OpenList 请求间隔(ms)",
         "label.queue_interval_ms": "目录间隔(ms)",
@@ -1063,6 +1070,7 @@
         "label.log_file": "Log File",
         "label.temp_dir": "Temp Download Dir",
         "label.state_file": "State File",
+        "label.target_key": "Active Target",
         "label.openlist_page_size": "OpenList Page Size",
         "label.openlist_request_interval_ms": "OpenList Request Interval (ms)",
         "label.queue_interval_ms": "Directory Interval (ms)",
@@ -1376,6 +1384,10 @@
       return translateDriverText(pair.zh || "", pair.en || "");
     }
 
+    function activeTargetKey() {
+      return String(document.getElementById("target_key")?.value || providerRegistryPayload?.active_target || "guangya");
+    }
+
     async function loadProviderRegistry() {
       const data = await call("/api/provider/registry");
       providerRegistryPayload = data || providerRegistryPayload;
@@ -1397,7 +1409,7 @@
           method: "POST",
           body: JSON.stringify({
             driver: context.driver,
-            target: "guangya",
+            target: activeTargetKey(),
             analysis_summary: sourceAnalyzeCache?.summary || {},
           }),
         });
@@ -1419,7 +1431,7 @@
           method: "POST",
           body: JSON.stringify({
             drivers: driversCache,
-            target: "guangya",
+            target: activeTargetKey(),
             only_gaps: filters.onlyGaps,
             only_onboarding_ready: filters.onlyOnboardingReady,
             next_action: filters.nextAction,
@@ -3132,7 +3144,7 @@
           method: "POST",
           body: JSON.stringify({
             drivers: driversCache,
-            target: "guangya",
+            target: activeTargetKey(),
             only_gaps: filters.onlyGaps,
             only_onboarding_ready: filters.onlyOnboardingReady,
             next_action: filters.nextAction,
