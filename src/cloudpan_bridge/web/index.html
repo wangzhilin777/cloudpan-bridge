@@ -414,7 +414,7 @@
 
           <div class="panel">
             <h2 data-i18n="panel.capability">能力矩阵与建议</h2>
-            <div class="subtle" data-i18n="desc.capability">根据当前选择的源驱动和现有目标端 Guangya，给出诚实降级后的推荐路径。这里不会把“只能补传”的组合误导成可秒传。</div>
+            <div class="subtle" id="capability-desc" data-i18n="desc.capability">根据当前选择的源驱动和现有目标端 Guangya，给出诚实降级后的推荐路径。这里不会把“只能补传”的组合误导成可秒传。</div>
             <div class="notice" id="capability-summary">等待驱动信息...</div>
             <div class="actions" id="capability-quick-actions"></div>
           </div>
@@ -427,7 +427,7 @@
                 <input id="source_path">
               </div>
               <div>
-                <label data-i18n="label.target_path">光鸭目标目录</label>
+                <label id="target-path-label" data-i18n="label.target_path">光鸭目标目录</label>
                 <input id="target_path">
               </div>
               <div>
@@ -524,7 +524,7 @@
         <section class="tab-panel" data-panel="miaochuan">
           <div class="panel">
             <h2 data-i18n="panel.miaochuan">秒传 JSON 直导</h2>
-            <div class="subtle" data-i18n="desc.miaochuan">支持直接粘贴油猴或插件导出的 JSON。若你已自动抓取到光鸭 Authorization，会优先使用它。</div>
+            <div class="subtle" id="miaochuan-desc" data-i18n="desc.miaochuan">支持直接粘贴油猴或插件导出的 JSON。若你已自动抓取到光鸭 Authorization，会优先使用它。</div>
             <label data-i18n="label.miaochuan_payload">秒传 JSON</label>
             <textarea id="miaochuan_payload" placeholder='{"files":[{"path":"/demo.zip","size":"123","etag":"md5"}]}'></textarea>
             <div class="actions">
@@ -724,13 +724,13 @@
 
           <div class="panel">
             <h2 data-i18n="panel.target_profiles">目标端 Profiles</h2>
-            <div class="subtle" data-i18n="desc.target_profiles">这里列出当前目标端适配器支持的快传指纹和降级方式。现在正式内置目标端仍是 Guangya。</div>
+            <div class="subtle" id="target-profiles-desc" data-i18n="desc.target_profiles">这里列出当前目标端适配器支持的快传指纹和降级方式。现在正式内置目标端仍是 Guangya。</div>
             <div class="mount-list" id="about-target-profiles">等待载入...</div>
           </div>
 
           <div class="panel">
             <h2 data-i18n="panel.driver_matrix">Driver 能力矩阵</h2>
-            <div class="subtle" data-i18n="desc.driver_matrix">这是当前内置的“源驱动 -> Guangya”能力矩阵，只表示当前项目的真实支持判断，不等于所有跨网盘都能秒传。</div>
+            <div class="subtle" id="driver-matrix-desc" data-i18n="desc.driver_matrix">这是当前内置的“源驱动 -> Guangya”能力矩阵，只表示当前项目的真实支持判断，不等于所有跨网盘都能秒传。</div>
             <div class="mount-list" id="about-driver-matrix">等待载入...</div>
           </div>
 
@@ -1309,6 +1309,12 @@
       const isGuangya = target === "guangya";
       const captureCardTitle = document.getElementById("capture-card-title");
       const targetAuthPanelTitle = document.getElementById("target-auth-panel-title");
+      const targetPathLabel = document.getElementById("target-path-label");
+      const capabilityDesc = document.getElementById("capability-desc");
+      const targetProfilesDesc = document.getElementById("target-profiles-desc");
+      const driverMatrixDesc = document.getElementById("driver-matrix-desc");
+      const miaochuanDesc = document.getElementById("miaochuan-desc");
+      const runMiaochuanButton = document.getElementById("run-miaochuan");
       if (captureCardTitle) {
         captureCardTitle.textContent = isGuangya
           ? t("card.capture")
@@ -1326,6 +1332,61 @@
             : currentLang() === "mix"
               ? "目标端鉴权状态 / Target Auth State"
               : "目标端鉴权状态");
+      }
+      if (targetPathLabel) {
+        targetPathLabel.textContent = isGuangya
+          ? t("label.target_path")
+          : (currentLang() === "en"
+            ? "Target Directory"
+            : currentLang() === "mix"
+              ? "目标端目录 / Target Directory"
+              : "目标端目录");
+      }
+      if (capabilityDesc) {
+        capabilityDesc.textContent = isGuangya
+          ? t("desc.capability")
+          : (currentLang() === "en"
+            ? `Show the honest recommendation for the current source driver to ${target}, including whether the current combination is still only profile-level or not writable yet.`
+            : currentLang() === "mix"
+              ? `这里会根据当前源驱动和目标端 ${target} 给出诚实建议，包括当前组合是否仍只有档案层、还没接通写入。 / Honest recommendation for target ${target}.`
+              : `这里会根据当前源驱动和目标端 ${target} 给出诚实建议，包括当前组合是否仍只有档案层、还没接通写入。`);
+      }
+      if (targetProfilesDesc) {
+        targetProfilesDesc.textContent = isGuangya
+          ? t("desc.target_profiles")
+          : (currentLang() === "en"
+            ? `This lists the current target adapter profile for ${target}. At this stage, it may still be profile-only and not a writable adapter.`
+            : currentLang() === "mix"
+              ? `这里列出当前目标端 ${target} 的档案与降级信息；现阶段它可能仍只是档案层，还不是可写入适配器。 / Profile-level target info for ${target}.`
+              : `这里列出当前目标端 ${target} 的档案与降级信息；现阶段它可能仍只是档案层，还不是可写入适配器。`);
+      }
+      if (driverMatrixDesc) {
+        driverMatrixDesc.textContent = isGuangya
+          ? t("desc.driver_matrix")
+          : (currentLang() === "en"
+            ? `This is the current built-in source-driver to ${target} matrix. It reflects this project's real support judgment, not a promise that the combination is already writable.`
+            : currentLang() === "mix"
+              ? `这是当前内置的“源驱动 -> ${target}”能力矩阵，只表示当前项目的真实支持判断，不等于该组合已经接通可写入。 / Built-in matrix for ${target}.`
+              : `这是当前内置的“源驱动 -> ${target}”能力矩阵，只表示当前项目的真实支持判断，不等于该组合已经接通可写入。`);
+      }
+      if (miaochuanDesc) {
+        miaochuanDesc.textContent = isGuangya
+          ? t("desc.miaochuan")
+          : (currentLang() === "en"
+            ? "Flash-upload JSON direct import is currently Guangya-only. For other targets, keep this panel as a reference/diagnosis area and do not treat it as a writable import path."
+            : currentLang() === "mix"
+              ? "秒传 JSON 直导当前仅适用于 Guangya。切到其他目标端时，这里只保留参考/诊断意义，不应视为可直接写入。 / Flash-upload JSON direct import is Guangya-only for now."
+              : "秒传 JSON 直导当前仅适用于 Guangya。切到其他目标端时，这里只保留参考/诊断意义，不应视为可直接写入。");
+      }
+      if (runMiaochuanButton) {
+        runMiaochuanButton.disabled = !isGuangya;
+        runMiaochuanButton.title = isGuangya
+          ? ""
+          : (currentLang() === "en"
+            ? "Current flash-upload JSON direct import only supports Guangya."
+            : currentLang() === "mix"
+              ? "当前秒传 JSON 直导仅支持 Guangya。 / Guangya only."
+              : "当前秒传 JSON 直导仅支持 Guangya。");
       }
       document.querySelectorAll("[data-target-only]").forEach((el) => {
         const expected = String(el.getAttribute("data-target-only") || "");
