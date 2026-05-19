@@ -409,7 +409,7 @@ def default_provider_specs() -> dict[str, ProviderCaptureSpec]:
             label="OneDrive",
             login_url="https://onedrive.live.com/",
             session_dir="onedrive",
-            recommended_drivers=["OneDrive"],
+            recommended_drivers=["OneDrive", "Sharepoint"],
             domains=["onedrive.live.com", "login.live.com", "microsoft.com", "graph.microsoft.com"],
             required_keys=["refresh_token"],
             header_aliases=["authorization", "cookie"],
@@ -463,6 +463,93 @@ def default_provider_specs() -> dict[str, ProviderCaptureSpec]:
             };
             """,
             description="优先抓取 Dropbox 的 refresh_token / access_token；如果使用自己的应用参数，再按驱动说明补 App Key / Secret。",
+        ),
+        "openlist": ProviderCaptureSpec(
+            key="openlist",
+            label="OpenList",
+            login_url="https://doc.oplist.org/guide/drivers/openlist",
+            session_dir="openlist",
+            capture_mode="manual",
+            recommended_drivers=["OpenList", "AListV3"],
+            domains=[],
+            required_keys=["url", "root_folder_path"],
+            header_aliases=[],
+            storage_aliases=["url", "username", "password", "token", "meta_password", "root_folder_path", "web_proxy", "webdav_policy", "proxy_range"],
+            page_probe="return {};",
+            description="OpenList 互挂更适合手动凭证模式，按文档填写 url、用户名密码或 token、meta password 与根目录路径。",
+        ),
+        "cloudreve": ProviderCaptureSpec(
+            key="cloudreve",
+            label="Cloudreve",
+            login_url="https://doc.oplist.org/guide/drivers/cloudreve_v4",
+            session_dir="cloudreve",
+            recommended_drivers=["Cloudreve", "CloudreveV3", "CloudreveV4"],
+            domains=[],
+            required_keys=["refresh_token"],
+            header_aliases=["authorization", "cookie"],
+            storage_aliases=["url", "username", "password", "cookie", "refresh_token", "access_token", "root_folder_path"],
+            page_probe="""
+            return {
+              href: location.href,
+              cookie: document.cookie || "",
+              access_token: window.localStorage.getItem("access_token") || window.sessionStorage.getItem("access_token") || "",
+              refresh_token: window.localStorage.getItem("refresh_token") || window.sessionStorage.getItem("refresh_token") || ""
+            };
+            """,
+            description="Cloudreve 优先抓取 refresh_token / access_token，必要时再回退到 Cookie 或用户名密码方案。",
+        ),
+        "github": ProviderCaptureSpec(
+            key="github",
+            label="GitHub",
+            login_url="https://doc.oplist.org/guide/drivers/github",
+            session_dir="github",
+            capture_mode="manual",
+            recommended_drivers=["Github"],
+            domains=[],
+            required_keys=["token", "owner", "repo"],
+            header_aliases=[],
+            storage_aliases=["token", "owner", "repo", "ref", "branch", "type"],
+            page_probe="return {};",
+            description="GitHub 驱动优先按文档手动填写 token、owner、repo、ref 等字段，不依赖浏览器自动抓取。",
+        ),
+        "terabox": ProviderCaptureSpec(
+            key="terabox",
+            label="TeraBox",
+            login_url="https://doc.oplist.org/guide/drivers/terabox",
+            session_dir="terabox",
+            recommended_drivers=["TeraBox"],
+            domains=["terabox.com"],
+            required_keys=["cookie_header"],
+            header_aliases=["authorization", "cookie"],
+            storage_aliases=["cookie", "refresh_token", "root_folder_id"],
+            page_probe="""
+            return {
+              href: location.href,
+              cookie: document.cookie || "",
+              userAgent: navigator.userAgent || ""
+            };
+            """,
+            description="TeraBox 当前更适合作为浏览器 Cookie 抓取型驱动处理，正式挂载前请先按文档验证下载模式与风控限制。",
+        ),
+        "yandexdisk": ProviderCaptureSpec(
+            key="yandexdisk",
+            label="Yandex Disk",
+            login_url="https://doc.oplist.org/guide/drivers/yandex",
+            session_dir="yandexdisk",
+            recommended_drivers=["YandexDisk"],
+            domains=["disk.yandex.com", "disk.yandex.ru", "yandex.com", "yandex.ru"],
+            required_keys=["refresh_token"],
+            header_aliases=["authorization", "cookie"],
+            storage_aliases=["refresh_token", "access_token", "token", "authorization", "root_folder_path"],
+            page_probe="""
+            return {
+              href: location.href,
+              cookie: document.cookie || "",
+              access_token: window.localStorage.getItem("access_token") || window.sessionStorage.getItem("access_token") || "",
+              refresh_token: window.localStorage.getItem("refresh_token") || window.sessionStorage.getItem("refresh_token") || ""
+            };
+            """,
+            description="Yandex Disk 优先抓取 refresh_token / access_token，再按官方流程回填根目录路径与其他字段。",
         ),
         "webdav": ProviderCaptureSpec(
             key="webdav",

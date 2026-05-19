@@ -243,6 +243,125 @@ DRIVER_GUIDES: dict[str, dict[str, Any]] = {
         },
         "defaults": {},
     },
+    "openlist": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/openlist",
+        "summary": {
+            "zh": "OpenList 互挂适合把另一个 OpenList / AList 实例接进来，重点是 url、用户名密码或 token、meta password、根目录路径，以及代理策略。",
+            "en": "The OpenList driver is for mounting another OpenList / AList instance. The key fields are url, username/password or token, meta password, root path, and proxy strategy.",
+        },
+        "steps": {
+            "zh": [
+                "先确认目标 OpenList / AList 实例本身能正常访问，且你已经拿到可用的登录方式。",
+                "优先按文档手动填写 url、用户名密码或 token；如果源目录本身带 meta password，也一起补上。",
+                "根目录路径先从 / 或一个小目录开始验证，确认列目录、分页和下载都稳定后再扩大范围。",
+                "如果你是互挂另一个聚合盘，不要默认把它宣传成 Guangya 秒传来源，先分析它透出的哈希能力。"
+            ],
+            "en": [
+                "Confirm that the target OpenList / AList instance is reachable and that you already have a valid login method.",
+                "Fill url plus username/password or token manually first, and add meta password when the source path requires it.",
+                "Start from / or a small root path, validate listing, pagination, and download stability, then scale up.",
+                "If you are mounting another aggregator, do not present it as a Guangya fast-upload source before verifying the exposed hash behavior."
+            ],
+        },
+        "defaults": {
+            "root_folder_path": "/",
+            "web_proxy": "false",
+        },
+    },
+    "cloudreve": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/cloudreve_v4",
+        "summary": {
+            "zh": "Cloudreve 驱动既可以走 Cookie，也可以走账号密码或 Refresh Token。浏览器抓取适合起步，但正式挂载前仍建议先确认当前实例版本与认证方式。",
+            "en": "The Cloudreve driver can work with Cookie, account/password, or Refresh Token. Browser capture is a good bootstrap path, but you should still verify the current instance version and auth mode before production mounting.",
+        },
+        "steps": {
+            "zh": [
+                "先确认你对接的是 Cloudreve v3 还是 v4 实例，并核对 OpenList 当前驱动文档对应的字段要求。",
+                "如果页面抓取已经拿到 cookie / refresh_token / access_token，可先回填表单并验证一个小目录。",
+                "如果实例更适合用户名密码或 API token，就按文档切回手动填写模式，不要强依赖浏览器抓取。",
+                "扩大同步范围前，先验证分页、下载直链和中文文件名是否稳定。"
+            ],
+            "en": [
+                "Confirm whether the target instance is Cloudreve v3 or v4 and match the actual driver-field requirements from the OpenList documentation.",
+                "If browser capture already collected cookie / refresh_token / access_token, prefill them and validate on a small directory first.",
+                "If the instance is better served by account/password or API token, switch back to manual credentials instead of relying on browser capture.",
+                "Before scaling up, verify pagination, direct-download links, and non-ASCII filenames."
+            ],
+        },
+        "defaults": {
+            "root_folder_path": "/",
+        },
+    },
+    "github": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/github",
+        "summary": {
+            "zh": "GitHub 驱动更像代码仓库读取驱动，核心是 Personal Access Token、owner、repo、ref/branch，以及仓库内容类型选择。",
+            "en": "The GitHub driver is more of a repository-content source. The key fields are Personal Access Token, owner, repo, ref/branch, and content type selection.",
+        },
+        "steps": {
+            "zh": [
+                "先创建 GitHub Personal Access Token，并确认仓库可见性和 scope 满足当前读取需求。",
+                "按文档手动填写 token、owner、repo、ref 或 branch，再用小仓库或小目录验证列表与下载。",
+                "如果你读取的是 release 资源、LFS 或大仓库归档，要额外留意速率限制和 API 配额。",
+                "默认不要把 GitHub 当成 Guangya 秒传来源；只有确实能拿到稳定 MD5 时，才适合后续再提升能力判断。"
+            ],
+            "en": [
+                "Create a GitHub Personal Access Token first and confirm that repository visibility plus scopes match the read requirements.",
+                "Fill token, owner, repo, ref, or branch manually, then validate listing and download on a small repository or subpath.",
+                "If you read release assets, LFS, or large repository archives, pay extra attention to rate limits and API quota.",
+                "Do not present GitHub as a Guangya fast-upload source by default. Only upgrade later if stable MD5 exposure is actually proven."
+            ],
+        },
+        "defaults": {
+            "ref": "main",
+        },
+    },
+    "terabox": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/terabox",
+        "summary": {
+            "zh": "TeraBox 当前更偏浏览器抓 Cookie 的驱动。网页登录抓取可以降低接入门槛，但正式挂载前仍要先验证文档里提到的下载方式与风控约束。",
+            "en": "TeraBox is currently more of a browser-cookie-oriented driver. Web capture can reduce onboarding friction, but you still need to verify download mode and anti-abuse constraints from the documentation before production use.",
+        },
+        "steps": {
+            "zh": [
+                "先登录 TeraBox 网页端，按文档要求从浏览器请求里抓完整 Cookie。",
+                "把 Cookie 回填到挂载字段后，先验证一个小目录的列目录与下载，不要一开始就扫整盘。",
+                "如果驱动文档要求额外参数或特殊下载方式，优先按当前 OpenList 文档填写，不要自己猜字段。",
+                "默认按保守补传路径处理，除非你已经验证当前驱动能稳定给出适合 Guangya 的 MD5。"
+            ],
+            "en": [
+                "Log in to TeraBox web and capture the full Cookie from browser requests as described in the documentation.",
+                "After filling the Cookie back into the mount fields, validate listing and download on a small directory first instead of scanning the whole drive.",
+                "If the driver requires extra parameters or a special download mode, follow the current OpenList documentation instead of guessing field names.",
+                "Default to conservative fallback upload unless you have already verified that the current driver exposes Guangya-usable MD5 values consistently."
+            ],
+        },
+        "defaults": {},
+    },
+    "yandexdisk": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/yandex",
+        "summary": {
+            "zh": "Yandex Disk 更适合按 OpenList 文档走 OAuth / Refresh Token 流程。浏览器抓取可辅助校验，但正式挂载仍建议以官方授权流程为准。",
+            "en": "Yandex Disk is better handled with the OAuth / Refresh Token flow recommended by the OpenList documentation. Browser capture can help inspect the session, but production mounting should still rely on the official authorization flow.",
+        },
+        "steps": {
+            "zh": [
+                "先按文档完成 Yandex 的授权流程，获取 Refresh Token。",
+                "如果页面抓取已经看到 access_token / refresh_token，也只把它当辅助校验，不建议替代正式 OAuth 配置。",
+                "先用一个小目录验证列目录和下载，再确认根目录路径与代理策略。",
+                "默认不要把它宣传成 Guangya 秒传来源；只有确认稳定 MD5 后，才适合再提升能力等级。"
+            ],
+            "en": [
+                "Complete the Yandex authorization flow first and obtain a Refresh Token as described in the documentation.",
+                "Even if browser capture already sees access_token / refresh_token, treat that only as a verification aid rather than a replacement for the formal OAuth configuration.",
+                "Validate listing and download on a small directory first, then confirm root-path and proxy settings.",
+                "Do not present it as a Guangya fast-upload source by default. Only upgrade the capability later if stable MD5 is actually confirmed."
+            ],
+        },
+        "defaults": {
+            "root_folder_path": "/",
+        },
+    },
     "webdav": {
         "doc_url": "https://doc.oplist.org/guide/drivers/webdav",
         "summary": {
@@ -763,7 +882,7 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
         "key": "onedrive",
         "label": "OneDrive",
         "label_zh": "OneDrive",
-        "driver_aliases": ["onedrive"],
+        "driver_aliases": ["onedrive", "sharepoint"],
         "login_mode": "online api or own Azure app",
         "likely_hashes": [],
         "hash_fields_supported": [],
@@ -850,6 +969,165 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
                 "notes": {
                     "zh": "如果后续确认当前 OpenList 驱动能稳定补出 MD5，再考虑提升能力等级；默认先按保守补传处理。",
                     "en": "Only upgrade this capability later if the current OpenList driver is proven to expose stable MD5 values. Default to conservative fallback upload first.",
+                },
+            }
+        },
+    },
+    "openlist": {
+        "key": "openlist",
+        "label": "OpenList",
+        "label_zh": "OpenList / AList",
+        "driver_aliases": ["openlist", "alistv3"],
+        "login_mode": "manual url + username/password or token",
+        "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "stable",
+        "capture_strategy": "优先手动填写 url、用户名密码或 token，再按需要补 meta password、根目录路径与代理策略。",
+        "capture_strategy_en": "Fill url plus username/password or token first, then add meta password, root path, and proxy strategy as needed.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/openlist"],
+        "default_mount_values": {
+            "root_folder_path": "/",
+            "web_proxy": "false",
+        },
+        "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "如果你互挂的是另一个聚合盘，底层真实哈希能力仍要靠源分析确认，默认先按保守补传处理。",
+            "en": "If you are mounting another aggregator, the real hash capability still depends on the underlying source analysis. Default to conservative fallback upload first.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先验证列目录、分页和下载，再按保守补传路径推进，不默认承诺秒传。",
+                "recommended_flow_en": "Validate listing, pagination, and download first, then continue through conservative fallback upload without promising fast upload by default.",
+                "notes": {
+                    "zh": "互挂 OpenList 不代表天然可秒传，只有底层源端稳定提供 MD5 / GCID 时才适合后续提升能力等级。",
+                    "en": "Mounting another OpenList does not imply native fast upload. Only upgrade later if the underlying source stably exposes MD5 / GCID.",
+                },
+            }
+        },
+    },
+    "cloudreve": {
+        "key": "cloudreve",
+        "label": "Cloudreve",
+        "label_zh": "Cloudreve",
+        "driver_aliases": ["cloudreve", "cloudrevev3", "cloudrevev4"],
+        "login_mode": "cookie or refresh token or account password",
+        "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "stable",
+        "capture_strategy": "优先抓取 refresh_token / access_token 或 Cookie，再结合当前实例版本决定是否改回用户名密码。",
+        "capture_strategy_en": "Capture refresh_token / access_token or Cookie first, then decide whether the current instance should switch back to account-password mode.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/cloudreve_v4"],
+        "default_mount_values": {
+            "root_folder_path": "/",
+        },
+        "recommended_rate_profile": "balanced",
+        "risk_notes": {
+            "zh": "Cloudreve 的认证方式和哈希暴露更依赖具体实例版本，正式跑前一定先做小目录验证。",
+            "en": "Cloudreve authentication and hash exposure depend more on the specific instance version, so always validate on a small directory first.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先小目录验证分页、下载和认证方式，再按补传链路推进。",
+                "recommended_flow_en": "Validate pagination, download, and auth mode on a small directory first, then continue through fallback upload.",
+                "notes": {
+                    "zh": "只有确认当前实例稳定给出 MD5 后，才适合考虑更激进的元数据同步路径。",
+                    "en": "Only consider a more aggressive metadata-first path after the current instance is proven to expose stable MD5 values.",
+                },
+            }
+        },
+    },
+    "github": {
+        "key": "github",
+        "label": "GitHub",
+        "label_zh": "GitHub",
+        "driver_aliases": ["github"],
+        "login_mode": "manual token + owner + repo",
+        "likely_hashes": ["sha1"],
+        "hash_fields_supported": ["sha1"],
+        "download_link_supported": "stable",
+        "capture_strategy": "按文档手动填写 token、owner、repo、ref/branch 等字段，不依赖浏览器抓取。",
+        "capture_strategy_en": "Fill token, owner, repo, ref/branch, and related fields manually instead of relying on browser capture.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/github"],
+        "default_mount_values": {
+            "ref": "main",
+        },
+        "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "GitHub 更偏代码仓库读取场景，常见指纹更接近 sha1 / blob 标识，不应默认承诺 Guangya 秒传。",
+            "en": "GitHub is more of a repository-content source. Its common fingerprints are closer to sha1/blob identifiers and should not promise Guangya fast upload by default.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先用小仓库验证列目录与下载，再按保守补传路径推进。",
+                "recommended_flow_en": "Validate listing and download on a small repository first, then continue through conservative fallback upload.",
+                "notes": {
+                    "zh": "GitHub 常见是 sha1 而不是稳定 MD5，默认不应当作 Guangya 秒传来源。",
+                    "en": "GitHub commonly exposes sha1 rather than stable MD5, so it should not be treated as a Guangya fast-upload source by default.",
+                },
+            }
+        },
+    },
+    "terabox": {
+        "key": "terabox",
+        "label": "TeraBox",
+        "label_zh": "TeraBox",
+        "driver_aliases": ["terabox"],
+        "login_mode": "browser cookie capture",
+        "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "conditional",
+        "capture_strategy": "优先抓取浏览器 Cookie，再按当前驱动文档补额外字段与下载策略。",
+        "capture_strategy_en": "Capture the browser Cookie first, then add extra fields and download strategy according to the current driver documentation.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/terabox"],
+        "default_mount_values": {},
+        "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "TeraBox 更偏逆向 Cookie 驱动，风控与下载限制更敏感，正式跑前一定先做小目录验证。",
+            "en": "TeraBox is more of a reverse-engineered Cookie-based driver, so anti-abuse and download limits are more sensitive. Always validate on a small directory first.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先小目录验证下载，再按保守补传路径推进，不默认承诺秒传。",
+                "recommended_flow_en": "Validate download on a small directory first, then continue through conservative fallback upload without promising fast upload by default.",
+                "notes": {
+                    "zh": "只有确认当前驱动稳定给出 MD5 后，才适合后续再提升能力等级。",
+                    "en": "Only upgrade the capability later if the current driver is proven to expose stable MD5 values consistently.",
+                },
+            }
+        },
+    },
+    "yandexdisk": {
+        "key": "yandexdisk",
+        "label": "Yandex Disk",
+        "label_zh": "Yandex Disk",
+        "driver_aliases": ["yandexdisk"],
+        "login_mode": "refresh token + oauth flow",
+        "likely_hashes": ["md5"],
+        "hash_fields_supported": ["md5"],
+        "download_link_supported": "stable",
+        "capture_strategy": "优先按文档走 OAuth / Refresh Token 流程；浏览器抓取只作为辅助校验。",
+        "capture_strategy_en": "Prefer the OAuth / Refresh Token flow from the documentation; use browser capture only as a diagnostic aid.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/yandex"],
+        "default_mount_values": {
+            "root_folder_path": "/",
+        },
+        "recommended_rate_profile": "balanced",
+        "risk_notes": {
+            "zh": "只有确认当前驱动稳定返回 MD5 时，才适合把它当作 Guangya 元数据秒传候选来源。",
+            "en": "Only treat it as a Guangya metadata-first candidate after the current driver is proven to expose stable MD5 values.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "fast_upload_partial",
+                "recommended_flow": "先分析小目录的 MD5 覆盖率，命中高时优先元数据同步，否则按补传路径推进。",
+                "recommended_flow_en": "Analyze MD5 coverage on a small directory first. Use metadata-first sync only when the hit rate is good; otherwise continue via fallback upload.",
+                "notes": {
+                    "zh": "Yandex Disk 理论上更接近 MD5 型驱动，但正式跑前仍建议先做小目录验证。",
+                    "en": "Yandex Disk is theoretically closer to an MD5-style driver, but you should still validate on a small directory first.",
                 },
             }
         },

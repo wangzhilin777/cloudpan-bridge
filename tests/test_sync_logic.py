@@ -1247,7 +1247,7 @@ def test_build_storage_payload_serializes_addition_and_types() -> None:
 
 def test_default_provider_specs_cover_major_sources() -> None:
     specs = default_provider_specs()
-    assert {"guangya", "quark", "123pan", "189cloud", "baidu", "thunder", "aliyundriveopen", "onedrive", "googledrive", "dropbox", "webdav", "s3", "ftp", "sftp", "seafile", "smb", "azureblob", "mega", "pikpak", "115", "139yun"} <= set(specs)
+    assert {"guangya", "quark", "123pan", "189cloud", "baidu", "thunder", "aliyundriveopen", "onedrive", "googledrive", "dropbox", "openlist", "cloudreve", "github", "terabox", "yandexdisk", "webdav", "s3", "ftp", "sftp", "seafile", "smb", "azureblob", "mega", "pikpak", "115", "139yun"} <= set(specs)
     assert "cookie_header" in specs["quark"].required_keys
     assert "bdstoken" in specs["baidu"].required_keys
     assert "authorization" in specs["thunder"].required_keys
@@ -1255,6 +1255,11 @@ def test_default_provider_specs_cover_major_sources() -> None:
     assert "refresh_token" in specs["onedrive"].required_keys
     assert "refresh_token" in specs["googledrive"].required_keys
     assert "refresh_token" in specs["dropbox"].required_keys
+    assert specs["openlist"].capture_mode == "manual"
+    assert "refresh_token" in specs["cloudreve"].required_keys
+    assert specs["github"].capture_mode == "manual"
+    assert "cookie_header" in specs["terabox"].required_keys
+    assert "refresh_token" in specs["yandexdisk"].required_keys
     assert specs["webdav"].capture_mode == "manual"
     assert specs["s3"].capture_mode == "manual"
     assert specs["ftp"].capture_mode == "manual"
@@ -1277,6 +1282,12 @@ def test_capture_alias_registry_resolves_real_spec_keys() -> None:
     assert alias_map["123open"] == "123pan"
     assert alias_map["googledrive"] == "googledrive"
     assert alias_map["dropbox"] == "dropbox"
+    assert alias_map["sharepoint"] == "onedrive"
+    assert alias_map["alistv3"] == "openlist"
+    assert alias_map["cloudreve"] == "cloudreve"
+    assert alias_map["github"] == "github"
+    assert alias_map["terabox"] == "terabox"
+    assert alias_map["yandexdisk"] == "yandexdisk"
     assert alias_map["115share"] == "115"
     assert alias_map["webdav"] == "webdav"
     assert alias_map["s3"] == "s3"
@@ -1339,6 +1350,14 @@ def test_driver_guide_supports_profile_and_alias_resolution() -> None:
     guide_smb = provider_registry_module.get_driver_guide("SMB")
     assert guide_smb is not None
     assert guide_smb["docUrl"].endswith("/smb")
+
+    guide_openlist = provider_registry_module.get_driver_guide("AListV3")
+    assert guide_openlist is not None
+    assert guide_openlist["docUrl"].endswith("/openlist")
+
+    guide_terabox = provider_registry_module.get_driver_guide("TeraBox")
+    assert guide_terabox is not None
+    assert guide_terabox["docUrl"].endswith("/terabox")
 
 
 def test_unknown_driver_guide_returns_generic_fallback_without_claiming_full_coverage() -> None:
@@ -1548,6 +1567,11 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["guides"]["googledrive"]["docUrl"] == "https://doc.oplist.org/guide/drivers/google_drive"
     assert payload["guides"]["webdav"]["docUrl"] == "https://doc.oplist.org/guide/drivers/webdav"
     assert payload["guides"]["s3"]["docUrl"] == "https://doc.oplist.org/guide/drivers/s3"
+    assert payload["guides"]["openlist"]["docUrl"] == "https://doc.oplist.org/guide/drivers/openlist"
+    assert payload["guides"]["cloudreve"]["docUrl"] == "https://doc.oplist.org/guide/drivers/cloudreve_v4"
+    assert payload["guides"]["github"]["docUrl"] == "https://doc.oplist.org/guide/drivers/github"
+    assert payload["guides"]["terabox"]["docUrl"] == "https://doc.oplist.org/guide/drivers/terabox"
+    assert payload["guides"]["yandexdisk"]["docUrl"] == "https://doc.oplist.org/guide/drivers/yandex"
     assert payload["guides"]["smb"]["docUrl"] == "https://doc.oplist.org/guide/drivers/smb"
     assert payload["guides"]["azureblob"]["docUrl"] == "https://doc.oplist.org/guide/drivers/azure_blob"
     assert payload["guides"]["mega"]["docUrl"] == "https://doc.oplist.org/guide/drivers/mega"
@@ -1556,6 +1580,11 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["source_profiles"]["189cloud"]["loginMode"] == "cookie + sessionKey style fields"
     assert payload["source_profiles"]["googledrive"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/google_drive"
     assert payload["source_profiles"]["dropbox"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/dropbox"
+    assert payload["source_profiles"]["openlist"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/openlist"
+    assert payload["source_profiles"]["cloudreve"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/cloudreve_v4"
+    assert payload["source_profiles"]["github"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/github"
+    assert payload["source_profiles"]["terabox"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/terabox"
+    assert payload["source_profiles"]["yandexdisk"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/yandex"
     assert payload["source_profiles"]["115"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/115"
     assert payload["source_profiles"]["webdav"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/webdav"
     assert payload["source_profiles"]["s3"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/s3"
@@ -1592,6 +1621,11 @@ def test_provider_captures_endpoint_includes_complex_driver_specs(tmp_path: Path
     assert providers["onedrive"]["required_keys"] == ["refresh_token"]
     assert providers["googledrive"]["required_keys"] == ["refresh_token"]
     assert providers["dropbox"]["required_keys"] == ["refresh_token"]
+    assert providers["openlist"]["capture_mode"] == "manual"
+    assert providers["cloudreve"]["required_keys"] == ["refresh_token"]
+    assert providers["github"]["capture_mode"] == "manual"
+    assert providers["terabox"]["required_keys"] == ["cookie_header"]
+    assert providers["yandexdisk"]["required_keys"] == ["refresh_token"]
     assert providers["webdav"]["capture_mode"] == "manual"
     assert providers["s3"]["capture_mode"] == "manual"
     assert providers["ftp"]["capture_mode"] == "manual"
@@ -1609,6 +1643,11 @@ def test_provider_captures_endpoint_includes_complex_driver_specs(tmp_path: Path
     assert providers["139yun"]["source_profile"]["docLinks"] == ["https://doc.oplist.org/guide/drivers/139.html"]
     assert providers["aliyundriveopen"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/aliyundrive_open"
     assert providers["googledrive"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/google_drive"
+    assert providers["openlist"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/openlist"
+    assert providers["cloudreve"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/cloudreve_v4"
+    assert providers["github"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/github"
+    assert providers["terabox"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/terabox"
+    assert providers["yandexdisk"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/yandex"
     assert providers["115"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/115"
     assert providers["139yun"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/139.html"
 
@@ -1838,6 +1877,57 @@ def test_provider_coverage_audit_marks_smb_azureblob_mega_as_covered(tmp_path: P
     assert rows["mega"]["hasGuide"] is True
     assert rows["mega"]["hasCapture"] is True
     assert rows["mega"]["hasCapability"] is True
+
+
+def test_provider_coverage_audit_marks_openlist_cloudreve_terabox_yandex_as_covered(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_audit",
+        json={
+            "drivers": ["OpenList", "AListV3", "Cloudreve", "TeraBox", "YandexDisk", "Sharepoint", "Github"],
+            "target": "guangya",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    rows = {item["normalized"]: item for item in payload["rows"]}
+    assert rows["openlist"]["hasProfile"] is True
+    assert rows["openlist"]["hasGuide"] is True
+    assert rows["openlist"]["hasCapture"] is True
+    assert rows["openlist"]["hasCapability"] is True
+    assert rows["alistv3"]["hasProfile"] is True
+    assert rows["alistv3"]["canonicalDriverKey"] == "openlist"
+    assert rows["cloudreve"]["hasProfile"] is True
+    assert rows["cloudreve"]["hasGuide"] is True
+    assert rows["cloudreve"]["hasCapture"] is True
+    assert rows["cloudreve"]["hasCapability"] is True
+    assert rows["terabox"]["hasProfile"] is True
+    assert rows["terabox"]["hasGuide"] is True
+    assert rows["terabox"]["hasCapture"] is True
+    assert rows["terabox"]["hasCapability"] is True
+    assert rows["yandexdisk"]["hasProfile"] is True
+    assert rows["yandexdisk"]["hasGuide"] is True
+    assert rows["yandexdisk"]["hasCapture"] is True
+    assert rows["yandexdisk"]["hasCapability"] is True
+    assert rows["sharepoint"]["hasProfile"] is True
+    assert rows["sharepoint"]["canonicalDriverKey"] == "onedrive"
+    assert rows["sharepoint"]["captureSpecKey"] == "onedrive"
+    assert rows["github"]["hasProfile"] is True
+    assert rows["github"]["hasGuide"] is True
+    assert rows["github"]["hasCapture"] is True
+    assert rows["github"]["hasCapability"] is True
 
 
 def test_provider_coverage_audit_can_infer_dynamic_profile_capture_and_capability() -> None:

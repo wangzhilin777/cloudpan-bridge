@@ -471,6 +471,7 @@ Guangya 是当前已完成最多的目标端，必须继续保留并增强。
   - guide 查询已支持 canonical key / alias 归一，`123Open / BaiduNetdisk / 189Cloud` 这类别名不再误报缺 guide
   - `GoogleDrive / Dropbox / 115` 已补成静态 profile / guide / capture / capability 条目，不再默认落回 generic 兜底
   - `WebDav / S3 / FTP / SFTP / Seafile / SMB / AzureBlob / Mega` 已补成静态条目，并新增“手动凭证模式”，不再误导成浏览器自动抓取型驱动
+  - `OpenList / AListV3 / Cloudreve / Github / TeraBox / YandexDisk` 已补成静态条目；其中 `Sharepoint` 已并入 `OneDrive` 档案归一处理
   - 当前这批重点驱动的已知显式缺口已清空，后续主要剩全 OpenList 驱动的继续扩面
   - 覆盖审计已新增 `onboardingReady / onboardingStage`，可直接筛出“已具备 profile、可以继续补 guide/capture/capability”的驱动
   - 覆盖审计 / Scaffold 现在在未手工传 `drivers` 时，可直接读取当前 OpenList 驱动列表生成缺口视图，便于后续跟进 OpenList 新增驱动

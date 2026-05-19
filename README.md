@@ -50,7 +50,12 @@
   - `OneDrive`：优先抓 `refresh_token / access_token`
   - `Google Drive`：优先抓 `refresh_token / access_token`
   - `Dropbox`：优先抓 `refresh_token / access_token`
+  - `Cloudreve`：优先抓 `refresh_token / access_token`，必要时回退 Cookie 或用户名密码
+  - `TeraBox`：优先抓 `Cookie`
+  - `Yandex Disk`：优先抓 `refresh_token / access_token`
   - `WebDAV / S3 / FTP / SFTP / Seafile / SMB / Azure Blob / MEGA`：走手动凭证模式
+  - `OpenList / AListV3`：走手动凭证模式
+  - `GitHub`：走手动凭证模式
   - `PikPak`：优先抓 `refresh_token / access_token`
   - `115 网盘`：优先抓 `Cookie / token`
   - `139 云盘`：优先抓 `Authorization`
@@ -74,9 +79,16 @@
   - `SMB`
   - `AzureBlob`
   - `Mega`
+  - `OpenList`
+  - `Cloudreve`
+  - `Github`
+  - `TeraBox`
+  - `YandexDisk`
   - `PikPak`
   - `115`
   - `139Yun`
+  - `Sharepoint`
+  - `AListV3`
 - 对还没补到专用说明的驱动，也会给出通用 OpenList 接入兜底说明和官方驱动文档入口
 - guide 数据现在还会额外携带 `docUrlCandidates`，方便后续继续扩页面时直接接官方文档候选链路
 - 页面里的驱动接入弹窗现在也会直接列出这些文档候选链接，并默认打开第一条最可信候选
