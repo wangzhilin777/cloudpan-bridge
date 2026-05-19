@@ -1839,6 +1839,43 @@ def test_miaochuan_diagnose_endpoint_returns_summary(tmp_path: Path) -> None:
     assert payload["provider_counts"] == {"189cloud": 1}
 
 
+def test_miaochuan_import_rejects_non_guangya_target(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "target_key": "quark"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    app = create_app(config_path)
+    client = TestClient(app)
+    response = client.post(
+        "/api/miaochuan/import",
+        json={
+            "target_key": "quark",
+            "miaochuan_payload": json.dumps(
+                {
+                    "files": [
+                        {
+                            "path": "/demo.zip",
+                            "size": "123",
+                            "etag": "ABCDEF0123456789ABCDEF0123456789",
+                        }
+                    ]
+                }
+            ),
+        },
+    )
+    assert response.status_code == 400
+    assert "当前秒传 JSON 直导仅支持 guangya" in response.json()["detail"]
+
+
 def test_serialize_and_summarize_source_entries() -> None:
     entries = [
         SourceEntry(path="/a.bin", md5="abc", size=10, provider="openlist", hash_type="md5"),

@@ -254,6 +254,13 @@ def create_app(config_path: Path) -> FastAPI:
             raise HTTPException(status_code=400, detail=preflight["message"])
         return preflight
 
+    def require_miaochuan_target(target_key: str = "") -> str:
+        normalized = str(target_key or config.target_key or "guangya").strip().lower() or "guangya"
+        if normalized != "guangya":
+            raise HTTPException(status_code=400, detail=f"当前秒传 JSON 直导仅支持 guangya，目标端 {normalized} 暂不支持此入口。")
+        require_selectable_target(normalized)
+        return normalized
+
     def deep_merge_dicts(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
         merged = dict(base)
         for key, value in patch.items():
@@ -779,6 +786,8 @@ def create_app(config_path: Path) -> FastAPI:
     def start_miaochuan_import(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         nonlocal config
         payload = payload or {}
+        config = AppConfig.load(config_path)
+        require_miaochuan_target(str(payload.get("target_key") or config.target_key or "guangya"))
         miaochuan_payload = str(payload.get("miaochuan_payload") or "").strip()
         if not miaochuan_payload:
             raise HTTPException(status_code=400, detail="请先粘贴秒传 JSON。")
@@ -787,7 +796,6 @@ def create_app(config_path: Path) -> FastAPI:
                 raise HTTPException(status_code=409, detail="同步任务正在运行")
             sync_state["running"] = True
             sync_state["last_error"] = ""
-        config = AppConfig.load(config_path)
         worker = Thread(
             target=run_sync_job,
             args=(

@@ -3569,6 +3569,7 @@
         await call("/api/miaochuan/import", {
           method: "POST",
           body: JSON.stringify({
+            target_key: activeTargetKey(),
             miaochuan_payload: document.getElementById("miaochuan_payload").value,
             guangya_authorization: document.getElementById("guangya_authorization").value,
           }),
