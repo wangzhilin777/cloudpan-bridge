@@ -47,6 +47,7 @@
   - `139 云盘`：优先抓 `Authorization`
 - 支持按当前 OpenList 驱动字段生成“通用网页登录抓取模板”
 - 支持复杂驱动的“接入流程说明 / 官方文档链接 / 推荐默认值”
+- 对还没补到专用说明的驱动，也会给出通用 OpenList 接入兜底说明和官方驱动文档入口
 - 支持源驱动到 Guangya 的基础能力矩阵提示
   - 区分 `fast_upload_partial / download_upload_only / unsupported` 等等级
   - 页面会给出诚实降级后的建议路径，而不是默认宣称都能秒传

@@ -619,6 +619,42 @@ def _serialize_driver_guide(guide: dict[str, Any]) -> dict[str, Any]:
             "en": list((guide.get("steps") or {}).get("en") or []),
         },
         "defaults": dict(guide.get("defaults") or {}),
+        "isGenericFallback": bool(guide.get("is_generic_fallback", False)),
+    }
+
+
+def _build_generic_driver_guide(driver: str) -> dict[str, Any] | None:
+    display_name = str(driver or "").strip()
+    if not display_name:
+        return None
+    login_url = ""
+    capture_match = resolve_capture_spec_for_driver(display_name)
+    if capture_match.get("loginUrl"):
+        login_url = str(capture_match.get("loginUrl") or "")
+    generic_doc_url = "https://doc.oplist.org/guide/drivers/"
+    login_hint = login_url or "对应网盘官网登录页"
+    return {
+        "doc_url": generic_doc_url,
+        "summary": {
+            "zh": f"{display_name} 暂时还没有仓库内置的专用接入说明，当前先提供一个通用 OpenList 驱动接入兜底流程。",
+            "en": f"{display_name} does not have a dedicated in-repo onboarding guide yet. A generic OpenList driver onboarding fallback is provided for now.",
+        },
+        "steps": {
+            "zh": [
+                "先在挂载页读取当前驱动的实时字段，优先按 OpenList 返回的真实字段名填写，不要自己猜参数名。",
+                f"如果该驱动需要网页登录态，先用页面里的“源网盘登录抓取”打开 {login_hint}，抓到 Cookie / Token / Header 后再回填挂载表单。",
+                "先用一个小目录验证列目录、分页和小文件下载是否稳定，再考虑跑大目录或边扫边同步。",
+                "如果后续验证通过，再把这个驱动补进 provider registry 的专用 guide / capture / capability 条目。",
+            ],
+            "en": [
+                "Load the live driver fields from the mount page first, and fill the exact OpenList field names instead of guessing parameters.",
+                f"If this driver requires web session data, use the source-login capture panel to open {login_hint}, capture Cookie / Token / Header values, and prefill the mount form.",
+                "Validate listing, pagination, and small-file download with a small directory before running large scans or streaming sync.",
+                "Once verified, promote this driver into dedicated provider-registry guide / capture / capability entries.",
+            ],
+        },
+        "defaults": {},
+        "is_generic_fallback": True,
     }
 
 
@@ -646,9 +682,12 @@ def _resolve_guide_key(driver: str) -> tuple[str, dict[str, Any] | None]:
 
 def get_driver_guide(driver: str) -> dict[str, Any] | None:
     _matched_key, guide = _resolve_guide_key(driver)
-    if guide is None:
+    if guide is not None:
+        return _serialize_driver_guide(guide)
+    fallback = _build_generic_driver_guide(driver)
+    if fallback is None:
         return None
-    return _serialize_driver_guide(guide)
+    return _serialize_driver_guide(fallback)
 
 
 def list_driver_guides() -> dict[str, dict[str, Any]]:
@@ -789,7 +828,7 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
         profile = get_source_profile_by_driver(driver)
         has_profile = str(profile.get("key") or "") != "generic"
         guide = get_driver_guide(driver)
-        has_guide = guide is not None
+        has_guide = guide is not None and not bool((guide or {}).get("isGenericFallback"))
         matched_guide_key, _matched_guide = _resolve_guide_key(driver)
         capture_match = resolve_capture_spec_for_driver(driver)
         has_capture = bool(capture_match.get("specKey")) and normalized in capture_supported_aliases
