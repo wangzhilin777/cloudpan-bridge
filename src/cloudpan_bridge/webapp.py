@@ -281,14 +281,16 @@ def create_app(config_path: Path) -> FastAPI:
         return payload
 
     def load_grouped_config_payload() -> dict[str, Any]:
-        normalized = AppConfig.load(config_path).to_dict()
+        normalized_model = AppConfig.load(config_path)
+        normalized = normalized_model.to_dict()
         if not config_path.exists():
             return normalized
         raw_payload = json.loads(config_path.read_text(encoding="utf-8"))
+        flat_keys = set(normalized_model.to_flat_dict().keys()) | {"grouped_config", "config_meta", "effective_openlist_url"}
         raw_grouped = {
             key: value
             for key, value in raw_payload.items()
-            if isinstance(value, dict) and key in normalized
+            if isinstance(value, dict) and key not in flat_keys
         }
         return deep_merge_dicts(normalized, raw_grouped)
 

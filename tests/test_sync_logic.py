@@ -490,6 +490,35 @@ def test_config_endpoint_returns_flat_and_grouped_views(tmp_path: Path) -> None:
     assert payload["config_meta"]["active_target"] == "guangya"
 
 
+def test_config_endpoint_grouped_view_preserves_unknown_nested_sections(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src"
+  },
+  "extra_runtime": {
+    "feature_flag": true,
+    "notes": {
+      "owner": "demo"
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/config")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["grouped_config"]["extra_runtime"]["feature_flag"] is True
+    assert payload["grouped_config"]["extra_runtime"]["notes"]["owner"] == "demo"
+    assert "extra_runtime" not in payload
+
+
 def test_config_endpoint_accepts_grouped_partial_update(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
