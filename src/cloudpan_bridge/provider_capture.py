@@ -422,6 +422,46 @@ def default_provider_specs() -> dict[str, ProviderCaptureSpec]:
             """,
             description="优先抓取 OneDrive 登录态里的 refresh_token / access_token；如果最终仍需 Azure 应用参数，请按驱动说明补齐。",
         ),
+        "googledrive": ProviderCaptureSpec(
+            key="googledrive",
+            label="Google Drive",
+            login_url="https://drive.google.com/drive/my-drive",
+            session_dir="googledrive",
+            recommended_drivers=["GoogleDrive", "GoogleDriveShare", "Google Photos"],
+            domains=["drive.google.com", "accounts.google.com", "googleapis.com"],
+            required_keys=["refresh_token"],
+            header_aliases=["authorization", "cookie"],
+            storage_aliases=["refresh_token", "access_token", "token", "authorization"],
+            page_probe="""
+            return {
+              href: location.href,
+              cookie: document.cookie || "",
+              access_token: window.localStorage.getItem("access_token") || window.sessionStorage.getItem("access_token") || "",
+              refresh_token: window.localStorage.getItem("refresh_token") || window.sessionStorage.getItem("refresh_token") || ""
+            };
+            """,
+            description="优先抓取 Google Drive 登录态里的 refresh_token / access_token；若最终仍需 Google Cloud 应用参数，请按驱动说明补齐。",
+        ),
+        "dropbox": ProviderCaptureSpec(
+            key="dropbox",
+            label="Dropbox",
+            login_url="https://www.dropbox.com/login",
+            session_dir="dropbox",
+            recommended_drivers=["Dropbox"],
+            domains=["dropbox.com", "dropboxapi.com"],
+            required_keys=["refresh_token"],
+            header_aliases=["authorization", "cookie"],
+            storage_aliases=["refresh_token", "access_token", "token", "authorization"],
+            page_probe="""
+            return {
+              href: location.href,
+              cookie: document.cookie || "",
+              access_token: window.localStorage.getItem("access_token") || window.sessionStorage.getItem("access_token") || "",
+              refresh_token: window.localStorage.getItem("refresh_token") || window.sessionStorage.getItem("refresh_token") || ""
+            };
+            """,
+            description="优先抓取 Dropbox 的 refresh_token / access_token；如果使用自己的应用参数，再按驱动说明补 App Key / Secret。",
+        ),
         "pikpak": ProviderCaptureSpec(
             key="pikpak",
             label="PikPak",
@@ -441,6 +481,26 @@ def default_provider_specs() -> dict[str, ProviderCaptureSpec]:
             };
             """,
             description="优先抓取 PikPak refresh_token / access_token；若平台差异导致后续异常，再按驱动说明改用对应端来源。",
+        ),
+        "115": ProviderCaptureSpec(
+            key="115",
+            label="115 网盘",
+            login_url="https://115.com/",
+            session_dir="115",
+            recommended_drivers=["115", "115Share"],
+            domains=["115.com", "anxia.com"],
+            required_keys=["cookie_header"],
+            header_aliases=["authorization", "cookie"],
+            storage_aliases=["access_token", "refresh_token", "token", "authorization", "pickcode"],
+            page_probe="""
+            return {
+              href: location.href,
+              cookie: document.cookie || "",
+              access_token: window.localStorage.getItem("access_token") || window.sessionStorage.getItem("access_token") || "",
+              refresh_token: window.localStorage.getItem("refresh_token") || window.sessionStorage.getItem("refresh_token") || ""
+            };
+            """,
+            description="优先抓取 115 的 Cookie 与常见 token 字段；如后续还需要 pickcode / sha1 相关能力，再结合驱动说明继续补字段。",
         ),
         "139yun": ProviderCaptureSpec(
             key="139yun",

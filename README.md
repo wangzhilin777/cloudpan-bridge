@@ -48,10 +48,26 @@
   - `迅雷云盘`：`Authorization / x-device-id / x-captcha-token / x-client-id`
   - `阿里云盘 Open`：优先抓 `refresh_token`
   - `OneDrive`：优先抓 `refresh_token / access_token`
+  - `Google Drive`：优先抓 `refresh_token / access_token`
+  - `Dropbox`：优先抓 `refresh_token / access_token`
   - `PikPak`：优先抓 `refresh_token / access_token`
+  - `115 网盘`：优先抓 `Cookie / token`
   - `139 云盘`：优先抓 `Authorization`
 - 支持按当前 OpenList 驱动字段生成“通用网页登录抓取模板”
 - 支持复杂驱动的“接入流程说明 / 官方文档链接 / 推荐默认值”
+- 第一批已补成静态档案的重点驱动已覆盖：
+  - `AliyundriveOpen`
+  - `123Open`
+  - `189Cloud`
+  - `Quark`
+  - `Baidu`
+  - `Thunder`
+  - `OneDrive`
+  - `GoogleDrive`
+  - `Dropbox`
+  - `PikPak`
+  - `115`
+  - `139Yun`
 - 对还没补到专用说明的驱动，也会给出通用 OpenList 接入兜底说明和官方驱动文档入口
 - guide 数据现在还会额外携带 `docUrlCandidates`，方便后续继续扩页面时直接接官方文档候选链路
 - 页面里的驱动接入弹窗现在也会直接列出这些文档候选链接，并默认打开第一条最可信候选

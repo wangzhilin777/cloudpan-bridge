@@ -197,6 +197,52 @@ DRIVER_GUIDES: dict[str, dict[str, Any]] = {
             "chunk_size": "5",
         },
     },
+    "googledrive": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/google_drive",
+        "summary": {
+            "zh": "Google Drive 更适合走 OpenList 官方推荐的 OAuth / Refresh Token 方案。浏览器抓取可以辅助确认登录态，但正式挂载仍建议以 Google Cloud 应用参数为准。",
+            "en": "Google Drive is better handled with the OAuth / Refresh Token flow recommended by OpenList. Browser capture can help inspect the session, but production mounts should still rely on Google Cloud app parameters.",
+        },
+        "steps": {
+            "zh": [
+                "先按官方文档在 Google Cloud Console 创建应用，获取 Client ID / Client Secret，并完成 OAuth 同意页面配置。",
+                "使用 OpenList 提供的授权流程获取 Refresh Token；如果页面抓取已经拿到 access_token / refresh_token，也只把它当辅助校验，不建议替代正式 OAuth 配置。",
+                "挂载前先确认 Root Folder / Team Drive 等参数是否和你的账号类型一致，再用小目录验证列目录与 MD5 返回情况。",
+                "如果目录中混有 Google Docs 这类云原生文件，要预期它们不一定具备普通二进制文件那样的 MD5。"
+            ],
+            "en": [
+                "Create a Google Cloud application first, obtain Client ID / Client Secret, and finish the OAuth consent screen setup.",
+                "Use the OpenList authorization flow to obtain a Refresh Token. Even if browser capture already sees access_token / refresh_token, treat that only as a verification aid rather than a replacement for the formal OAuth setup.",
+                "Before mounting, verify Root Folder / Team Drive related settings, then validate listing and MD5 availability on a small directory.",
+                "If the directory contains Google Docs style native files, do not assume they expose normal binary-file MD5 values."
+            ],
+        },
+        "defaults": {
+            "root_folder_path": "/",
+        },
+    },
+    "dropbox": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/dropbox",
+        "summary": {
+            "zh": "Dropbox 建议按 OpenList 文档走自己的 OAuth 应用参数和 Refresh Token 流程。浏览器抓到的登录态可以帮助校验，但不应代替正式挂载参数。",
+            "en": "For Dropbox, follow the OpenList documentation and use your own OAuth application plus Refresh Token flow. Browser-captured session data is useful for inspection, but should not replace formal mount parameters.",
+        },
+        "steps": {
+            "zh": [
+                "先在 Dropbox App Console 创建应用，获取 App Key / App Secret，并确保作用域符合 OpenList 驱动要求。",
+                "通过官方 OAuth 流程获取 Refresh Token；页面抓取得到的 access_token 只适合作辅助诊断，不建议长期直接依赖。",
+                "先挂一个小目录验证列目录和下载，再决定是否扩大同步范围。",
+                "Dropbox 更常见的是 content hash / 版本标识，而不是稳定的 MD5，因此不要默认把它规划成对 Guangya 可秒传的来源。"
+            ],
+            "en": [
+                "Create an app in the Dropbox App Console first, obtain App Key / App Secret, and ensure the scopes match the OpenList driver requirements.",
+                "Use the official OAuth flow to obtain a Refresh Token. Any access_token captured from the browser should be treated as diagnostic only, not as a long-term substitute.",
+                "Mount a small directory first and validate listing plus download before scaling up.",
+                "Dropbox more commonly exposes content-hash or revision style identifiers rather than stable MD5 values, so do not assume it is Guangya fast-upload ready by default."
+            ],
+        },
+        "defaults": {},
+    },
     "pikpak": {
         "doc_url": "https://doc.oplist.org/guide/drivers/pikpak.html",
         "summary": {
@@ -220,6 +266,28 @@ DRIVER_GUIDES: dict[str, dict[str, Any]] = {
         "defaults": {
             "root_folder_id": "root",
         },
+    },
+    "115": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/115",
+        "summary": {
+            "zh": "115 更偏 Cookie / 浏览器态驱动。网页登录抓取能明显降低接入门槛，但正式跑大目录前仍要先验证下载链路、pickcode/哈希返回情况和风控表现。",
+            "en": "115 is more of a Cookie / browser-session oriented driver. Web login capture reduces onboarding friction, but you should still verify download behavior, pickcode/hash availability, and rate-control behavior before scanning large trees.",
+        },
+        "steps": {
+            "zh": [
+                "先登录 115 网页端，确认账号本身可以正常列目录和打开目标目录。",
+                "优先抓 Cookie 与常见 token 字段，按当前 OpenList 驱动字段名回填，不要自行猜测字段名。",
+                "如果后续需要更强的秒传/链路判断，要额外关注 pickcode、sha1、md5 等字段在当前驱动里是否真的可见。",
+                "大目录执行前先跑源分析，确认当前挂载到底返回了哪些哈希，再决定是优先元数据路径还是直接按补传规划。"
+            ],
+            "en": [
+                "Log in to the 115 web app first and make sure the account can list directories and open the target folder normally.",
+                "Capture Cookie and common token fields first, then prefill the exact OpenList driver field names instead of inventing names.",
+                "If you later need stronger fast-upload decisions, explicitly inspect whether pickcode, sha1, md5, and similar fields are truly exposed by the current driver.",
+                "Before running large trees, analyze the source directory first and verify which hashes the current mount really returns, then decide whether to prioritize metadata-first flow or fallback upload planning."
+            ],
+        },
+        "defaults": {},
     },
     "139yun": {
         "doc_url": "https://doc.oplist.org/guide/drivers/139.html",
@@ -548,6 +616,68 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
             }
         },
     },
+    "googledrive": {
+        "key": "googledrive",
+        "label": "Google Drive",
+        "label_zh": "Google Drive",
+        "driver_aliases": ["googledrive", "googledriveshare", "googlephotos", "gdrive"],
+        "login_mode": "oauth refresh token + google cloud app",
+        "likely_hashes": ["md5"],
+        "hash_fields_supported": ["md5"],
+        "download_link_supported": "stable",
+        "capture_strategy": "优先走 Google OAuth / Refresh Token 正式方案，浏览器抓取只作为辅助检查登录态。",
+        "capture_strategy_en": "Prefer the formal Google OAuth / Refresh Token flow. Browser capture should be used only as a session-inspection helper.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/google_drive"],
+        "default_mount_values": {
+            "root_folder_path": "/",
+        },
+        "recommended_rate_profile": "balanced",
+        "risk_notes": {
+            "zh": "Google Docs 等云原生文件不一定具备普通二进制文件的 MD5，建议先小目录验证。",
+            "en": "Google-native files such as Google Docs may not expose binary-style MD5 values, so validate with a small directory first.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "fast_upload_partial",
+                "recommended_flow": "先分析当前目录的 MD5 覆盖率，命中率高时优先元数据同步，否则按待补传树保守推进。",
+                "recommended_flow_en": "Analyze MD5 coverage first. If the hit rate is high, prefer metadata sync; otherwise move conservatively through the pending tree.",
+                "notes": {
+                    "zh": "Google Drive 对普通二进制文件常能拿到 MD5，但云原生文档和共享盘结构要单独留意。",
+                    "en": "Google Drive often exposes MD5 for regular binary files, but native docs and shared-drive structures need extra caution.",
+                },
+            }
+        },
+    },
+    "dropbox": {
+        "key": "dropbox",
+        "label": "Dropbox",
+        "label_zh": "Dropbox",
+        "driver_aliases": ["dropbox"],
+        "login_mode": "oauth refresh token + app credentials",
+        "likely_hashes": ["content_hash"],
+        "hash_fields_supported": ["etag"],
+        "download_link_supported": "stable",
+        "capture_strategy": "优先使用自己的 Dropbox 应用参数和 Refresh Token，浏览器抓取只作为辅助诊断。",
+        "capture_strategy_en": "Prefer your own Dropbox app credentials plus Refresh Token. Use browser capture only as a diagnostic aid.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/dropbox"],
+        "default_mount_values": {},
+        "recommended_rate_profile": "balanced",
+        "risk_notes": {
+            "zh": "Dropbox 更常见的是 content hash / revision 等标识，不应默认承诺对 Guangya 可秒传。",
+            "en": "Dropbox more commonly exposes content-hash or revision style identifiers, so do not promise Guangya fast upload by default.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先稳定挂载和小目录下载，再按补传或中转上传链路规划，不默认承诺秒传。",
+                "recommended_flow_en": "Stabilize mounting and small-directory downloads first, then plan via fallback upload or relay-like flow without promising fast upload.",
+                "notes": {
+                    "zh": "如果后续确认当前 OpenList 驱动能稳定补出 MD5，再考虑提升能力等级；默认先按保守补传处理。",
+                    "en": "Only upgrade this capability later if the current OpenList driver is proven to expose stable MD5 values. Default to conservative fallback upload first.",
+                },
+            }
+        },
+    },
     "pikpak": {
         "key": "pikpak",
         "label": "PikPak",
@@ -576,6 +706,36 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
                 "notes": {
                     "zh": "PikPak 的实际快传能力依赖更多平台细节，当前对 Guangya 应按保守策略提示。",
                     "en": "PikPak fast-upload behavior depends on more platform-specific details, so Guangya should treat it conservatively for now.",
+                },
+            }
+        },
+    },
+    "115": {
+        "key": "115",
+        "label": "115",
+        "label_zh": "115 网盘",
+        "driver_aliases": ["115", "115share"],
+        "login_mode": "cookie + browser session fields",
+        "likely_hashes": ["sha1", "pickcode"],
+        "hash_fields_supported": ["sha1", "pickcode"],
+        "download_link_supported": "conditional",
+        "capture_strategy": "优先抓 Cookie 与常见会话字段，再结合驱动实际返回的 pickcode / sha1 / md5 决定后续路线。",
+        "capture_strategy_en": "Capture Cookie and common session fields first, then decide the next path based on whether the driver really exposes pickcode / sha1 / md5.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/115"],
+        "default_mount_values": {},
+        "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "115 的哈希表现和下载行为更依赖当前驱动实现，正式跑前一定先做小目录源分析。",
+            "en": "115 hash exposure and download behavior depend heavily on the current driver implementation, so always analyze a small directory first.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先验证当前驱动是否真的返回 MD5 / 可快传指纹；默认按补传或外部秒传 JSON 辅助路线处理。",
+                "recommended_flow_en": "Verify whether the current driver really exposes MD5 or other fast-upload-ready fingerprints first. Default to fallback upload or an external flash-upload JSON assisted flow.",
+                "notes": {
+                    "zh": "115 常见的是 pickcode / sha1 一类字段，若缺少 MD5 / GCID，就不应默认宣传成 Guangya 秒传来源。",
+                    "en": "115 more commonly exposes pickcode / sha1 style fields. Without MD5 / GCID, it should not be presented as a Guangya fast-upload source by default.",
                 },
             }
         },
@@ -759,6 +919,7 @@ def _guess_driver_doc_urls(driver: str) -> list[str]:
             "aliyundriveopen": "aliyundrive_open",
             "123open": "123_open",
             "139yun": "139.html",
+            "googledrive": "google_drive",
             "quark": "quark.html",
             "pikpak": "pikpak.html",
         }

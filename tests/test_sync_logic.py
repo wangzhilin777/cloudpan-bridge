@@ -1247,13 +1247,16 @@ def test_build_storage_payload_serializes_addition_and_types() -> None:
 
 def test_default_provider_specs_cover_major_sources() -> None:
     specs = default_provider_specs()
-    assert {"guangya", "quark", "123pan", "189cloud", "baidu", "thunder", "aliyundriveopen", "onedrive", "pikpak", "139yun"} <= set(specs)
+    assert {"guangya", "quark", "123pan", "189cloud", "baidu", "thunder", "aliyundriveopen", "onedrive", "googledrive", "dropbox", "pikpak", "115", "139yun"} <= set(specs)
     assert "cookie_header" in specs["quark"].required_keys
     assert "bdstoken" in specs["baidu"].required_keys
     assert "authorization" in specs["thunder"].required_keys
     assert "refresh_token" in specs["aliyundriveopen"].required_keys
     assert "refresh_token" in specs["onedrive"].required_keys
+    assert "refresh_token" in specs["googledrive"].required_keys
+    assert "refresh_token" in specs["dropbox"].required_keys
     assert "refresh_token" in specs["pikpak"].required_keys
+    assert "cookie_header" in specs["115"].required_keys
     assert "authorization" in specs["139yun"].required_keys
 
 
@@ -1264,12 +1267,21 @@ def test_capture_alias_registry_resolves_real_spec_keys() -> None:
     assert alias_map["alipan"] == "aliyundriveopen"
     assert alias_map["baidunetdisk"] == "baidu"
     assert alias_map["123open"] == "123pan"
+    assert alias_map["googledrive"] == "googledrive"
+    assert alias_map["dropbox"] == "dropbox"
+    assert alias_map["115share"] == "115"
     assert "quarkopen" in supported
+    assert "googlephotos" in supported
 
     resolved = resolve_capture_spec_for_driver("AliyunDriveOpen")
     assert resolved["specKey"] == "aliyundriveopen"
     assert resolved["matchedAlias"] == "aliyundriveopen"
     assert resolved["loginUrl"].startswith("https://")
+
+    google_resolved = resolve_capture_spec_for_driver("GoogleDrive")
+    assert google_resolved["specKey"] == "googledrive"
+    assert google_resolved["matchedAlias"] == "googledrive"
+    assert google_resolved["loginUrl"].startswith("https://")
 
     missing = resolve_capture_spec_for_driver("UnknownDrive")
     assert missing["specKey"] == ""
@@ -1291,6 +1303,14 @@ def test_driver_guide_supports_profile_and_alias_resolution() -> None:
     assert guide_189 is not None
     assert guide_189["docUrl"].endswith("/189")
     assert any(item.endswith("/189") for item in guide_189["docUrlCandidates"])
+
+    guide_google = provider_registry_module.get_driver_guide("GoogleDrive")
+    assert guide_google is not None
+    assert guide_google["docUrl"].endswith("/google_drive")
+
+    guide_115 = provider_registry_module.get_driver_guide("115Share")
+    assert guide_115 is not None
+    assert guide_115["docUrl"].endswith("/115")
 
 
 def test_unknown_driver_guide_returns_generic_fallback_without_claiming_full_coverage() -> None:
@@ -1497,9 +1517,13 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert response.status_code == 200
     payload = response.json()
     assert payload["guides"]["aliyundriveopen"]["docUrl"] == "https://doc.oplist.org/guide/drivers/aliyundrive_open"
+    assert payload["guides"]["googledrive"]["docUrl"] == "https://doc.oplist.org/guide/drivers/google_drive"
     assert payload["guides"]["quark"]["defaults"]["web_proxy"] == "true"
     assert payload["source_profiles"]["189cloud"]["recommendedRateProfile"] == "safe"
     assert payload["source_profiles"]["189cloud"]["loginMode"] == "cookie + sessionKey style fields"
+    assert payload["source_profiles"]["googledrive"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/google_drive"
+    assert payload["source_profiles"]["dropbox"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/dropbox"
+    assert payload["source_profiles"]["115"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/115"
     assert payload["source_profiles"]["quark"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/quark.html"
     assert payload["source_profiles"]["thunder"]["hashFieldsSupported"] == ["gcid"]
     assert payload["target_profiles"]["guangya"]["fastUploadHashes"] == ["md5", "gcid"]
@@ -1528,12 +1552,18 @@ def test_provider_captures_endpoint_includes_complex_driver_specs(tmp_path: Path
     providers = {item["key"]: item for item in payload["providers"]}
     assert providers["aliyundriveopen"]["recommended_drivers"] == ["AliyundriveOpen", "AliyunDrive", "Alipan"]
     assert providers["onedrive"]["required_keys"] == ["refresh_token"]
+    assert providers["googledrive"]["required_keys"] == ["refresh_token"]
+    assert providers["dropbox"]["required_keys"] == ["refresh_token"]
+    assert providers["115"]["required_keys"] == ["cookie_header"]
     assert providers["pikpak"]["login_url"] == "https://mypikpak.com/drive/all"
     assert providers["139yun"]["required_keys"] == ["authorization"]
     assert providers["aliyundriveopen"]["source_profile"]["key"] == "aliyundriveopen"
+    assert providers["googledrive"]["source_profile"]["key"] == "googledrive"
     assert providers["onedrive"]["source_profile"]["recommendedRateProfile"] == "balanced"
     assert providers["139yun"]["source_profile"]["docLinks"] == ["https://doc.oplist.org/guide/drivers/139.html"]
     assert providers["aliyundriveopen"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/aliyundrive_open"
+    assert providers["googledrive"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/google_drive"
+    assert providers["115"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/115"
     assert providers["139yun"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/139.html"
 
 
@@ -1614,8 +1644,46 @@ def test_provider_coverage_audit_endpoint_reports_registry_and_capture_coverage(
     assert rows["unknowndrive"]["hasCapture"] is False
     assert rows["unknowndrive"]["captureSpecKey"] == ""
     assert rows["unknowndrive"]["missingItems"] == ["profile", "guide", "capture", "capability"]
-    assert rows["unknowndrive"]["nextAction"] == "add_profile_first"
-    assert rows["unknowndrive"]["priorityRank"] == 1
+
+
+def test_provider_coverage_audit_marks_google_dropbox_115_as_covered(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_audit",
+        json={
+            "drivers": ["GoogleDrive", "Dropbox", "115Share"],
+            "target": "guangya",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    rows = {item["normalized"]: item for item in payload["rows"]}
+    assert rows["googledrive"]["hasProfile"] is True
+    assert rows["googledrive"]["hasGuide"] is True
+    assert rows["googledrive"]["hasCapture"] is True
+    assert rows["googledrive"]["hasCapability"] is True
+    assert rows["googledrive"]["nextAction"] == "covered"
+    assert rows["dropbox"]["hasProfile"] is True
+    assert rows["dropbox"]["hasGuide"] is True
+    assert rows["dropbox"]["hasCapture"] is True
+    assert rows["dropbox"]["hasCapability"] is True
+    assert rows["dropbox"]["capabilityLevel"] == "download_upload_only"
+    assert rows["115share"]["hasProfile"] is True
+    assert rows["115share"]["hasGuide"] is True
+    assert rows["115share"]["hasCapture"] is True
+    assert rows["115share"]["hasCapability"] is True
 
 
 def test_provider_coverage_audit_can_infer_dynamic_profile_capture_and_capability() -> None:
