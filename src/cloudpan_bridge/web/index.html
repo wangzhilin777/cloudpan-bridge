@@ -400,7 +400,7 @@
                 <div id="sync-summary">等待载入</div>
               </div>
               <div class="status-card">
-                <strong data-i18n="card.capture">光鸭抓取</strong>
+                <strong id="capture-card-title" data-i18n="card.capture">光鸭抓取</strong>
                 <div id="capture-summary">等待载入</div>
               </div>
             </div>
@@ -675,7 +675,7 @@
           </div>
 
           <div class="panel">
-            <h2 data-i18n="panel.guangya_auth">光鸭登录信息</h2>
+            <h2 id="target-auth-panel-title" data-i18n="panel.guangya_auth">光鸭登录信息</h2>
             <div class="panel-grid">
               <div>
               <label data-i18n="label.target_key">当前目标端</label>
@@ -934,7 +934,7 @@
         "desc.miaochuan": "支持直接粘贴油猴或插件导出的 JSON。若你已自动抓取到光鸭 Authorization，会优先使用它。",
         "desc.provider_capture": "如果还没有挂载，或想直接从网页登录态抓取 Cookie / Token / Header，可以先在这里选网盘类型，打开登录页抓取，再一键写入当前挂载表单。",
         "desc.capability": "根据当前选择的源驱动和现有目标端 Guangya，给出诚实降级后的推荐路径。这里不会把“只能补传”的组合误导成可秒传。",
-        "desc.logs": "这里会自动滚动到最新日志。同步、队列、挂载和光鸭抓取状态都可以从这里看。",
+        "desc.logs": "这里会自动滚动到最新日志。同步、队列、挂载和目标端状态都可以从这里看。",
         "desc.source_profiles": "这里列出当前内置的 OpenList 源端 profile、常见哈希和推荐频率。后续继续扩全驱动时，就往这层补。",
         "desc.target_profiles": "这里列出当前目标端适配器支持的快传指纹和降级方式。现在正式内置目标端仍是 Guangya。",
         "desc.driver_matrix": "这是当前内置的“源驱动 -> Guangya”能力矩阵，只表示当前项目的真实支持判断，不等于所有跨网盘都能秒传。",
@@ -1062,7 +1062,7 @@
         "desc.miaochuan": "Paste JSON exported by your userscript or plugin. If Guangya Authorization has been captured, it will be used first.",
         "desc.provider_capture": "If you do not have a mount yet, or want to capture Cookie / Token / Header directly from a web login session, choose the provider here, start login capture, then apply the result to the current mount form.",
         "desc.capability": "Show the honest recommendation for the current source driver to Guangya, including fallback behavior instead of overpromising fast upload.",
-        "desc.logs": "Logs auto-scroll to the newest line. Sync, queue, mount, and capture activity all appear here.",
+        "desc.logs": "Logs auto-scroll to the newest line. Sync, queue, mount, and target-state activity all appear here.",
         "desc.source_profiles": "This lists the built-in OpenList source profiles, likely hashes, and recommended rate presets. Keep extending this layer as more drivers are covered.",
         "desc.target_profiles": "This lists the current target adapters, their fast-upload hashes, and fallback modes. Guangya is still the primary built-in target.",
         "desc.driver_matrix": "This is the current built-in source-driver to Guangya matrix. It reflects this project's real support judgment, not a promise that all cross-cloud copies can fast upload.",
@@ -1307,6 +1307,26 @@
     function renderTargetSpecificControls() {
       const target = activeTargetKey();
       const isGuangya = target === "guangya";
+      const captureCardTitle = document.getElementById("capture-card-title");
+      const targetAuthPanelTitle = document.getElementById("target-auth-panel-title");
+      if (captureCardTitle) {
+        captureCardTitle.textContent = isGuangya
+          ? t("card.capture")
+          : (currentLang() === "en"
+            ? "Target State"
+            : currentLang() === "mix"
+              ? "目标端状态 / Target State"
+              : "目标端状态");
+      }
+      if (targetAuthPanelTitle) {
+        targetAuthPanelTitle.textContent = isGuangya
+          ? t("panel.guangya_auth")
+          : (currentLang() === "en"
+            ? "Target Auth State"
+            : currentLang() === "mix"
+              ? "目标端鉴权状态 / Target Auth State"
+              : "目标端鉴权状态");
+      }
       document.querySelectorAll("[data-target-only]").forEach((el) => {
         const expected = String(el.getAttribute("data-target-only") || "");
         el.style.display = expected === target ? "" : "none";
@@ -2699,6 +2719,7 @@
       const missing = !captured.authorization && !captured.access_token && !captured.refresh_token;
       const activeTarget = String(targetStateSummary?.target_key || activeTargetKey() || "guangya");
       const targetFields = Array.isArray(targetStateSummary?.fields) ? targetStateSummary.fields : [];
+      const isGuangya = activeTarget === "guangya";
       const targetStateLine = targetStateSummary
         ? `<div class="mono">${currentLang() === "en" ? "Active target state" : currentLang() === "mix" ? "当前目标端状态 / Active target state" : "当前目标端状态"}: ${escapeHtml(activeTarget)} | ${currentLang() === "en" ? "fields" : currentLang() === "mix" ? "字段 / fields" : "字段"}=${targetStateSummary.field_count ?? 0} | ${escapeHtml(targetFields.join(", ") || "-")}</div>`
         : "";
@@ -2706,10 +2727,10 @@
         <div class="badge">${escapeHtml(capture?.status || "idle")}</div>
         <div class="mono">${escapeHtml(capture?.message || "")}</div>
         ${targetStateLine}
-        <div class="mono">Authorization: ${captured.authorization ? (currentLang() === "en" ? "captured" : currentLang() === "mix" ? "已抓取 / captured" : "已抓取") : (currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未抓取 / missing" : "未抓取")}</div>
-        <div class="mono">Access Token: ${captured.access_token ? (currentLang() === "en" ? "captured" : currentLang() === "mix" ? "已抓取 / captured" : "已抓取") : (currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未抓取 / missing" : "未抓取")}</div>
-        <div class="mono">Refresh Token: ${captured.refresh_token ? (currentLang() === "en" ? "captured" : currentLang() === "mix" ? "已抓取 / captured" : "已抓取") : (currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未抓取 / missing" : "未抓取")}</div>
-        ${missing ? `<div class="mono">${currentLang() === "en" ? "Hint: click Guangya capture to auto-fill the login data." : currentLang() === "mix" ? "提示 / Hint: 点击光鸭抓取按钮自动回填登录信息。" : "提示: 需要点击“打开光鸭登录并自动抓取”完成自动回填。"}</div>` : ""}
+        ${isGuangya ? `<div class="mono">Authorization: ${captured.authorization ? (currentLang() === "en" ? "captured" : currentLang() === "mix" ? "已抓取 / captured" : "已抓取") : (currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未抓取 / missing" : "未抓取")}</div>` : ""}
+        ${isGuangya ? `<div class="mono">Access Token: ${captured.access_token ? (currentLang() === "en" ? "captured" : currentLang() === "mix" ? "已抓取 / captured" : "已抓取") : (currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未抓取 / missing" : "未抓取")}</div>` : ""}
+        ${isGuangya ? `<div class="mono">Refresh Token: ${captured.refresh_token ? (currentLang() === "en" ? "captured" : currentLang() === "mix" ? "已抓取 / captured" : "已抓取") : (currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未抓取 / missing" : "未抓取")}</div>` : ""}
+        ${isGuangya && missing ? `<div class="mono">${currentLang() === "en" ? "Hint: click Guangya capture to auto-fill the login data." : currentLang() === "mix" ? "提示 / Hint: 点击光鸭抓取按钮自动回填登录信息。" : "提示: 需要点击“打开光鸭登录并自动抓取”完成自动回填。"}</div>` : ""}
       `;
     }
 
