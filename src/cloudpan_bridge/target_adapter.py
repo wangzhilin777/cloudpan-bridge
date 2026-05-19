@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import ftplib
 import hashlib
 import shutil
 from pathlib import Path, PurePosixPath
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
+from urllib.parse import urlparse
 
 import httpx
 
@@ -343,8 +345,132 @@ class WebDavTargetAdapter:
         return None
 
 
+class FtpTargetAdapter:
+    def __init__(
+        self,
+        base_url: str,
+        username: str = "",
+        password: str = "",
+        *,
+        ftp_factory: Callable[[], ftplib.FTP] | None = None,
+    ) -> None:
+        self.base_url = str(base_url or "").strip()
+        self.username = username
+        self.password = password
+        self._ftp_factory = ftp_factory or ftplib.FTP
+        self.ftp: ftplib.FTP | None = None
+        parsed = urlparse(self.base_url if "://" in self.base_url else f"ftp://{self.base_url.lstrip('/')}")
+        self.host = parsed.hostname or ""
+        self.port = int(parsed.port or 21)
+        self.root_path = str(PurePosixPath("/" + parsed.path.lstrip("/")))
+
+    def ensure_auth(self) -> None:
+        if not self.host:
+            raise RuntimeError("FTP 目标端未配置 URL。")
+        if self.ftp is not None:
+            return
+        ftp = self._ftp_factory()
+        ftp.connect(self.host, self.port)
+        ftp.login(self.username or "anonymous", self.password or "")
+        self.ftp = ftp
+
+    def export_state(self) -> dict[str, str]:
+        return {
+            "url": self.base_url,
+            "username": self.username,
+        }
+
+    def close(self) -> None:
+        if self.ftp is None:
+            return
+        try:
+            self.ftp.quit()
+        except Exception:
+            try:
+                self.ftp.close()
+            except Exception:
+                pass
+        self.ftp = None
+
+    def _normalize_path(self, path: str) -> str:
+        normalized = str(PurePosixPath("/" + str(path or "/").lstrip("/")))
+        return "/" if normalized == "." else normalized
+
+    def _build_remote_path(self, path: str) -> str:
+        normalized = self._normalize_path(path)
+        if self.root_path == "/":
+            return normalized
+        if normalized == "/":
+            return self.root_path
+        return str(PurePosixPath(self.root_path) / normalized.lstrip("/"))
+
+    def ensure_target_dir(self, path: str) -> str:
+        self.ensure_auth()
+        assert self.ftp is not None
+        normalized = self._normalize_path(path)
+        remote = self._build_remote_path(normalized)
+        current = PurePosixPath("/")
+        for part in PurePosixPath(remote).parts[1:]:
+            current = current / part
+            try:
+                self.ftp.mkd(str(current))
+            except Exception:
+                # Most FTP servers return an error if the directory already exists.
+                pass
+        return normalized
+
+    def delete_if_exists(self, parent_id: str, name: str) -> bool:
+        target_path = str(PurePosixPath(self._normalize_path(parent_id)) / name)
+        return self.remove_target_path(target_path)
+
+    def remove_target_path(self, path: str) -> bool:
+        self.ensure_auth()
+        assert self.ftp is not None
+        normalized = self._normalize_path(path)
+        if normalized == "/":
+            return False
+        remote = self._build_remote_path(normalized)
+        try:
+            self.ftp.delete(remote)
+            return True
+        except Exception:
+            try:
+                self.ftp.rmd(remote)
+                return True
+            except Exception:
+                return False
+
+    def try_fast_upload(
+        self,
+        file_name: str,
+        file_size: int,
+        parent_id: str,
+        md5_hex: str = "",
+        gcid: str = "",
+    ) -> DirectImportResult:
+        return DirectImportResult(
+            success=False,
+            reason="FTP 目标端当前只支持普通上传/覆盖，不支持元数据秒传。",
+        )
+
+    def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, Any]:
+        self.ensure_auth()
+        assert self.ftp is not None
+        target_path = str(PurePosixPath(self._normalize_path(target_parent_id)) / target_name)
+        remote = self._build_remote_path(target_path)
+        with local_path.open("rb") as handle:
+            self.ftp.storbinary(f"STOR {remote}", handle)
+        return {
+            "path": target_path,
+            "size": local_path.stat().st_size,
+        }
+
+    def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
+        return None
+
+
 def supported_target_keys() -> list[str]:
-    return ["guangya", "openlist", "localfs", "webdav"]
+    return ["guangya", "openlist", "localfs", "webdav", "ftp"]
 
 
 def create_target_adapter(config: AppConfig, state: SyncState, target_key: str = "") -> TargetAdapter:
@@ -381,5 +507,11 @@ def create_target_adapter(config: AppConfig, state: SyncState, target_key: str =
             base_url=config.webdav_target_url,
             username=config.webdav_target_username,
             password=config.webdav_target_password,
+        )
+    if normalized == "ftp":
+        return FtpTargetAdapter(
+            base_url=config.ftp_target_url,
+            username=config.ftp_target_username,
+            password=config.ftp_target_password,
         )
     raise NotImplementedError(f"目标端暂未实现: {normalized}")
