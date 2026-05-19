@@ -4,6 +4,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
 from .guangya import GuangyaService
+from .openlist import OpenListClient
 from .models import DirectImportResult
 from .config import AppConfig
 from .models import SyncState
@@ -74,8 +75,63 @@ class GuangyaTargetAdapter:
         self.service.verify_local_md5(local_path, md5_hex)
 
 
+class OpenListTargetAdapter:
+    def __init__(
+        self,
+        base_url: str,
+        token: str = "",
+        username: str = "",
+        password: str = "",
+        page_size: int = 200,
+        request_interval_ms: int = 300,
+    ) -> None:
+        self.client = OpenListClient(
+            base_url=base_url,
+            token=token,
+            username=username,
+            password=password,
+            page_size=page_size,
+            request_interval_ms=request_interval_ms,
+        )
+
+    def ensure_auth(self) -> None:
+        self.client.ensure_login()
+
+    def export_state(self) -> dict[str, str]:
+        return {"token": self.client.token}
+
+    def close(self) -> None:
+        self.client.close()
+
+    def ensure_target_dir(self, path: str) -> str:
+        normalized = str(PurePosixPath("/" + str(path or "/").lstrip("/")))
+        return self.client.ensure_directory(normalized)
+
+    def delete_if_exists(self, parent_id: str, name: str) -> bool:
+        return self.client.delete_path_if_exists(parent_id, name)
+
+    def try_fast_upload(
+        self,
+        file_name: str,
+        file_size: int,
+        parent_id: str,
+        md5_hex: str = "",
+        gcid: str = "",
+    ) -> DirectImportResult:
+        return DirectImportResult(
+            success=False,
+            reason="OpenList 目标端当前只支持普通上传，不支持跨盘元数据秒传。",
+        )
+
+    def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, Any]:
+        return self.client.upload_local_file(local_path, target_parent_id, target_name)
+
+    def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
+        return None
+
+
 def supported_target_keys() -> list[str]:
-    return ["guangya"]
+    return ["guangya", "openlist"]
 
 
 def create_target_adapter(config: AppConfig, state: SyncState, target_key: str = "") -> TargetAdapter:
@@ -94,5 +150,15 @@ def create_target_adapter(config: AppConfig, state: SyncState, target_key: str =
             refresh_token=target_state.get("refresh_token", "") or config.guangya_refresh_token,
             device_id=target_state.get("device_id", "") or config.guangya_device_id,
             phone_number=config.guangya_phone,
+        )
+    if normalized == "openlist":
+        target_state = state.get_target_state("openlist")
+        return OpenListTargetAdapter(
+            base_url=config.openlist_url,
+            token=target_state.get("token", "") or config.openlist_token,
+            username=config.openlist_username,
+            password=config.openlist_password,
+            page_size=config.openlist_page_size,
+            request_interval_ms=config.openlist_request_interval_ms,
         )
     raise NotImplementedError(f"目标端暂未实现: {normalized}")

@@ -267,6 +267,24 @@ TARGET_PROFILES: dict[str, dict[str, Any]] = {
             "zh": "已验证 token 写回、目录自动创建、下载补传与元数据秒传基础链路。后续仍需继续补强 token 刷新时机与更细的接口兼容性矩阵。",
             "en": "Token persistence, auto directory creation, reupload fallback, and metadata-based fast upload are already wired. More token-refresh timing and API compatibility details still need expansion.",
         },
+    },
+    "openlist": {
+        "key": "openlist",
+        "label": "OpenList",
+        "label_zh": "OpenList 挂载目标",
+        "auth_mode": "openlist token or username/password",
+        "token_refresh": "reuse OpenList auth session",
+        "auto_create_dir": True,
+        "fast_upload_hashes": [],
+        "fallback_modes": ["download_upload"],
+        "description": {
+            "zh": "第二个正式目标端。用于把源端文件写入 OpenList 挂载目录，当前按普通上传/覆盖链路处理，不承诺跨盘秒传。",
+            "en": "Second built-in writable target. It writes files into an OpenList mount and currently uses normal upload/overwrite only, not cross-cloud fast upload.",
+        },
+        "research_notes": {
+            "zh": "当前以 OpenList fs mkdir / remove / form 接口为基础，适合作为真实可写目标端，但仍属于保守中转能力，不应宣传成秒传目标。",
+            "en": "This target is based on OpenList fs mkdir / remove / form APIs. It is a real writable target, but still a conservative relay/upload path rather than a fast-upload target.",
+        },
     }
 }
 
@@ -962,7 +980,23 @@ def build_driver_target_capability(
         source_profile = build_dynamic_source_profile(driver, live_fields, target=target)
     target_key = str(target or "guangya").strip().lower() or "guangya"
     target_profile = _serialize_target_profile(TARGET_PROFILES.get(target_key, TARGET_PROFILES["guangya"]))
-    target_capability = dict(source_profile.get("capabilityToTargets") or {}).get(target_key, {})
+    capability_to_targets = dict(source_profile.get("capabilityToTargets") or {})
+    target_capability = dict(capability_to_targets.get(target_key) or {})
+    if not target_capability and target_key == "openlist":
+        target_capability = {
+            "level": "download_upload_only",
+            "recommendedFlow": "当前组合可写入 OpenList 目标端，但按普通上传/覆盖处理，不承诺跨盘秒传。",
+            "recommendedFlowEn": "This combination can write into the OpenList target, but it is handled as normal upload/overwrite rather than cross-cloud fast upload.",
+            "notes": {
+                "zh": "适合把 OpenList 作为聚合目标端或中转目标端；如果你要真正秒传，仍应优先选择具备元数据导入能力的目标端。",
+                "en": "Use OpenList as an aggregated writable target or relay target. For true metadata-based fast upload, prefer a target that supports direct import.",
+            },
+        }
+        source_profile = dict(source_profile)
+        source_profile["capabilityToTargets"] = {
+            **capability_to_targets,
+            target_key: dict(target_capability),
+        }
     level = str(target_capability.get("level") or "unsupported")
     if level not in CAPABILITY_LEVEL_ORDER:
         level = "unsupported"

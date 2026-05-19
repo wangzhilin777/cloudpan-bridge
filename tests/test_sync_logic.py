@@ -29,7 +29,7 @@ from cloudpan_bridge.syncer import (
     serialize_source_entry,
     summarize_source_entries,
 )
-from cloudpan_bridge.target_adapter import GuangyaTargetAdapter
+from cloudpan_bridge.target_adapter import GuangyaTargetAdapter, OpenListTargetAdapter
 from cloudpan_bridge.webapp import (
     build_pending_selected_execution_groups,
     compute_rate_limit_cooldown_ms,
@@ -370,6 +370,36 @@ def test_sync_runner_builds_guangya_target_adapter_from_generic_target_state(tmp
     adapter.close()
 
 
+def test_sync_runner_builds_openlist_target_adapter(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  },
+  "openlist": {
+    "url": "http://127.0.0.1:5244",
+    "username": "admin",
+    "password": "demo",
+    "token": "cfg-token"
+  },
+  "targets": {
+    "active_target": "openlist"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    state = SyncState(target_states={"openlist": {"token": "state-token"}})
+    adapter = runner._build_target_adapter(state)
+    assert isinstance(adapter, OpenListTargetAdapter)
+    assert adapter.export_state()["token"] == "state-token"
+    adapter.close()
+
+
 def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
@@ -390,10 +420,13 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     payload = response.json()
     assert payload["active_target"] == "guangya"
     assert payload["driver_matrix"]["thunder"]["targetProfile"]["key"] == "guangya"
-    assert payload["implemented_targets"] == ["guangya"]
+    assert payload["implemented_targets"] == ["guangya", "openlist"]
     assert payload["target_implementation_status"]["guangya"]["known_profile"] is True
     assert payload["target_implementation_status"]["guangya"]["implemented"] is True
     assert payload["target_implementation_status"]["guangya"]["selectable"] is True
+    assert payload["target_implementation_status"]["openlist"]["known_profile"] is True
+    assert payload["target_implementation_status"]["openlist"]["implemented"] is True
+    assert payload["target_implementation_status"]["openlist"]["selectable"] is True
 
 
 def test_target_preflight_endpoint_reports_supported_target(tmp_path: Path) -> None:
@@ -415,6 +448,35 @@ def test_target_preflight_endpoint_reports_supported_target(tmp_path: Path) -> N
     assert response.status_code == 200
     payload = response.json()
     assert payload["target_key"] == "guangya"
+    assert payload["known_profile"] is True
+    assert payload["implemented"] is True
+    assert payload["selectable"] is True
+
+
+def test_target_preflight_endpoint_reports_openlist_target(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "openlist": {
+    "url": "http://127.0.0.1:5244",
+    "username": "admin",
+    "password": "demo"
+  },
+  "targets": {
+    "active_target": "openlist"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/target/preflight?target=openlist")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["target_key"] == "openlist"
     assert payload["known_profile"] is True
     assert payload["implemented"] is True
     assert payload["selectable"] is True
@@ -2305,6 +2367,29 @@ def test_provider_capability_assess_download_only_prefers_pending_tree(tmp_path:
     assert payload["assessedLevel"] == "download_upload_only"
     assert payload["strategy"]["recommendedMode"] == "pending_tree_first"
     assert payload["strategy"]["preferPendingTree"] is True
+
+
+def test_provider_capability_openlist_target_defaults_to_download_upload_only(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "targets": {
+    "active_target": "openlist"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/provider/capability?driver=Thunder&target=openlist")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["targetProfile"]["key"] == "openlist"
+    assert payload["level"] == "download_upload_only"
+    assert "OpenList" in payload["recommendedFlowEn"]
 
 
 def test_provider_coverage_audit_accepts_grouped_filters(tmp_path: Path) -> None:

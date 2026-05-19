@@ -336,6 +336,103 @@ class OpenListClient:
                     handle.write(chunk)
         return local_path
 
+    def list_entries(self, path: str) -> list[dict[str, Any]]:
+        self.ensure_login()
+        normalized = self._normalize_dir(path)
+        payload = self._request_json(
+            "POST",
+            "/api/fs/list",
+            json_body={
+                "path": normalized,
+                "password": "",
+                "page": 1,
+                "per_page": 1000,
+                "refresh": False,
+            },
+        )
+        if int(payload.get("code", 500)) != 200:
+            raise RuntimeError(payload.get("message") or payload.get("msg") or f"OpenList 列表读取失败: {normalized}")
+        data = payload.get("data") or {}
+        if not isinstance(data, dict):
+            data = {}
+        content = data.get("content") or []
+        if not isinstance(content, list):
+            return []
+        return [item for item in content if isinstance(item, dict)]
+
+    def ensure_directory(self, path: str) -> str:
+        self.ensure_login()
+        normalized = self._normalize_dir(path)
+        if normalized == "/":
+            return normalized
+        current = "/"
+        for part in [part for part in normalized.strip("/").split("/") if part]:
+            current = self._join(current, part)
+            self._mkdir_if_needed(current)
+        return normalized
+
+    def delete_path_if_exists(self, parent_path: str, name: str) -> bool:
+        self.ensure_login()
+        normalized_parent = self._normalize_dir(parent_path)
+        normalized_name = str(name or "").strip().strip("/")
+        if not normalized_name:
+            return False
+        entries = self.list_entries(normalized_parent)
+        if normalized_name not in {str(item.get("name") or "").strip() for item in entries}:
+            return False
+        payload = self._request_json(
+            "POST",
+            "/api/fs/remove",
+            json_body={
+                "dir": normalized_parent,
+                "names": [normalized_name],
+            },
+        )
+        if int(payload.get("code", 500)) != 200:
+            raise RuntimeError(payload.get("message") or payload.get("msg") or f"OpenList 删除失败: {normalized_parent}/{normalized_name}")
+        return True
+
+    def upload_local_file(self, local_path: Path, target_parent_path: str, target_name: str) -> dict[str, Any]:
+        self.ensure_login()
+        normalized_parent = self.ensure_directory(target_parent_path)
+        normalized_name = str(target_name or "").strip()
+        if not normalized_name:
+            raise RuntimeError("OpenList 上传失败: 缺少目标文件名")
+        with local_path.open("rb") as handle:
+            response = self.client.put(
+                f"{self.base_url}/api/fs/form",
+                headers={"authorization": self.token} if self.token else {},
+                data={
+                    "path": normalized_parent,
+                },
+                files={
+                    "file": (normalized_name, handle, "application/octet-stream"),
+                },
+            )
+        response.raise_for_status()
+        try:
+            payload = response.json()
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError("OpenList 上传返回了非 JSON 响应") from exc
+        if int(payload.get("code", 500)) != 200:
+            raise RuntimeError(payload.get("message") or payload.get("msg") or f"OpenList 上传失败: {normalized_parent}/{normalized_name}")
+        return payload
+
+    def _mkdir_if_needed(self, path: str) -> None:
+        payload = self._request_json(
+            "POST",
+            "/api/fs/mkdir",
+            json_body={"path": path},
+        )
+        code = int(payload.get("code", 500))
+        if code == 200:
+            return
+        message = str(payload.get("message") or payload.get("msg") or "")
+        lowered = message.lower()
+        if any(keyword in lowered for keyword in ("exist", "exists", "already", "重复", "已存在")):
+            return
+        raise RuntimeError(message or f"OpenList 创建目录失败: {path}")
+
     @staticmethod
     def _extract_hash_fields(item: dict[str, Any]) -> dict[str, Any]:
         md5_hex = ""
