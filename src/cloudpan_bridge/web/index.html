@@ -752,6 +752,7 @@
               <select id="coverage-onboarding-stage-filter" style="width:auto;min-width:220px;"></select>
               <button class="secondary" id="export-coverage-json" data-i18n="btn.export_coverage_json">导出覆盖审计 JSON</button>
               <button class="secondary" id="export-coverage-md" data-i18n="btn.export_coverage_md">导出覆盖审计 Markdown</button>
+              <button class="secondary" id="export-coverage-scaffold">导出待补 Scaffold JSON</button>
             </div>
             <div class="notice" id="about-coverage-backlog">等待载入...</div>
             <div class="notice" id="about-coverage-action-stats">等待载入...</div>
@@ -3467,6 +3468,27 @@
           headers: { "content-type": "application/json" },
         });
         downloadTextFile("cloudpan-bridge-coverage-audit.md", markdown, "text/markdown;charset=utf-8");
+      };
+      document.getElementById("export-coverage-scaffold").onclick = async () => {
+        if (!Array.isArray(driversCache) || !driversCache.length) {
+          await loadDrivers();
+        }
+        const filters = currentCoverageFilters();
+        const scaffold = await call("/api/provider/coverage_scaffold", {
+          method: "POST",
+          body: JSON.stringify({
+            drivers: driversCache,
+            target: activeTargetKey(),
+            only_gaps: filters.onlyGaps,
+            only_onboarding_ready: filters.onlyOnboardingReady,
+            next_action: filters.nextAction,
+            missing_item: filters.missingItem,
+            capability_level: filters.capabilityLevel,
+            profile_key: filters.profileKey,
+            onboarding_stage: filters.onboardingStage,
+          }),
+        });
+        downloadTextFile("cloudpan-bridge-coverage-scaffold.json", JSON.stringify(scaffold, null, 2), "application/json;charset=utf-8");
       };
       document.getElementById("open-driver-doc").onclick = () => {
         const candidates = guideDocCandidates(currentDriverGuide);

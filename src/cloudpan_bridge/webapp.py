@@ -25,6 +25,7 @@ from .provider_capture import (
 )
 from .provider_registry import (
     build_driver_coverage_audit,
+    build_driver_coverage_scaffold,
     filter_driver_coverage_audit,
     assess_driver_target_capability,
     build_driver_capability_matrix,
@@ -1107,6 +1108,26 @@ def create_app(config_path: Path) -> FastAPI:
         )
         markdown = render_driver_coverage_audit_markdown(audit)
         return PlainTextResponse(markdown, media_type="text/markdown; charset=utf-8")
+
+    @app.post("/api/provider/coverage_scaffold")
+    def post_provider_coverage_scaffold(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload = payload or {}
+        drivers = payload.get("drivers")
+        target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
+        if not isinstance(drivers, list):
+            raise HTTPException(status_code=400, detail="缺少 drivers")
+        audit = build_driver_coverage_audit([str(item or "") for item in drivers], target=target)
+        audit = filter_driver_coverage_audit(
+            audit,
+            only_gaps=bool(payload.get("only_gaps")),
+            only_onboarding_ready=bool(payload.get("only_onboarding_ready")),
+            next_action=str(payload.get("next_action") or ""),
+            missing_item=str(payload.get("missing_item") or ""),
+            capability_level=str(payload.get("capability_level") or ""),
+            profile_key=str(payload.get("profile_key") or ""),
+            onboarding_stage=str(payload.get("onboarding_stage") or ""),
+        )
+        return build_driver_coverage_scaffold(audit)
 
     @app.post("/api/provider/capability_assess")
     def post_provider_capability_assess(payload: dict[str, Any] | None = None) -> dict[str, Any]:

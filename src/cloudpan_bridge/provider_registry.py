@@ -1213,6 +1213,54 @@ def render_driver_coverage_audit_markdown(audit: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def build_driver_coverage_scaffold(audit: dict[str, Any]) -> dict[str, Any]:
+    backlog = list(audit.get("backlog") or [])
+    rows = list(audit.get("rows") or [])
+    row_by_driver = {
+        str(item.get("driver") or ""): item
+        for item in rows
+        if str(item.get("driver") or "").strip()
+    }
+    items: list[dict[str, Any]] = []
+    for backlog_item in backlog:
+        driver = str(backlog_item.get("driver") or "").strip()
+        row = row_by_driver.get(driver, {})
+        items.append(
+            {
+                "driver": driver,
+                "normalized": str(backlog_item.get("normalized") or ""),
+                "canonicalDriverKey": str(backlog_item.get("canonicalDriverKey") or row.get("canonicalDriverKey") or "generic"),
+                "profileKey": str(backlog_item.get("profileKey") or row.get("profileKey") or "generic"),
+                "nextAction": str(backlog_item.get("nextAction") or ""),
+                "priorityRank": int(backlog_item.get("priorityRank") or 99),
+                "onboardingStage": str(backlog_item.get("onboardingStage") or ""),
+                "missingItems": list(backlog_item.get("missingItems") or []),
+                "guideDocUrl": str(row.get("guideDocUrl") or ""),
+                "docLinks": list(row.get("docLinks") or []),
+                "captureSpecKey": str(row.get("captureSpecKey") or ""),
+                "captureLoginUrl": str(row.get("captureLoginUrl") or ""),
+                "captureMatchedAlias": str(row.get("captureMatchedAlias") or ""),
+                "capabilityLevel": str(backlog_item.get("capabilityLevel") or row.get("capabilityLevel") or "unsupported"),
+            }
+        )
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for item in items:
+        grouped.setdefault(str(item.get("nextAction") or "unknown"), []).append(item)
+    for key in grouped:
+        grouped[key] = sorted(grouped[key], key=lambda item: (int(item.get("priorityRank") or 99), str(item.get("driver") or "").lower()))
+    return {
+        "target": str(audit.get("target") or "guangya"),
+        "filters": dict(audit.get("filters") or {}),
+        "summary": {
+            "totalBacklog": len(items),
+            "actionCount": len(grouped),
+        },
+        "byNextAction": grouped,
+        "items": items,
+        "executionPlan": dict(audit.get("executionPlan") or {}),
+    }
+
+
 def assess_driver_target_capability(
     driver: str,
     analysis_summary: dict[str, Any] | None = None,

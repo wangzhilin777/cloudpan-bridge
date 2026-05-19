@@ -1359,6 +1359,65 @@ def test_provider_coverage_audit_markdown_supports_onboarding_ready_filter(monke
     assert "`UnknownDrive`" not in text
 
 
+def test_provider_coverage_scaffold_endpoint_returns_grouped_backlog(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_scaffold",
+        json={
+            "drivers": ["UnknownDrive", "AliyundriveOpen"],
+            "target": "guangya",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["totalBacklog"] == 1
+    assert payload["byNextAction"]["add_profile_first"][0]["driver"] == "UnknownDrive"
+    assert payload["items"][0]["missingItems"] == ["profile", "guide", "capture", "capability"]
+
+
+def test_provider_coverage_scaffold_endpoint_respects_filters(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_scaffold",
+        json={
+            "drivers": ["UnknownDrive", "AliyundriveOpen", "Thunder"],
+            "target": "guangya",
+            "next_action": "add_profile_first",
+            "missing_item": "profile",
+            "only_gaps": True,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["totalBacklog"] == 1
+    assert list(payload["byNextAction"].keys()) == ["add_profile_first"]
+    assert payload["items"][0]["driver"] == "UnknownDrive"
+
+
 def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(

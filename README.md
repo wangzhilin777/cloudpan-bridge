@@ -169,6 +169,9 @@
   - 现在还会额外生成“执行波次建议”
     - 按 `add_profile_first / add_guide / add_capture_spec / assess_target_capability` 分波
     - 每一波直接列出对应驱动、缺口类型与相关 profile
+  - 现在还支持导出“待补 Scaffold JSON”
+    - 会把当前筛选结果整理成可继续补驱动的结构化清单
+    - 包含 driver、nextAction、missingItems、guideDocUrl、captureLoginUrl 等信息
   - 支持导出 `JSON / Markdown` 审计结果，便于拆分后续任务
   - 支持页面内只看缺口、按下一步动作过滤
   - 还支持按缺口类型过滤，例如只看“缺 capture”的驱动
