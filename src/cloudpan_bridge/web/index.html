@@ -1862,27 +1862,29 @@
       renderCapabilitySummary();
     }
 
-    async function refreshCoverageAudit() {
-      if (!Array.isArray(driversCache) || !driversCache.length) {
-        coverageAuditCache = null;
-        renderAboutRegistry();
-        return;
+    function buildCoverageAuditPayload(filters) {
+      const payload = {
+        target: activeTargetKey(),
+        only_gaps: filters.onlyGaps,
+        only_onboarding_ready: filters.onlyOnboardingReady,
+        next_action: filters.nextAction,
+        missing_item: filters.missingItem,
+        capability_level: filters.capabilityLevel,
+        profile_key: filters.profileKey,
+        onboarding_stage: filters.onboardingStage,
+      };
+      if (Array.isArray(driversCache) && driversCache.length) {
+        payload.drivers = driversCache;
       }
+      return payload;
+    }
+
+    async function refreshCoverageAudit() {
       const filters = currentCoverageFilters();
       try {
         coverageAuditCache = await call("/api/provider/coverage_audit", {
           method: "POST",
-          body: JSON.stringify({
-            drivers: driversCache,
-            target: activeTargetKey(),
-            only_gaps: filters.onlyGaps,
-            only_onboarding_ready: filters.onlyOnboardingReady,
-            next_action: filters.nextAction,
-            missing_item: filters.missingItem,
-            capability_level: filters.capabilityLevel,
-            profile_key: filters.profileKey,
-            onboarding_stage: filters.onboardingStage,
-          }),
+          body: JSON.stringify(buildCoverageAuditPayload(filters)),
         });
       } catch (_error) {
         coverageAuditCache = null;
@@ -2273,25 +2275,25 @@
       }) : [];
       if (!auditRows.length) {
         coverageBacklogRoot.textContent = currentLang() === "en"
-          ? "The prioritized backlog will appear after the OpenList driver list is loaded."
+          ? "The prioritized backlog will appear after OpenList driver coverage is available."
           : currentLang() === "mix"
-            ? "驱动列表载入后，这里会显示优先级 backlog。 / The prioritized backlog will appear after drivers are loaded."
-            : "驱动列表载入后，这里会显示优先级 backlog。";
+            ? "OpenList 驱动覆盖可用后，这里会显示优先级 backlog。 / The prioritized backlog will appear after driver coverage is available."
+            : "OpenList 驱动覆盖可用后，这里会显示优先级 backlog。";
         coverageActionStatsRoot.textContent = currentLang() === "en"
-          ? "The next-action stats will appear after the OpenList driver list is loaded."
+          ? "The next-action stats will appear after OpenList driver coverage is available."
           : currentLang() === "mix"
-            ? "驱动列表载入后，这里会显示下一步动作统计。 / The next-action stats will appear after drivers are loaded."
-            : "驱动列表载入后，这里会显示下一步动作统计。";
+            ? "OpenList 驱动覆盖可用后，这里会显示下一步动作统计。 / The next-action stats will appear after driver coverage is available."
+            : "OpenList 驱动覆盖可用后，这里会显示下一步动作统计。";
         coverageRoot.textContent = currentLang() === "en"
-          ? "Coverage audit will appear after the OpenList driver list is loaded."
+          ? "Coverage audit will appear after OpenList driver coverage is available."
           : currentLang() === "mix"
-            ? "驱动列表载入后，这里会显示覆盖审计结果。 / Coverage audit will appear after drivers are loaded."
-            : "驱动列表载入后，这里会显示覆盖审计结果。";
+            ? "OpenList 驱动覆盖可用后，这里会显示覆盖审计结果。 / Coverage audit will appear after driver coverage is available."
+            : "OpenList 驱动覆盖可用后，这里会显示覆盖审计结果。";
         coveragePlanRoot.textContent = currentLang() === "en"
-          ? "Execution waves will appear after the OpenList driver list is loaded."
+          ? "Execution waves will appear after OpenList driver coverage is available."
           : currentLang() === "mix"
-            ? "驱动列表载入后，这里会显示执行波次建议。 / Execution waves will appear after drivers are loaded."
-            : "驱动列表载入后，这里会显示执行波次建议。";
+            ? "OpenList 驱动覆盖可用后，这里会显示执行波次建议。 / Execution waves will appear after driver coverage is available."
+            : "OpenList 驱动覆盖可用后，这里会显示执行波次建议。";
       } else {
         const actionCounts = filteredAuditRows.reduce((acc, item) => {
           const key = String(item.nextAction || "unknown");
@@ -3730,66 +3732,27 @@
         downloadTextFile("cloudpan-bridge-coverage-audit.json", JSON.stringify(coverageAuditCache, null, 2), "application/json;charset=utf-8");
       };
       document.getElementById("export-coverage-md").onclick = async () => {
-        if (!Array.isArray(driversCache) || !driversCache.length) {
-          await loadDrivers();
-        }
         const filters = currentCoverageFilters();
         const markdown = await call("/api/provider/coverage_audit_markdown", {
           method: "POST",
-          body: JSON.stringify({
-            drivers: driversCache,
-            target: activeTargetKey(),
-            only_gaps: filters.onlyGaps,
-            only_onboarding_ready: filters.onlyOnboardingReady,
-            next_action: filters.nextAction,
-            missing_item: filters.missingItem,
-            capability_level: filters.capabilityLevel,
-            profile_key: filters.profileKey,
-            onboarding_stage: filters.onboardingStage,
-          }),
+          body: JSON.stringify(buildCoverageAuditPayload(filters)),
           headers: { "content-type": "application/json" },
         });
         downloadTextFile("cloudpan-bridge-coverage-audit.md", markdown, "text/markdown;charset=utf-8");
       };
       document.getElementById("export-coverage-scaffold").onclick = async () => {
-        if (!Array.isArray(driversCache) || !driversCache.length) {
-          await loadDrivers();
-        }
         const filters = currentCoverageFilters();
         const scaffold = await call("/api/provider/coverage_scaffold", {
           method: "POST",
-          body: JSON.stringify({
-            drivers: driversCache,
-            target: activeTargetKey(),
-            only_gaps: filters.onlyGaps,
-            only_onboarding_ready: filters.onlyOnboardingReady,
-            next_action: filters.nextAction,
-            missing_item: filters.missingItem,
-            capability_level: filters.capabilityLevel,
-            profile_key: filters.profileKey,
-            onboarding_stage: filters.onboardingStage,
-          }),
+          body: JSON.stringify(buildCoverageAuditPayload(filters)),
         });
         downloadTextFile("cloudpan-bridge-coverage-scaffold.json", JSON.stringify(scaffold, null, 2), "application/json;charset=utf-8");
       };
       document.getElementById("export-coverage-scaffold-md").onclick = async () => {
-        if (!Array.isArray(driversCache) || !driversCache.length) {
-          await loadDrivers();
-        }
         const filters = currentCoverageFilters();
         const markdown = await call("/api/provider/coverage_scaffold_markdown", {
           method: "POST",
-          body: JSON.stringify({
-            drivers: driversCache,
-            target: activeTargetKey(),
-            only_gaps: filters.onlyGaps,
-            only_onboarding_ready: filters.onlyOnboardingReady,
-            next_action: filters.nextAction,
-            missing_item: filters.missingItem,
-            capability_level: filters.capabilityLevel,
-            profile_key: filters.profileKey,
-            onboarding_stage: filters.onboardingStage,
-          }),
+          body: JSON.stringify(buildCoverageAuditPayload(filters)),
           headers: { "content-type": "application/json" },
         });
         downloadTextFile("cloudpan-bridge-coverage-scaffold.md", markdown, "text/markdown;charset=utf-8");
