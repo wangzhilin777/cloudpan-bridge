@@ -2090,6 +2090,49 @@ def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Pat
     assert payload["strategy"]["preferPendingTree"] is False
 
 
+def test_provider_capability_assess_accepts_grouped_target_and_filters(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  },
+  "targets": {
+    "active_target": "guangya"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/capability_assess",
+        json={
+            "driver": "189Cloud",
+            "grouped_config": {
+                "targets": {
+                    "active_target": "guangya"
+                }
+            },
+            "analysis_summary": {
+                "total": 2,
+                "fast_upload_ready": 2,
+                "md5_ready": 2,
+                "gcid_ready": 0,
+                "missing_fast_upload": 0,
+            },
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["targetProfile"]["key"] == "guangya"
+    assert payload["assessedLevel"] == "fast_upload_supported"
+
+
 def test_provider_capability_assess_without_analysis_requires_probe_first(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
@@ -2151,6 +2194,45 @@ def test_provider_capability_assess_download_only_prefers_pending_tree(tmp_path:
     assert payload["assessedLevel"] == "download_upload_only"
     assert payload["strategy"]["recommendedMode"] == "pending_tree_first"
     assert payload["strategy"]["preferPendingTree"] is True
+
+
+def test_provider_coverage_audit_accepts_grouped_filters(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "targets": {
+    "active_target": "guangya"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_audit",
+        json={
+            "drivers": ["UnknownDrive", "Thunder"],
+            "grouped_config": {
+                "targets": {
+                    "active_target": "guangya"
+                },
+                "ui": {
+                    "coverage_filters": {
+                        "onlyGaps": True,
+                        "nextAction": "add_profile_first",
+                    }
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["rows"]) >= 1
+    assert all(item["nextAction"] == "add_profile_first" for item in payload["rows"])
+    assert all(item["nextAction"] == "add_profile_first" for item in payload["backlog"])
 
 
 def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:

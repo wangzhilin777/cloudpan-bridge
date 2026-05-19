@@ -318,6 +318,19 @@ def create_app(config_path: Path) -> FastAPI:
         normalized["selected_paths"] = list(raw.get("selected_paths") or [])
         return normalized
 
+    def normalize_registry_payload(payload: dict[str, Any] | None, runtime_config: AppConfig) -> dict[str, Any]:
+        raw = dict(payload or {})
+        normalized = dict(raw)
+        normalized["target"] = str(resolve_payload_value(raw, "target", ("targets", "active_target"), runtime_config.target_key or "guangya"))
+        normalized["only_gaps"] = bool(resolve_payload_value(raw, "only_gaps", ("ui", "coverage_filters", "onlyGaps"), raw.get("only_gaps") or False))
+        normalized["only_onboarding_ready"] = bool(resolve_payload_value(raw, "only_onboarding_ready", ("ui", "coverage_filters", "onlyOnboardingReady"), raw.get("only_onboarding_ready") or False))
+        normalized["next_action"] = str(resolve_payload_value(raw, "next_action", ("ui", "coverage_filters", "nextAction"), raw.get("next_action") or ""))
+        normalized["missing_item"] = str(resolve_payload_value(raw, "missing_item", ("ui", "coverage_filters", "missingItem"), raw.get("missing_item") or ""))
+        normalized["capability_level"] = str(resolve_payload_value(raw, "capability_level", ("ui", "coverage_filters", "capabilityLevel"), raw.get("capability_level") or ""))
+        normalized["profile_key"] = str(resolve_payload_value(raw, "profile_key", ("ui", "coverage_filters", "profileKey"), raw.get("profile_key") or ""))
+        normalized["onboarding_stage"] = str(resolve_payload_value(raw, "onboarding_stage", ("ui", "coverage_filters", "onboardingStage"), raw.get("onboarding_stage") or ""))
+        return normalized
+
     def load_config_payload() -> dict[str, Any]:
         normalized = AppConfig.load(config_path)
         payload = normalized.to_flat_dict()
@@ -1167,7 +1180,7 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.post("/api/provider/coverage_audit")
     def post_provider_coverage_audit(payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        payload = payload or {}
+        payload = normalize_registry_payload(payload, config)
         drivers = payload.get("drivers")
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
         if not isinstance(drivers, list):
@@ -1186,7 +1199,7 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.post("/api/provider/coverage_audit_markdown")
     def post_provider_coverage_audit_markdown(payload: dict[str, Any] | None = None) -> PlainTextResponse:
-        payload = payload or {}
+        payload = normalize_registry_payload(payload, config)
         drivers = payload.get("drivers")
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
         if not isinstance(drivers, list):
@@ -1207,7 +1220,7 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.post("/api/provider/coverage_scaffold")
     def post_provider_coverage_scaffold(payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        payload = payload or {}
+        payload = normalize_registry_payload(payload, config)
         drivers = payload.get("drivers")
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
         if not isinstance(drivers, list):
@@ -1227,7 +1240,7 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.post("/api/provider/coverage_scaffold_markdown")
     def post_provider_coverage_scaffold_markdown(payload: dict[str, Any] | None = None) -> PlainTextResponse:
-        payload = payload or {}
+        payload = normalize_registry_payload(payload, config)
         drivers = payload.get("drivers")
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
         if not isinstance(drivers, list):
@@ -1249,7 +1262,7 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.post("/api/provider/capability_assess")
     def post_provider_capability_assess(payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        payload = payload or {}
+        payload = normalize_registry_payload(payload, config)
         driver = str(payload.get("driver") or "").strip()
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
         if not driver:
@@ -1372,7 +1385,7 @@ def create_app(config_path: Path) -> FastAPI:
     @app.post("/api/provider/capture/start")
     def start_provider_capture(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         payload = payload or {}
-        provider = str(payload.get("provider") or "").strip().lower()
+        provider = str(resolve_payload_value(payload, "provider", default="")).strip().lower()
         driver = str(payload.get("driver") or "").strip()
         login_url = str(payload.get("login_url") or "").strip()
         if not provider:
@@ -1400,7 +1413,7 @@ def create_app(config_path: Path) -> FastAPI:
     @app.post("/api/provider/capture/prefill")
     def provider_capture_prefill(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         payload = payload or {}
-        provider = str(payload.get("provider") or "").strip().lower()
+        provider = str(resolve_payload_value(payload, "provider", default="")).strip().lower()
         driver = str(payload.get("driver") or "").strip()
         return build_provider_prefill(provider, driver)
 
