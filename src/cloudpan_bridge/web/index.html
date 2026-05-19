@@ -1147,7 +1147,12 @@
       }
       return null;
     }
-    const currentLang = () => getStorageValue(UI_LANGUAGE_KEY, LEGACY_UI_LANGUAGE_KEYS) || "zh";
+    const currentLang = () => {
+      const groupedLanguage = typeof configCache?.grouped_config?.ui?.language === "string"
+        ? configCache.grouped_config.ui.language
+        : "";
+      return groupedLanguage || getStorageValue(UI_LANGUAGE_KEY, LEGACY_UI_LANGUAGE_KEYS) || "zh";
+    };
     let configCache = {};
     let currentDirectoryPath = "/";
     let currentParentPath = null;
@@ -1169,6 +1174,7 @@
     let currentProviderGuide = null;
     let coverageAuditCache = null;
     let panelStatePersistTimer = null;
+    let uiPrefsPersistTimer = null;
 
     function getGroupedConfigValue(path, fallback = "") {
       let current = configCache?.grouped_config;
@@ -1207,6 +1213,8 @@
     }
 
     function getCoverageFilterState() {
+      const groupedFilters = getGroupedConfigValue(["ui", "coverage_filters"], null);
+      if (groupedFilters && typeof groupedFilters === "object") return { ...groupedFilters };
       try {
         return JSON.parse(localStorage.getItem(COVERAGE_FILTERS_KEY) || "{}");
       } catch {
@@ -1216,6 +1224,28 @@
 
     function setCoverageFilterState(nextState) {
       localStorage.setItem(COVERAGE_FILTERS_KEY, JSON.stringify(nextState));
+      setGroupedConfigValue(["ui", "coverage_filters"], { ...(nextState || {}) });
+      scheduleUiPrefsPersist();
+    }
+
+    function scheduleUiPrefsPersist() {
+      if (uiPrefsPersistTimer) clearTimeout(uiPrefsPersistTimer);
+      uiPrefsPersistTimer = setTimeout(async () => {
+        try {
+          await call("/api/config", {
+            method: "POST",
+            body: JSON.stringify({
+              grouped_config: {
+                ui: {
+                  language: currentLang(),
+                  coverage_filters: getCoverageFilterState(),
+                },
+              },
+            }),
+          });
+        } catch (_error) {
+        }
+      }, 180);
     }
 
     function currentCoverageFilters() {
@@ -1488,6 +1518,8 @@
       langSelect.value = currentLang();
       langSelect.addEventListener("change", () => {
         localStorage.setItem(UI_LANGUAGE_KEY, langSelect.value);
+        setGroupedConfigValue(["ui", "language"], langSelect.value);
+        scheduleUiPrefsPersist();
         applyI18n();
       });
     }
@@ -2471,6 +2503,14 @@
 
     function applyConfigToForm(config) {
       configCache = { ...(config || {}) };
+      const groupedLanguage = getGroupedConfigValue(["ui", "language"], "");
+      if (typeof groupedLanguage === "string" && groupedLanguage) {
+        localStorage.setItem(UI_LANGUAGE_KEY, groupedLanguage);
+      }
+      const groupedCoverageFilters = getGroupedConfigValue(["ui", "coverage_filters"], null);
+      if (groupedCoverageFilters && typeof groupedCoverageFilters === "object") {
+        localStorage.setItem(COVERAGE_FILTERS_KEY, JSON.stringify(groupedCoverageFilters));
+      }
       const panelState = configCache.panel_open_states || {};
       if (panelState && typeof panelState === "object") {
         setPanelState({ ...getPanelState(), ...panelState });
@@ -2507,6 +2547,9 @@
         el.value = value ?? "";
       }
       document.getElementById("effective_openlist_url").value = config?.effective_openlist_url || "";
+      applySavedCoverageFilters();
+      const langSelect = document.getElementById("ui_language");
+      if (langSelect) langSelect.value = currentLang();
     }
 
     async function saveConfig() {
@@ -2530,6 +2573,7 @@
     async function loadConfig() {
       const data = await call("/api/config");
       applyConfigToForm(data);
+      applyI18n();
       return data;
     }
 

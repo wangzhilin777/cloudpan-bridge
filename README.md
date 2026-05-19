@@ -183,6 +183,8 @@
     - 或只看某个具体 profile，如 `aliyundriveopen`
   - 这些筛选项现在会按当前 registry / 审计结果动态生成
     - 不再把 profile key、执行阶段之类的选项写死在前端
+  - 当前语言与覆盖审计筛选也会跟随配置持久化
+    - 下次重新进入页面时，会优先恢复上次保存的语言和审计过滤条件
   - 现在还支持一层“接入阶段”视图
     - `needs_profile_bootstrap`
     - `ready_for_guide`

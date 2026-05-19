@@ -274,7 +274,11 @@ def create_app(config_path: Path) -> FastAPI:
         return payload
 
     def load_grouped_config_payload() -> dict[str, Any]:
-        return AppConfig.load(config_path).to_dict()
+        normalized = AppConfig.load(config_path).to_dict()
+        if not config_path.exists():
+            return normalized
+        raw_payload = json.loads(config_path.read_text(encoding="utf-8"))
+        return deep_merge_dicts(normalized, raw_payload)
 
     def save_config_payload(payload: dict[str, Any]) -> None:
         grouped_patch = dict(payload.get("grouped_config", {}) or {}) if isinstance(payload.get("grouped_config"), dict) else {}
@@ -290,7 +294,8 @@ def create_app(config_path: Path) -> FastAPI:
             }
         )
         normalized = AppConfig.from_payload(merged)
-        config_path.write_text(json.dumps(normalized.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        final_payload = deep_merge_dicts(current_grouped, normalized.to_dict())
+        config_path.write_text(json.dumps(final_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     def merged_provider_capture_snapshots() -> dict[str, dict[str, Any]]:
         payload = load_config_payload()
