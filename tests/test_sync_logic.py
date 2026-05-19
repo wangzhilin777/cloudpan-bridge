@@ -584,6 +584,39 @@ def test_config_endpoint_grouped_view_preserves_unknown_scalar_and_list_sections
     assert "provider_order" not in payload
 
 
+def test_config_endpoint_flat_update_preserves_unknown_scalar_and_list_sections(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  },
+  "feature_switch": true,
+  "provider_order": ["quark", "189cloud"]
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/config",
+        json={
+            "source_path": "/src-2",
+            "target_path": "/dst-2",
+        },
+    )
+    assert response.status_code == 200
+    saved = json.loads(config_path.read_text(encoding="utf-8"))
+    assert saved["sync"]["source_path"] == "/src-2"
+    assert saved["sync"]["target_path"] == "/dst-2"
+    assert saved["feature_switch"] is True
+    assert saved["provider_order"] == ["quark", "189cloud"]
+
+
 def test_config_endpoint_accepts_grouped_partial_update(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
