@@ -1354,6 +1354,80 @@ def test_openlist_login_accepts_grouped_openlist_fields(tmp_path: Path, monkeypa
     assert saved["openlist"]["url"] == "http://127.0.0.1:5245"
     assert saved["openlist"]["username"] == "grouped-admin"
     assert saved["openlist"]["token"] == "grouped-token"
+    assert "openlist_url" not in saved
+    assert "openlist_token" not in saved
+
+
+def test_status_persists_grouped_capture_updates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    state_path = tmp_path / "sync-state.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  },
+  "state": {
+    "state_file": "__STATE_FILE__"
+  },
+  "targets": {
+    "active_target": "guangya",
+    "guangya": {}
+  }
+}
+""".replace("__STATE_FILE__", str(state_path).replace("\\", "\\\\")).strip(),
+        encoding="utf-8",
+    )
+    state_path.write_text(json.dumps({"target_states": {}}, ensure_ascii=False), encoding="utf-8")
+    from cloudpan_bridge import webapp as webapp_module
+
+    class FakeProviderCaptureManager:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        def snapshots(self) -> dict[str, dict[str, object]]:
+            return {
+                "quark": {
+                    "provider": "quark",
+                    "status": "captured",
+                    "message": "from live snapshot",
+                    "captured": {
+                        "cookie_header": "sid=1; token=2",
+                    },
+                }
+            }
+
+        def snapshot(self, provider: str) -> dict[str, object]:
+            if provider == "guangya":
+                return {
+                    "provider": "guangya",
+                    "status": "captured",
+                    "message": "guangya live",
+                    "captured": {
+                        "authorization": "Bearer live-auth",
+                        "access_token": "live-token",
+                        "refresh_token": "live-refresh",
+                        "device_id": "live-device",
+                    },
+                }
+            return {}
+
+        def definitions_payload(self) -> list[dict[str, object]]:
+            return []
+
+    monkeypatch.setattr(webapp_module, "ProviderCaptureManager", FakeProviderCaptureManager)
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.get("/api/status")
+    assert response.status_code == 200
+    saved = json.loads(config_path.read_text(encoding="utf-8"))
+    assert saved["targets"]["guangya"]["authorization"] == "Bearer live-auth"
+    assert saved["targets"]["guangya"]["access_token"] == "live-token"
+    assert saved["targets"]["guangya"]["refresh_token"] == "live-refresh"
+    assert saved["targets"]["guangya"]["device_id"] == "live-device"
+    assert saved["source_session"]["provider_captures"]["quark"]["captured"]["cookie_header"] == "sid=1; token=2"
+    assert "guangya_authorization" not in saved
+    assert "provider_captures" not in saved
 
 
 def test_openlist_list_dirs_accepts_grouped_fields(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

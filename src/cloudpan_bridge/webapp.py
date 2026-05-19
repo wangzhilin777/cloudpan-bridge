@@ -278,6 +278,29 @@ def create_app(config_path: Path) -> FastAPI:
             current = current[key]
         return current
 
+    def payload_nested_set(payload: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
+        current: dict[str, Any] = payload
+        for key in path[:-1]:
+            existing = current.get(key)
+            if not isinstance(existing, dict):
+                existing = {}
+                current[key] = existing
+            current = existing
+        current[path[-1]] = value
+
+    def save_grouped_config_updates(updates: dict[tuple[str, ...], Any]) -> bool:
+        grouped_patch: dict[str, Any] = {}
+        changed = False
+        current_grouped = load_grouped_config_payload()
+        for path, value in updates.items():
+            if payload_nested_get(current_grouped, path, None) == value:
+                continue
+            payload_nested_set(grouped_patch, path, value)
+            changed = True
+        if changed:
+            save_config_payload({"grouped_config": grouped_patch})
+        return changed
+
     def resolve_payload_value(
         payload: dict[str, Any] | None,
         flat_key: str,
@@ -456,19 +479,13 @@ def create_app(config_path: Path) -> FastAPI:
         tokens = state.get_target_state("guangya")
         if not tokens:
             return
-        payload = load_config_payload()
-        changed = False
-        mapping = {
-            "guangya_access_token": tokens.get("access_token", ""),
-            "guangya_refresh_token": tokens.get("refresh_token", ""),
-            "guangya_device_id": tokens.get("device_id", ""),
+        updates = {
+            ("targets", "guangya", "access_token"): str(tokens.get("access_token", "")),
+            ("targets", "guangya", "refresh_token"): str(tokens.get("refresh_token", "")),
+            ("targets", "guangya", "device_id"): str(tokens.get("device_id", "")),
         }
-        for key, value in mapping.items():
-            if value and payload.get(key) != value:
-                payload[key] = value
-                changed = True
+        changed = save_grouped_config_updates({path: value for path, value in updates.items() if value})
         if changed:
-            save_config_payload(payload)
             config = AppConfig.load(config_path)
             logger.info("光鸭 token/device_id 已自动写回配置")
 
@@ -484,28 +501,22 @@ def create_app(config_path: Path) -> FastAPI:
         device_id = str(captured.get("x-device-id") or captured.get("did") or captured.get("device_id") or "")
         if not any([authorization, access_token, refresh_token, device_id]):
             return
-        payload = load_config_payload()
-        changed = False
-        mapping = {
-            "guangya_authorization": authorization,
-            "guangya_access_token": access_token,
-            "guangya_refresh_token": refresh_token,
-            "guangya_device_id": device_id,
+        updates = {
+            ("targets", "guangya", "authorization"): authorization,
+            ("targets", "guangya", "access_token"): access_token,
+            ("targets", "guangya", "refresh_token"): refresh_token,
+            ("targets", "guangya", "device_id"): device_id,
         }
-        for key, value in mapping.items():
-            if value and payload.get(key) != value:
-                payload[key] = value
-                changed = True
+        changed = save_grouped_config_updates({path: value for path, value in updates.items() if value})
         if changed:
-            save_config_payload(payload)
             config = AppConfig.load(config_path)
             logger.info("光鸭 Authorization/token/device_id 已自动写回配置")
 
     def persist_provider_captures_to_config() -> None:
         nonlocal config
         snapshots = merged_provider_capture_snapshots()
-        payload = load_config_payload()
-        existing = dict(payload.get("provider_captures", {}) or {})
+        current_grouped = load_grouped_config_payload()
+        existing = dict(payload_nested_get(current_grouped, ("source_session", "provider_captures"), {}) or {})
         changed = False
         for provider, snapshot in snapshots.items():
             captured = snapshot.get("captured") if isinstance(snapshot, dict) else {}
@@ -521,8 +532,9 @@ def create_app(config_path: Path) -> FastAPI:
                 existing[provider] = normalized_snapshot
                 changed = True
         if changed:
-            payload["provider_captures"] = existing
-            save_config_payload(payload)
+            save_grouped_config_updates({
+                ("source_session", "provider_captures"): existing,
+            })
             config = AppConfig.load(config_path)
 
     def build_provider_prefill(provider: str, driver: str) -> dict[str, Any]:
@@ -1145,13 +1157,14 @@ def create_app(config_path: Path) -> FastAPI:
         )
         try:
             client.ensure_login()
-            cfg = load_config_payload()
-            cfg["openlist_url"] = client.base_url
-            cfg["openlist_username"] = client.username
+            updates: dict[tuple[str, ...], Any] = {
+                ("openlist", "url"): client.base_url,
+                ("openlist", "username"): client.username,
+                ("openlist", "token"): client.token,
+            }
             if resolve_payload_value(payload, "openlist_password", ("openlist", "password"), ""):
-                cfg["openlist_password"] = client.password
-            cfg["openlist_token"] = client.token
-            save_config_payload(cfg)
+                updates[("openlist", "password")] = client.password
+            save_grouped_config_updates(updates)
             config = AppConfig.load(config_path)
             logger.info("OpenList 登录成功，token 已写回配置")
             return {"ok": True, "openlist_token": client.token}
