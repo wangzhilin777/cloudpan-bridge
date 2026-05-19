@@ -339,6 +339,13 @@ def create_app(config_path: Path) -> FastAPI:
         normalized["login_url"] = str(resolve_payload_value(raw, "login_url", default="")).strip()
         return normalized
 
+    def normalize_storage_create_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
+        raw = dict(payload or {})
+        normalized = dict(raw)
+        normalized["driver"] = str(resolve_payload_value(raw, "driver", default="")).strip()
+        normalized["values"] = dict(raw.get("values") or {})
+        return normalized
+
     def load_config_payload() -> dict[str, Any]:
         normalized = AppConfig.load(config_path)
         payload = normalized.to_flat_dict()
@@ -1287,7 +1294,7 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.post("/api/openlist/storage/create")
     def create_openlist_storage(payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        payload = payload or {}
+        payload = normalize_storage_create_payload(payload)
         driver = str(payload.get("driver") or "").strip()
         values = dict(payload.get("values") or {})
         if not driver:

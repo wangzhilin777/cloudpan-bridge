@@ -2280,6 +2280,60 @@ def test_provider_capture_prefill_accepts_grouped_provider_and_driver(tmp_path: 
     assert payload["missing_required"] == []
 
 
+def test_openlist_storage_create_accepts_grouped_driver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge import webapp as webapp_module
+
+    seen: dict[str, object] = {}
+    info = OpenListDriverInfo(
+        name="Quark",
+        common=[OpenListDriverField(name="cookie", required=True)],
+        additional=[],
+        config={},
+    )
+
+    monkeypatch.setattr(webapp_module.OpenListAdminClient, "driver_info", lambda self, driver: info)
+
+    def fake_build_storage_payload(info_obj: OpenListDriverInfo, values: dict[str, object]) -> dict[str, object]:
+        seen["driver_name"] = info_obj.name
+        seen["values"] = values
+        return {"mount_path": "/quark", **values}
+
+    def fake_create_storage(self: object, driver: str, body: dict[str, object]) -> dict[str, object]:
+        seen["driver"] = driver
+        seen["body"] = body
+        return {"ok": True, "driver": driver, "body": body}
+
+    monkeypatch.setattr(webapp_module, "build_storage_payload", fake_build_storage_payload)
+    monkeypatch.setattr(webapp_module.OpenListAdminClient, "create_storage", fake_create_storage)
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.post(
+        "/api/openlist/storage/create",
+        json={
+            "grouped_config": {},
+            "driver": "Quark",
+            "values": {
+                "cookie": "sid=1; token=2"
+            },
+        },
+    )
+    assert response.status_code == 200
+    assert seen["driver"] == "Quark"
+    assert seen["driver_name"] == "Quark"
+    assert seen["values"] == {"cookie": "sid=1; token=2"}
+
+
 def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
