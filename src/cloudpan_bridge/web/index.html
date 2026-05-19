@@ -2218,6 +2218,12 @@
         body: JSON.stringify(payload),
       });
       configCache = payload;
+      providerRegistryPayload = {
+        ...(providerRegistryPayload || {}),
+        active_target: String(payload.target_key || "guangya"),
+      };
+      await loadProviderRegistry();
+      await refreshCoverageAudit();
       setNotice("sync-notice", "配置已保存");
       setNotice("dir-notice", "配置已保存");
     }
@@ -2919,6 +2925,17 @@
       });
       document.getElementById("provider-select").addEventListener("change", () => {
         renderProviderCapturePanel();
+      });
+      document.getElementById("target_key").addEventListener("change", async (event) => {
+        const nextTarget = String(event.target?.value || "guangya");
+        providerRegistryPayload = {
+          ...(providerRegistryPayload || {}),
+          active_target: nextTarget,
+        };
+        renderCapabilitySummary();
+        renderAboutRegistry();
+        await refreshCapabilityAssessment();
+        await refreshCoverageAudit();
       });
       document.getElementById("rate_limit_mode").addEventListener("change", () => {
         const selected = document.getElementById("mounted_source_select").value || document.getElementById("source_path").value || "/";

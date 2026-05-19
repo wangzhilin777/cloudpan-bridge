@@ -455,6 +455,7 @@ Guangya 是当前已完成最多的目标端，必须继续保留并增强。
 - `Phase 4`
   - Guangya 已抽出目标端适配器基础结构
   - 已新增 `target_key`、目标端工厂与页面目标端选择点，当前默认仍为 `guangya`
+  - 页面切换 `target_key` 后，能力矩阵、覆盖审计与导出链路都会按当前目标端实时刷新
 - `Phase 5`
   - 页面已具备驱动覆盖审计、按缺口过滤、导出 JSON/Markdown、优先级 backlog
   - 覆盖审计已修正为按真实 capture spec 判断，不再把 source profile 误当作已具备抓取支持
