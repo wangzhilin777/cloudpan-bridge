@@ -519,6 +519,45 @@ def test_config_endpoint_grouped_view_preserves_unknown_nested_sections(tmp_path
     assert "extra_runtime" not in payload
 
 
+def test_config_endpoint_grouped_update_preserves_unknown_nested_sections(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  },
+  "extra_runtime": {
+    "feature_flag": true,
+    "notes": {
+      "owner": "demo"
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/config",
+        json={
+            "grouped_config": {
+                "ui": {
+                    "language": "mix",
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    saved = json.loads(config_path.read_text(encoding="utf-8"))
+    assert saved["ui"]["language"] == "mix"
+    assert saved["extra_runtime"]["feature_flag"] is True
+    assert saved["extra_runtime"]["notes"]["owner"] == "demo"
+
+
 def test_config_endpoint_accepts_grouped_partial_update(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
