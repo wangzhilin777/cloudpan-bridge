@@ -66,7 +66,7 @@ DRIVER_GUIDES: dict[str, dict[str, Any]] = {
         },
     },
     "189cloud": {
-        "doc_url": "https://doc.oplist.org/guide/drivers/189cloud",
+        "doc_url": "https://doc.oplist.org/guide/drivers/189",
         "summary": {
             "zh": "天翼云盘驱动通常以 Cookie 与 sessionKey 类字段为主。网页登录抓取可作为快速起步，但正式挂载前仍建议先验证目录读取、小范围下载和分页稳定性。",
             "en": "189Cloud usually relies on Cookie and sessionKey-like fields. Web capture is a good bootstrap path, but you should still validate listing, small downloads, and pagination stability before large jobs.",
@@ -305,7 +305,7 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
         "download_link_supported": "stable",
         "capture_strategy": "优先抓 Cookie 与 sessionKey，再回填挂载表单。",
         "capture_strategy_en": "Capture Cookie and sessionKey first, then prefill mount fields.",
-        "doc_links": ["https://doc.oplist.org/guide/drivers/189cloud"],
+        "doc_links": ["https://doc.oplist.org/guide/drivers/189"],
         "default_mount_values": {},
         "recommended_rate_profile": "safe",
         "risk_notes": {
@@ -610,9 +610,60 @@ def _normalize_key(value: str) -> str:
     return "".join(ch.lower() for ch in str(value or "") if ch.isalnum())
 
 
+def _guess_driver_doc_urls(driver: str) -> list[str]:
+    raw = str(driver or "").strip()
+    normalized = _normalize_key(raw)
+    candidates: list[str] = []
+    if raw:
+        candidates.append(f"https://doc.oplist.org/guide/drivers/{raw}")
+    if normalized and normalized != raw:
+        candidates.append(f"https://doc.oplist.org/guide/drivers/{normalized}")
+    if normalized:
+        alias_variants = {
+            "189cloud": "189",
+            "aliyundriveopen": "aliyundrive_open",
+            "123open": "123_open",
+            "139yun": "139.html",
+            "quark": "quark.html",
+            "pikpak": "pikpak.html",
+        }
+        mapped = alias_variants.get(normalized, "")
+        if mapped:
+            candidates.append(f"https://doc.oplist.org/guide/drivers/{mapped}")
+    candidates.append("https://doc.oplist.org/guide/drivers/")
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in candidates:
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def _collect_guide_doc_candidates(driver: str, guide: dict[str, Any] | None = None) -> list[str]:
+    source_profile = get_source_profile_by_key_or_alias(driver)
+    candidates: list[str] = []
+    if guide and guide.get("doc_url"):
+        candidates.append(str(guide.get("doc_url") or ""))
+    candidates.extend(str(link or "") for link in list(source_profile.get("docLinks") or source_profile.get("doc_links") or []))
+    for alias in list(source_profile.get("driverAliases") or source_profile.get("driver_aliases") or []):
+        candidates.extend(_guess_driver_doc_urls(str(alias or "")))
+    candidates.extend(_guess_driver_doc_urls(driver))
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in candidates:
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
 def _serialize_driver_guide(guide: dict[str, Any]) -> dict[str, Any]:
     return {
         "docUrl": str(guide.get("doc_url") or ""),
+        "docUrlCandidates": list(guide.get("doc_url_candidates") or []),
         "summary": dict(guide.get("summary") or {}),
         "steps": {
             "zh": list((guide.get("steps") or {}).get("zh") or []),
@@ -683,10 +734,13 @@ def _resolve_guide_key(driver: str) -> tuple[str, dict[str, Any] | None]:
 def get_driver_guide(driver: str) -> dict[str, Any] | None:
     _matched_key, guide = _resolve_guide_key(driver)
     if guide is not None:
-        return _serialize_driver_guide(guide)
+        enriched = dict(guide)
+        enriched["doc_url_candidates"] = _collect_guide_doc_candidates(driver, guide)
+        return _serialize_driver_guide(enriched)
     fallback = _build_generic_driver_guide(driver)
     if fallback is None:
         return None
+    fallback["doc_url_candidates"] = _collect_guide_doc_candidates(driver, fallback)
     return _serialize_driver_guide(fallback)
 
 

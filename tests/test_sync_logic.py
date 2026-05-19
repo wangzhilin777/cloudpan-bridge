@@ -482,6 +482,7 @@ def test_driver_guide_supports_profile_and_alias_resolution() -> None:
     assert guide_123 is not None
     assert guide_123["docUrl"].endswith("/123_open")
     assert guide_123["isGenericFallback"] is False
+    assert guide_123["docUrlCandidates"][0].endswith("/123_open")
 
     guide_baidu = provider_registry_module.get_driver_guide("BaiduNetdisk")
     assert guide_baidu is not None
@@ -489,7 +490,8 @@ def test_driver_guide_supports_profile_and_alias_resolution() -> None:
 
     guide_189 = provider_registry_module.get_driver_guide("189Cloud")
     assert guide_189 is not None
-    assert guide_189["docUrl"].endswith("/189cloud")
+    assert guide_189["docUrl"].endswith("/189")
+    assert any(item.endswith("/189") for item in guide_189["docUrlCandidates"])
 
 
 def test_unknown_driver_guide_returns_generic_fallback_without_claiming_full_coverage() -> None:
@@ -497,6 +499,7 @@ def test_unknown_driver_guide_returns_generic_fallback_without_claiming_full_cov
     assert guide is not None
     assert guide["docUrl"] == "https://doc.oplist.org/guide/drivers/"
     assert guide["isGenericFallback"] is True
+    assert "https://doc.oplist.org/guide/drivers/" in guide["docUrlCandidates"]
 
     audit = provider_registry_module.build_driver_coverage_audit(["UnknownDrive"], target="guangya")
     row = audit["rows"][0]
