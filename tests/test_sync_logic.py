@@ -846,11 +846,15 @@ def test_build_driver_capture_spec_derives_generic_requirements() -> None:
 
 def test_status_restores_provider_captures_from_config(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
+    state_path = tmp_path / "sync-state.json"
     config_path.write_text(
         """
 {
   "source_path": "/src",
   "target_path": "/dst",
+  "state": {
+    "state_file": "__STATE_FILE__"
+  },
   "provider_captures": {
     "quark": {
       "provider": "quark",
@@ -862,7 +866,22 @@ def test_status_restores_provider_captures_from_config(tmp_path: Path) -> None:
     }
   }
 }
-""".strip(),
+""".replace("__STATE_FILE__", str(state_path).replace("\\", "\\\\")).strip(),
+        encoding="utf-8",
+    )
+    state_path.write_text(
+        json.dumps(
+            {
+                "target_states": {
+                    "guangya": {
+                        "access_token": "tok",
+                        "refresh_token": "refresh",
+                        "device_id": "device",
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
         encoding="utf-8",
     )
     from cloudpan_bridge.webapp import create_app
@@ -873,6 +892,10 @@ def test_status_restores_provider_captures_from_config(tmp_path: Path) -> None:
     assert status.status_code == 200
     body = status.json()
     assert body["provider_captures"]["quark"]["captured"]["cookie_header"] == "sid=1; token=2"
+    assert body["active_target"] == "guangya"
+    assert body["active_target_state"]["has_state"] is True
+    assert body["active_target_state"]["field_count"] == 3
+    assert "access_token" in body["active_target_state"]["fields"]
 
 
 def test_provider_driver_blueprint_endpoint_returns_dynamic_capture_spec(tmp_path: Path) -> None:

@@ -727,9 +727,27 @@ def create_app(config_path: Path) -> FastAPI:
         persist_provider_captures_to_config()
         with sync_lock:
             state = dict(sync_state)
+        persistent_state = load_state(config.state_file)
         snapshots = merged_provider_capture_snapshots()
+        active_target = str(config.target_key or "guangya").strip().lower() or "guangya"
+        target_states = {
+            key: {
+                "field_count": len(dict(value or {})),
+                "fields": sorted(str(field) for field in dict(value or {}).keys()),
+            }
+            for key, value in dict(persistent_state.target_states or {}).items()
+        }
+        active_target_state = persistent_state.get_target_state(active_target)
         return {
             "sync": state,
+            "active_target": active_target,
+            "active_target_state": {
+                "target_key": active_target,
+                "field_count": len(active_target_state),
+                "fields": sorted(active_target_state.keys()),
+                "has_state": bool(active_target_state),
+            },
+            "target_states": target_states,
             "guangya_capture": snapshots.get("guangya", provider_capture.snapshot("guangya")),
             "provider_captures": snapshots,
             "provider_definitions": provider_capture.definitions_payload(),
