@@ -66,6 +66,12 @@ class AppConfig:
     s3_target_access_key: str = ""
     s3_target_secret_key: str = ""
     s3_target_region: str = ""
+    seafile_target_url: str = ""
+    seafile_target_token: str = ""
+    seafile_target_username: str = ""
+    seafile_target_password: str = ""
+    seafile_target_repo_id: str = ""
+    seafile_target_repo_name: str = ""
     azureblob_target_account_url: str = ""
     azureblob_target_container: str = ""
     azureblob_target_prefix: str = ""
@@ -142,6 +148,12 @@ class AppConfig:
             s3_target_access_key=str(_pick(payload.get("s3_target_access_key"), targets.get("s3", {}).get("access_key"), default="")),
             s3_target_secret_key=str(_pick(payload.get("s3_target_secret_key"), targets.get("s3", {}).get("secret_key"), default="")),
             s3_target_region=str(_pick(payload.get("s3_target_region"), targets.get("s3", {}).get("region"), default="")),
+            seafile_target_url=str(_pick(payload.get("seafile_target_url"), targets.get("seafile", {}).get("url"), default="")),
+            seafile_target_token=str(_pick(payload.get("seafile_target_token"), targets.get("seafile", {}).get("token"), default="")),
+            seafile_target_username=str(_pick(payload.get("seafile_target_username"), targets.get("seafile", {}).get("username"), default="")),
+            seafile_target_password=str(_pick(payload.get("seafile_target_password"), targets.get("seafile", {}).get("password"), default="")),
+            seafile_target_repo_id=str(_pick(payload.get("seafile_target_repo_id"), targets.get("seafile", {}).get("repo_id"), default="")),
+            seafile_target_repo_name=str(_pick(payload.get("seafile_target_repo_name"), targets.get("seafile", {}).get("repo_name"), default="")),
             azureblob_target_account_url=str(_pick(payload.get("azureblob_target_account_url"), targets.get("azureblob", {}).get("account_url"), default="")),
             azureblob_target_container=str(_pick(payload.get("azureblob_target_container"), targets.get("azureblob", {}).get("container"), default="")),
             azureblob_target_prefix=str(_pick(payload.get("azureblob_target_prefix"), targets.get("azureblob", {}).get("prefix"), default="")),
@@ -211,6 +223,12 @@ class AppConfig:
             "s3_target_access_key": self.s3_target_access_key,
             "s3_target_secret_key": self.s3_target_secret_key,
             "s3_target_region": self.s3_target_region,
+            "seafile_target_url": self.seafile_target_url,
+            "seafile_target_token": self.seafile_target_token,
+            "seafile_target_username": self.seafile_target_username,
+            "seafile_target_password": self.seafile_target_password,
+            "seafile_target_repo_id": self.seafile_target_repo_id,
+            "seafile_target_repo_name": self.seafile_target_repo_name,
             "azureblob_target_account_url": self.azureblob_target_account_url,
             "azureblob_target_container": self.azureblob_target_container,
             "azureblob_target_prefix": self.azureblob_target_prefix,
@@ -294,6 +312,14 @@ class AppConfig:
                     "access_key": self.s3_target_access_key,
                     "secret_key": self.s3_target_secret_key,
                     "region": self.s3_target_region,
+                },
+                "seafile": {
+                    "url": self.seafile_target_url,
+                    "token": self.seafile_target_token,
+                    "username": self.seafile_target_username,
+                    "password": self.seafile_target_password,
+                    "repo_id": self.seafile_target_repo_id,
+                    "repo_name": self.seafile_target_repo_name,
                 },
                 "azureblob": {
                     "account_url": self.azureblob_target_account_url,

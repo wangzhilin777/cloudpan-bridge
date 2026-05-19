@@ -29,7 +29,7 @@ from cloudpan_bridge.syncer import (
     serialize_source_entry,
     summarize_source_entries,
 )
-from cloudpan_bridge.target_adapter import AzureBlobTargetAdapter, FtpTargetAdapter, GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, S3TargetAdapter, SftpTargetAdapter, SmbTargetAdapter, WebDavTargetAdapter
+from cloudpan_bridge.target_adapter import AzureBlobTargetAdapter, FtpTargetAdapter, GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, S3TargetAdapter, SeafileTargetAdapter, SftpTargetAdapter, SmbTargetAdapter, WebDavTargetAdapter
 from cloudpan_bridge.webapp import (
     build_pending_selected_execution_groups,
     compute_rate_limit_cooldown_ms,
@@ -150,6 +150,14 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
       "secret_key": "SECRET_TEST",
       "region": "ap-southeast-1"
     },
+    "seafile": {
+      "url": "https://seafile.example.com",
+      "token": "seafile-token",
+      "username": "seafile-user",
+      "password": "seafile-pass",
+      "repo_id": "repo-1",
+      "repo_name": "Archive"
+    },
     "azureblob": {
       "account_url": "https://demo.blob.core.windows.net",
       "container": "archive-container",
@@ -231,6 +239,12 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert cfg.s3_target_access_key == "AKIA_TEST"
     assert cfg.s3_target_secret_key == "SECRET_TEST"
     assert cfg.s3_target_region == "ap-southeast-1"
+    assert cfg.seafile_target_url == "https://seafile.example.com"
+    assert cfg.seafile_target_token == "seafile-token"
+    assert cfg.seafile_target_username == "seafile-user"
+    assert cfg.seafile_target_password == "seafile-pass"
+    assert cfg.seafile_target_repo_id == "repo-1"
+    assert cfg.seafile_target_repo_name == "Archive"
     assert cfg.azureblob_target_account_url == "https://demo.blob.core.windows.net"
     assert cfg.azureblob_target_container == "archive-container"
     assert cfg.azureblob_target_prefix == "cloudpan-bridge/archive"
@@ -256,6 +270,8 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert nested["targets"]["webdav"]["url"] == "https://dav.example.com/root"
     assert nested["targets"]["s3"]["endpoint"] == "https://s3.example.com"
     assert nested["targets"]["s3"]["bucket"] == "archive-bucket"
+    assert nested["targets"]["seafile"]["url"] == "https://seafile.example.com"
+    assert nested["targets"]["seafile"]["repo_id"] == "repo-1"
     assert nested["targets"]["azureblob"]["account_url"] == "https://demo.blob.core.windows.net"
     assert nested["targets"]["azureblob"]["container"] == "archive-container"
     assert nested["targets"]["smb"]["url"] == "smb://nas/share/archive"
@@ -289,6 +305,12 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
   "s3_target_access_key": "legacy-ak",
   "s3_target_secret_key": "legacy-sk",
   "s3_target_region": "cn-test-1",
+  "seafile_target_url": "https://legacy-seafile.example.com",
+  "seafile_target_token": "legacy-seafile-token",
+  "seafile_target_username": "legacy-seafile",
+  "seafile_target_password": "legacy-seafile-pass",
+  "seafile_target_repo_id": "legacy-repo-id",
+  "seafile_target_repo_name": "Legacy Repo",
   "azureblob_target_account_url": "https://legacy.blob.core.windows.net",
   "azureblob_target_container": "legacy-container",
   "azureblob_target_prefix": "legacy-prefix",
@@ -318,6 +340,9 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
     assert serialized["targets"]["s3"]["endpoint"] == "https://legacy-s3.example.com"
     assert serialized["targets"]["s3"]["bucket"] == "legacy-bucket"
     assert serialized["targets"]["s3"]["access_key"] == "legacy-ak"
+    assert serialized["targets"]["seafile"]["url"] == "https://legacy-seafile.example.com"
+    assert serialized["targets"]["seafile"]["token"] == "legacy-seafile-token"
+    assert serialized["targets"]["seafile"]["repo_id"] == "legacy-repo-id"
     assert serialized["targets"]["azureblob"]["account_url"] == "https://legacy.blob.core.windows.net"
     assert serialized["targets"]["azureblob"]["container"] == "legacy-container"
     assert serialized["targets"]["azureblob"]["account_name"] == "legacy-azure"
@@ -637,6 +662,41 @@ def test_sync_runner_builds_azureblob_target_adapter(tmp_path) -> None:
     adapter.close()
 
 
+def test_sync_runner_builds_seafile_target_adapter(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst",
+                },
+                "targets": {
+                    "active_target": "seafile",
+                    "seafile": {
+                        "url": "https://seafile.example.com",
+                        "token": "seafile-token",
+                        "username": "seafile-user",
+                        "password": "seafile-pass",
+                        "repo_id": "repo-1",
+                        "repo_name": "Archive",
+                    },
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    adapter = runner._build_target_adapter(SyncState())
+    assert isinstance(adapter, SeafileTargetAdapter)
+    exported = adapter.export_state()
+    assert exported["url"] == "https://seafile.example.com"
+    assert exported["token"] == "seafile-token"
+    assert exported["repo_id"] == "repo-1"
+    adapter.close()
+
+
 def test_sync_runner_builds_smb_target_adapter(tmp_path) -> None:
     path = tmp_path / "config.json"
     path.write_text(
@@ -872,6 +932,83 @@ def test_azureblob_target_adapter_uses_basic_blob_calls(tmp_path) -> None:
     assert ("get_container_client", "archive-container") in fake_service.container.calls
     assert ("upload_blob", "cloudpan-bridge/archive/photos/2026/demo.txt|True") in fake_service.container.calls
     assert ("delete_blob", "cloudpan-bridge/archive/photos/2026/demo.txt") in fake_service.container.calls
+    adapter.close()
+
+
+def test_seafile_target_adapter_uses_basic_http_calls(tmp_path) -> None:
+    local_file = tmp_path / "demo.txt"
+    local_file.write_text("hello", encoding="utf-8")
+
+    class FakeResponse:
+        def __init__(self, status_code: int, payload=None, text: str = "") -> None:  # type: ignore[no-untyped-def]
+            self.status_code = status_code
+            self._payload = payload
+            self.text = text
+
+        def json(self):  # type: ignore[no-untyped-def]
+            if self._payload is None:
+                raise ValueError("no json")
+            return self._payload
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str]] = []
+
+        def post(self, url: str, data=None, headers=None, files=None):  # type: ignore[no-untyped-def]
+            self.calls.append(("POST", url))
+            if url.endswith("/api2/auth-token/"):
+                return FakeResponse(200, {"token": "token-1"})
+            if "/api2/repos/repo-1/dir/" in url:
+                return FakeResponse(201, {"success": True})
+            if url == "https://upload.seafile.example.com/upload-api":
+                uploaded_name = files["file"][0] if files else ""
+                return FakeResponse(200, [{"name": uploaded_name}])
+            return FakeResponse(500, text="unexpected post")
+
+        def get(self, url: str, params=None, headers=None):  # type: ignore[no-untyped-def]
+            self.calls.append(("GET", url))
+            if url.endswith("/api2/repos/"):
+                return FakeResponse(200, [{"repo_id": "repo-1", "name": "Archive"}])
+            if url.endswith("/api/v2.1/repos/repo-1/dir/detail/"):
+                path = str((params or {}).get("path") or "")
+                if path == "/photos":
+                    return FakeResponse(404, text="missing")
+                if path == "/photos/2026":
+                    return FakeResponse(404, text="missing")
+                return FakeResponse(200, {"path": path})
+            if url.endswith("/api2/repos/repo-1/upload-link/"):
+                return FakeResponse(200, "https://upload.seafile.example.com/upload-api")
+            return FakeResponse(500, text="unexpected get")
+
+        def delete(self, url: str, params=None, headers=None):  # type: ignore[no-untyped-def]
+            self.calls.append(("DELETE", url))
+            return FakeResponse(200, {"success": True})
+
+        def close(self) -> None:
+            return None
+
+    fake_client = FakeClient()
+    adapter = SeafileTargetAdapter(
+        base_url="https://seafile.example.com",
+        username="demo",
+        password="secret",
+        repo_name="Archive",
+        client=fake_client,  # type: ignore[arg-type]
+    )
+    adapter.ensure_auth()
+    parent_id = adapter.ensure_target_dir("/photos/2026")
+    assert parent_id == "/photos/2026"
+    result = adapter.upload_local_file(local_file, parent_id, "demo.txt")
+    assert result["path"] == "/photos/2026/demo.txt"
+    assert result["repo_id"] == "repo-1"
+    assert adapter.remove_target_path("/photos/2026/demo.txt") is True
+    assert ("POST", "https://seafile.example.com/api2/auth-token/") in fake_client.calls
+    assert ("GET", "https://seafile.example.com/api2/repos/") in fake_client.calls
+    assert ("POST", "https://seafile.example.com/api2/repos/repo-1/dir/?p=/photos") in fake_client.calls
+    assert ("POST", "https://seafile.example.com/api2/repos/repo-1/dir/?p=/photos/2026") in fake_client.calls
+    assert ("GET", "https://seafile.example.com/api2/repos/repo-1/upload-link/") in fake_client.calls
+    assert ("POST", "https://upload.seafile.example.com/upload-api") in fake_client.calls
+    assert ("DELETE", "https://seafile.example.com/api2/repos/repo-1/file/") in fake_client.calls
     adapter.close()
 
 
@@ -1267,7 +1404,7 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     payload = response.json()
     assert payload["active_target"] == "guangya"
     assert payload["driver_matrix"]["thunder"]["targetProfile"]["key"] == "guangya"
-    assert payload["implemented_targets"] == ["guangya", "openlist", "localfs", "webdav", "s3", "azureblob", "ftp", "sftp", "smb"]
+    assert payload["implemented_targets"] == ["guangya", "openlist", "localfs", "webdav", "s3", "seafile", "azureblob", "ftp", "sftp", "smb"]
     assert payload["target_implementation_status"]["guangya"]["known_profile"] is True
     assert payload["target_implementation_status"]["guangya"]["implemented"] is True
     assert payload["target_implementation_status"]["guangya"]["selectable"] is True
@@ -1280,6 +1417,9 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     assert payload["target_implementation_status"]["s3"]["known_profile"] is True
     assert payload["target_implementation_status"]["s3"]["implemented"] is True
     assert payload["target_implementation_status"]["s3"]["selectable"] is True
+    assert payload["target_implementation_status"]["seafile"]["known_profile"] is True
+    assert payload["target_implementation_status"]["seafile"]["implemented"] is True
+    assert payload["target_implementation_status"]["seafile"]["selectable"] is True
     assert payload["target_implementation_status"]["azureblob"]["known_profile"] is True
     assert payload["target_implementation_status"]["azureblob"]["implemented"] is True
     assert payload["target_implementation_status"]["azureblob"]["selectable"] is True
@@ -2609,6 +2749,8 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["target_profiles"]["webdav"]["autoCreateDir"] is True
     assert payload["target_profiles"]["s3"]["authMode"] == "endpoint + bucket + access key/secret"
     assert payload["target_profiles"]["s3"]["autoCreateDir"] is True
+    assert payload["target_profiles"]["seafile"]["authMode"] == "seafile url + token or username/password + repo"
+    assert payload["target_profiles"]["seafile"]["autoCreateDir"] is True
     assert payload["target_profiles"]["azureblob"]["authMode"] == "account url + container + account key"
     assert payload["target_profiles"]["azureblob"]["autoCreateDir"] is True
     assert payload["target_profiles"]["smb"]["authMode"] == "smb url + username/password"

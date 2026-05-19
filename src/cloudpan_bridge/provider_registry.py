@@ -748,12 +748,30 @@ TARGET_PROFILES: dict[str, dict[str, Any]] = {
         "fast_upload_hashes": [],
         "fallback_modes": ["download_upload", "stream_upload"],
         "description": {
-            "zh": "第七个正式可写目标端。用于把同步结果写入 S3 或兼容对象存储，当前只按普通对象上传/覆盖处理，不承诺元数据秒传。",
-            "en": "Seventh built-in writable target. It writes sync results into S3 or compatible object storage and currently uses normal object upload/overwrite only, without any metadata-based fast-upload promise.",
+            "zh": "第五个正式可写目标端。用于把同步结果写入 S3 或兼容对象存储，当前只按普通对象上传/覆盖处理，不承诺元数据秒传。",
+            "en": "Fifth built-in writable target. It writes sync results into S3 or compatible object storage and currently uses normal object upload/overwrite only, without any metadata-based fast-upload promise.",
         },
         "research_notes": {
             "zh": "适合作为对象存储桶、备份桶或云原生归档目标端；当前能力定位仍是保守上传链路，不宣传成跨盘秒传。",
             "en": "Useful as a target for object-storage buckets, backup buckets, or cloud-native archives. The current capability remains a conservative upload path rather than cross-cloud fast upload.",
+        },
+    },
+    "seafile": {
+        "key": "seafile",
+        "label": "Seafile",
+        "label_zh": "Seafile 目标端",
+        "auth_mode": "seafile url + token or username/password + repo",
+        "token_refresh": "login token reusable",
+        "auto_create_dir": True,
+        "fast_upload_hashes": [],
+        "fallback_modes": ["download_upload", "stream_upload"],
+        "description": {
+            "zh": "第六个正式可写目标端。用于把同步结果写入 Seafile 资料库目录，当前只按普通上传/覆盖处理，不承诺元数据秒传。",
+            "en": "Sixth built-in writable target. It writes sync results into Seafile libraries and currently uses normal upload/overwrite only, without any metadata-based fast-upload promise.",
+        },
+        "research_notes": {
+            "zh": "适合作为团队资料库、私有云文档库或 Seafile 归档目录目标端；当前能力定位仍是保守上传链路，不宣传成跨盘秒传。",
+            "en": "Useful as a target for team libraries, private cloud document vaults, or Seafile archive directories. The current capability remains a conservative upload path rather than cross-cloud fast upload.",
         },
     },
     "azureblob": {
@@ -766,8 +784,8 @@ TARGET_PROFILES: dict[str, dict[str, Any]] = {
         "fast_upload_hashes": [],
         "fallback_modes": ["download_upload", "stream_upload"],
         "description": {
-            "zh": "第九个正式可写目标端。用于把同步结果写入 Azure Blob 容器，当前只按普通对象上传/覆盖处理，不承诺元数据秒传。",
-            "en": "Ninth built-in writable target. It writes sync results into Azure Blob containers and currently uses normal object upload/overwrite only, without any metadata-based fast-upload promise.",
+            "zh": "第十个正式可写目标端。用于把同步结果写入 Azure Blob 容器，当前只按普通对象上传/覆盖处理，不承诺元数据秒传。",
+            "en": "Tenth built-in writable target. It writes sync results into Azure Blob containers and currently uses normal object upload/overwrite only, without any metadata-based fast-upload promise.",
         },
         "research_notes": {
             "zh": "适合作为 Azure 对象存储、归档容器或备份容器目标端；当前能力定位仍是保守上传链路，不宣传成跨盘秒传。",
@@ -784,8 +802,8 @@ TARGET_PROFILES: dict[str, dict[str, Any]] = {
         "fast_upload_hashes": [],
         "fallback_modes": ["download_upload", "stream_upload"],
         "description": {
-            "zh": "第八个正式可写目标端。用于把同步结果写入 SMB 共享目录，当前只按普通上传/覆盖处理，不承诺元数据秒传。",
-            "en": "Eighth built-in writable target. It writes sync results into SMB share directories and currently uses normal upload/overwrite only, without any metadata-based fast-upload promise.",
+            "zh": "第七个正式可写目标端。用于把同步结果写入 SMB 共享目录，当前只按普通上传/覆盖处理，不承诺元数据秒传。",
+            "en": "Seventh built-in writable target. It writes sync results into SMB share directories and currently uses normal upload/overwrite only, without any metadata-based fast-upload promise.",
         },
         "research_notes": {
             "zh": "适合作为 NAS、局域网共享或 Windows 文件服务器目标端；当前能力定位仍是保守上传链路，不宣传成跨盘秒传。",
@@ -802,8 +820,8 @@ TARGET_PROFILES: dict[str, dict[str, Any]] = {
         "fast_upload_hashes": [],
         "fallback_modes": ["download_upload", "stream_upload"],
         "description": {
-            "zh": "第五个正式可写目标端。用于把同步结果写入 FTP 存储，当前只按普通上传/覆盖处理，不承诺元数据秒传。",
-            "en": "Fifth built-in writable target. It writes sync results into FTP storage and currently uses normal upload/overwrite only, without any metadata-based fast-upload promise.",
+            "zh": "第八个正式可写目标端。用于把同步结果写入 FTP 存储，当前只按普通上传/覆盖处理，不承诺元数据秒传。",
+            "en": "Eighth built-in writable target. It writes sync results into FTP storage and currently uses normal upload/overwrite only, without any metadata-based fast-upload promise.",
         },
         "research_notes": {
             "zh": "适合作为传统 NAS、主机面板或轻量服务器目录型目标端；当前能力定位仍是保守上传链路，不宣传成跨盘秒传。",
@@ -820,8 +838,8 @@ TARGET_PROFILES: dict[str, dict[str, Any]] = {
         "fast_upload_hashes": [],
         "fallback_modes": ["download_upload", "stream_upload"],
         "description": {
-            "zh": "第六个正式可写目标端。用于把同步结果写入 SFTP 存储，当前只按普通上传/覆盖处理，不承诺元数据秒传。",
-            "en": "Sixth built-in writable target. It writes sync results into SFTP storage and currently uses normal upload/overwrite only, without any metadata-based fast-upload promise.",
+            "zh": "第九个正式可写目标端。用于把同步结果写入 SFTP 存储，当前只按普通上传/覆盖处理，不承诺元数据秒传。",
+            "en": "Ninth built-in writable target. It writes sync results into SFTP storage and currently uses normal upload/overwrite only, without any metadata-based fast-upload promise.",
         },
         "research_notes": {
             "zh": "适合作为 Linux 主机、NAS 或云服务器目录型目标端；当前能力定位仍是保守上传链路，不宣传成跨盘秒传。",
@@ -2085,7 +2103,7 @@ def build_driver_target_capability(
     target_profile = _serialize_target_profile(TARGET_PROFILES.get(target_key, TARGET_PROFILES["guangya"]))
     capability_to_targets = dict(source_profile.get("capabilityToTargets") or {})
     target_capability = dict(capability_to_targets.get(target_key) or {})
-    if not target_capability and target_key in {"openlist", "localfs", "webdav", "s3", "azureblob", "ftp", "sftp", "smb"}:
+    if not target_capability and target_key in {"openlist", "localfs", "webdav", "s3", "seafile", "azureblob", "ftp", "sftp", "smb"}:
         if target_key == "openlist":
             target_capability = {
                 "level": "download_upload_only",
@@ -2124,6 +2142,16 @@ def build_driver_target_capability(
                 "notes": {
                     "zh": "适合作为对象存储桶、备份桶或云原生归档目标端；如果你要真正秒传，仍应优先选择支持元数据导入的目标端。",
                     "en": "Use it as a target for object-storage buckets, backup buckets, or cloud-native archives. For true fast upload, still prefer a target with metadata-import support.",
+                },
+            }
+        elif target_key == "seafile":
+            target_capability = {
+                "level": "download_upload_only",
+                "recommendedFlow": "当前组合可写入 Seafile 目标端，但只按普通上传/覆盖处理，不承诺跨盘秒传。",
+                "recommendedFlowEn": "This combination can write into the Seafile target, but it only uses normal upload/overwrite and does not promise any cross-cloud fast upload.",
+                "notes": {
+                    "zh": "适合作为团队资料库、私有云文档库或 Seafile 归档目录目标端；如果你要真正秒传，仍应优先选择支持元数据导入的目标端。",
+                    "en": "Use it as a target for team libraries, private-cloud document vaults, or Seafile archive directories. For true fast upload, still prefer a target with metadata-import support.",
                 },
             }
         elif target_key == "azureblob":

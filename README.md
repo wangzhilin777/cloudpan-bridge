@@ -40,7 +40,7 @@
 - 默认同步语义是“新增 + 覆盖”，不会因为源端删除而默认删除目标端文件
 - 支持把“目标端真实删除”作为独立开关启用
   - `delete_removed = true` 只会把已不存在的源文件从同步状态里移除
-  - 只有同时开启 `target_delete_removed = true`，才会尝试删除 `Guangya / OpenList / LocalFS / WebDAV / S3 / SMB / FTP / SFTP / Azure Blob` 目标端对应文件
+  - 只有同时开启 `target_delete_removed = true`，才会尝试删除 `Guangya / OpenList / LocalFS / WebDAV / S3 / Seafile / SMB / FTP / SFTP / Azure Blob` 目标端对应文件
   - 如果你当前只需要“改动覆盖，不做删除”，保持默认关闭即可
 - 支持最底层目录边扫边同步
 - 支持最底层目录批量入队
@@ -407,7 +407,7 @@
 - 目标端下拉现在会按内置 `target_profiles` 动态生成，后续扩目标端时不需要再手改前端选项
 - 同时只会放出当前真正可选、已实现适配器的目标端，避免页面先暴露还不能写入的目标端
 - 在真正启动同步、队列或最底层边扫边同步前，现在也会先做目标端预检，未实现目标端会直接在入口层返回清晰错误
-- 现阶段正式可写目标端已有 `guangya`、`openlist`、`localfs`、`webdav`、`s3`、`smb`、`ftp`、`sftp` 与 `azureblob`
+- 现阶段正式可写目标端已有 `guangya`、`openlist`、`localfs`、`webdav`、`s3`、`seafile`、`smb`、`ftp`、`sftp` 与 `azureblob`
 - 但真正支持秒传 JSON 直导和元数据秒传的目标端仍只有 `guangya`
 - 当前活动 Tab、日志抽屉显隐等页面状态会同步写入 `ui.panel_open_states`
 - 老版本本地缓存键也会自动迁移到新的 `CloudPan Bridge` 命名空间
@@ -455,6 +455,14 @@
       "access_key": "",
       "secret_key": "",
       "region": ""
+    },
+    "seafile": {
+      "url": "",
+      "token": "",
+      "username": "",
+      "password": "",
+      "repo_id": "",
+      "repo_name": ""
     },
     "smb": {
       "url": "",

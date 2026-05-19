@@ -5,7 +5,7 @@ import hashlib
 import shutil
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Protocol
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import httpx
 
@@ -466,6 +466,209 @@ class S3TargetAdapter:
             "size": local_path.stat().st_size,
             "bucket": self.bucket,
             "key": key,
+        }
+
+    def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
+        return None
+
+
+class SeafileTargetAdapter:
+    def __init__(
+        self,
+        base_url: str,
+        token: str = "",
+        username: str = "",
+        password: str = "",
+        repo_id: str = "",
+        repo_name: str = "",
+        *,
+        client: httpx.Client | None = None,
+    ) -> None:
+        self.base_url = str(base_url or "").rstrip("/")
+        self.token = str(token or "").strip()
+        self.username = username
+        self.password = password
+        self.repo_id = str(repo_id or "").strip()
+        self.repo_name = str(repo_name or "").strip()
+        self.client = client or httpx.Client(timeout=60.0, follow_redirects=True)
+
+    def ensure_auth(self) -> None:
+        if not self.base_url:
+            raise RuntimeError("Seafile 目标端未配置 URL。")
+        if not self.token:
+            if not self.username:
+                raise RuntimeError("Seafile 目标端未配置 token，也未提供用户名。")
+            response = self.client.post(
+                f"{self.base_url}/api2/auth-token/",
+                data={"username": self.username, "password": self.password},
+            )
+            if response.status_code != 200:
+                raise RuntimeError(f"Seafile 登录失败: {response.status_code} {response.text}")
+            payload = response.json()
+            token = str(payload.get("token") or "").strip()
+            if not token:
+                raise RuntimeError("Seafile 登录成功但未返回 token。")
+            self.token = token
+        if not self.repo_id:
+            self.repo_id = self._resolve_repo_id()
+
+    def export_state(self) -> dict[str, str]:
+        return {
+            "url": self.base_url,
+            "token": self.token,
+            "repo_id": self.repo_id,
+            "repo_name": self.repo_name,
+            "username": self.username,
+        }
+
+    def close(self) -> None:
+        try:
+            self.client.close()
+        except Exception:
+            pass
+
+    def _normalize_path(self, path: str) -> str:
+        normalized = str(PurePosixPath("/" + str(path or "/").lstrip("/")))
+        return "/" if normalized == "." else normalized
+
+    def _auth_headers(self) -> dict[str, str]:
+        headers: dict[str, str] = {}
+        if self.token:
+            headers["Authorization"] = f"Token {self.token}"
+        return headers
+
+    def _resolve_repo_id(self) -> str:
+        headers = self._auth_headers()
+        if self.repo_name:
+            response = self.client.get(f"{self.base_url}/api2/repos/", headers=headers)
+            if response.status_code != 200:
+                raise RuntimeError(f"Seafile 获取资料库列表失败: {response.status_code} {response.text}")
+            for item in list(response.json() or []):
+                current_name = str(item.get("name") or "")
+                if current_name == self.repo_name:
+                    repo_id = str(item.get("repo_id") or item.get("id") or "").strip()
+                    if repo_id:
+                        return repo_id
+            raise RuntimeError(f"Seafile 未找到名为 {self.repo_name} 的资料库。")
+        response = self.client.get(f"{self.base_url}/api2/default-repo/", headers=headers)
+        if response.status_code != 200:
+            raise RuntimeError(f"Seafile 获取默认资料库失败: {response.status_code} {response.text}")
+        payload = response.json()
+        repo_id = str(payload.get("repo_id") or payload.get("id") or "").strip()
+        if not repo_id:
+            raise RuntimeError("Seafile 默认资料库响应里缺少 repo_id。")
+        return repo_id
+
+    def _dir_exists(self, path: str) -> bool:
+        assert self.repo_id
+        normalized = self._normalize_path(path)
+        response = self.client.get(
+            f"{self.base_url}/api/v2.1/repos/{self.repo_id}/dir/detail/",
+            params={"path": normalized},
+            headers=self._auth_headers(),
+        )
+        if response.status_code == 200:
+            return True
+        if response.status_code == 404:
+            return False
+        raise RuntimeError(f"Seafile 查询目录失败: {normalized} -> {response.status_code} {response.text}")
+
+    def _create_dir(self, path: str) -> None:
+        assert self.repo_id
+        normalized = self._normalize_path(path)
+        encoded = quote(normalized, safe="/")
+        response = self.client.post(
+            f"{self.base_url}/api2/repos/{self.repo_id}/dir/?p={encoded}",
+            data={"operation": "mkdir"},
+            headers=self._auth_headers(),
+        )
+        if response.status_code not in {200, 201}:
+            raise RuntimeError(f"Seafile 创建目录失败: {normalized} -> {response.status_code} {response.text}")
+
+    def ensure_target_dir(self, path: str) -> str:
+        self.ensure_auth()
+        normalized = self._normalize_path(path)
+        if normalized == "/":
+            return normalized
+        current = PurePosixPath("/")
+        for part in PurePosixPath(normalized).parts[1:]:
+            current = current / part
+            current_path = str(current)
+            if not self._dir_exists(current_path):
+                self._create_dir(current_path)
+        return normalized
+
+    def delete_if_exists(self, parent_id: str, name: str) -> bool:
+        target_path = str(PurePosixPath(self._normalize_path(parent_id)) / name)
+        return self.remove_target_path(target_path)
+
+    def remove_target_path(self, path: str) -> bool:
+        self.ensure_auth()
+        assert self.repo_id
+        normalized = self._normalize_path(path)
+        if normalized == "/":
+            return False
+        response = self.client.delete(
+            f"{self.base_url}/api2/repos/{self.repo_id}/file/",
+            params={"p": normalized},
+            headers=self._auth_headers(),
+        )
+        if response.status_code in {200, 202, 204}:
+            return True
+        if response.status_code == 404:
+            return False
+        raise RuntimeError(f"Seafile 删除失败: {normalized} -> {response.status_code} {response.text}")
+
+    def try_fast_upload(
+        self,
+        file_name: str,
+        file_size: int,
+        parent_id: str,
+        md5_hex: str = "",
+        gcid: str = "",
+    ) -> DirectImportResult:
+        return DirectImportResult(
+            success=False,
+            reason="Seafile 目标端当前只支持普通上传/覆盖，不支持元数据秒传。",
+        )
+
+    def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, Any]:
+        self.ensure_auth()
+        assert self.repo_id
+        parent_path = self.ensure_target_dir(target_parent_id)
+        encoded = quote(parent_path, safe="/")
+        link_response = self.client.get(
+            f"{self.base_url}/api2/repos/{self.repo_id}/upload-link/",
+            params={"p": parent_path},
+            headers=self._auth_headers(),
+        )
+        if link_response.status_code != 200:
+            raise RuntimeError(f"Seafile 获取上传链接失败: {parent_path} -> {link_response.status_code} {link_response.text}")
+        try:
+            upload_link = link_response.json()
+        except Exception:
+            upload_link = link_response.text
+        upload_url = str(upload_link or "").strip().strip('"')
+        if not upload_url:
+            raise RuntimeError("Seafile 上传链接为空。")
+        if upload_url.startswith("/"):
+            upload_url = f"{self.base_url}{upload_url}"
+        with local_path.open("rb") as handle:
+            response = self.client.post(
+                upload_url,
+                data={"parent_dir": parent_path, "replace": "1"},
+                files={"file": (target_name, handle, "application/octet-stream")},
+                headers=self._auth_headers(),
+            )
+        if response.status_code not in {200, 201}:
+            raise RuntimeError(f"Seafile 上传失败: {parent_path} -> {response.status_code} {response.text}")
+        target_path = str(PurePosixPath(parent_path) / target_name)
+        return {
+            "path": target_path,
+            "size": local_path.stat().st_size,
+            "repo_id": self.repo_id,
+            "repo_name": self.repo_name,
+            "upload_link_path": encoded,
         }
 
     def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
@@ -982,7 +1185,7 @@ class SftpTargetAdapter:
 
 
 def supported_target_keys() -> list[str]:
-    return ["guangya", "openlist", "localfs", "webdav", "s3", "azureblob", "ftp", "sftp", "smb"]
+    return ["guangya", "openlist", "localfs", "webdav", "s3", "seafile", "azureblob", "ftp", "sftp", "smb"]
 
 
 def create_target_adapter(config: AppConfig, state: SyncState, target_key: str = "") -> TargetAdapter:
@@ -1028,6 +1231,16 @@ def create_target_adapter(config: AppConfig, state: SyncState, target_key: str =
             secret_key=config.s3_target_secret_key,
             region=config.s3_target_region,
             prefix=config.s3_target_prefix,
+        )
+    if normalized == "seafile":
+        target_state = state.get_target_state("seafile")
+        return SeafileTargetAdapter(
+            base_url=config.seafile_target_url,
+            token=target_state.get("token", "") or config.seafile_target_token,
+            username=config.seafile_target_username,
+            password=config.seafile_target_password,
+            repo_id=target_state.get("repo_id", "") or config.seafile_target_repo_id,
+            repo_name=config.seafile_target_repo_name,
         )
     if normalized == "azureblob":
         return AzureBlobTargetAdapter(
