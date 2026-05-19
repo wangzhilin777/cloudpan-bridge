@@ -359,6 +359,18 @@ def create_app(config_path: Path) -> FastAPI:
         )
         return normalized
 
+    def resolve_registry_drivers(payload: dict[str, Any]) -> list[str]:
+        drivers = payload.get("drivers")
+        if isinstance(drivers, list):
+            normalized = [str(item or "").strip() for item in drivers if str(item or "").strip()]
+            if normalized:
+                return normalized
+        with build_admin_client() as client:
+            live_drivers = [str(item or "").strip() for item in client.driver_names() if str(item or "").strip()]
+        if live_drivers:
+            return live_drivers
+        raise HTTPException(status_code=400, detail="缺少 drivers，且当前 OpenList 也没有返回可审计的驱动列表")
+
     def load_config_payload() -> dict[str, Any]:
         normalized = AppConfig.load(config_path)
         payload = normalized.to_flat_dict()
@@ -1215,11 +1227,9 @@ def create_app(config_path: Path) -> FastAPI:
     @app.post("/api/provider/coverage_audit")
     def post_provider_coverage_audit(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         payload = normalize_registry_payload(payload, config)
-        drivers = payload.get("drivers")
+        drivers = resolve_registry_drivers(payload)
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
-        if not isinstance(drivers, list):
-            raise HTTPException(status_code=400, detail="缺少 drivers")
-        audit = build_driver_coverage_audit([str(item or "") for item in drivers], target=target)
+        audit = build_driver_coverage_audit(drivers, target=target)
         return filter_driver_coverage_audit(
             audit,
             only_gaps=bool(payload.get("only_gaps")),
@@ -1234,11 +1244,9 @@ def create_app(config_path: Path) -> FastAPI:
     @app.post("/api/provider/coverage_audit_markdown")
     def post_provider_coverage_audit_markdown(payload: dict[str, Any] | None = None) -> PlainTextResponse:
         payload = normalize_registry_payload(payload, config)
-        drivers = payload.get("drivers")
+        drivers = resolve_registry_drivers(payload)
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
-        if not isinstance(drivers, list):
-            raise HTTPException(status_code=400, detail="缺少 drivers")
-        audit = build_driver_coverage_audit([str(item or "") for item in drivers], target=target)
+        audit = build_driver_coverage_audit(drivers, target=target)
         audit = filter_driver_coverage_audit(
             audit,
             only_gaps=bool(payload.get("only_gaps")),
@@ -1255,11 +1263,9 @@ def create_app(config_path: Path) -> FastAPI:
     @app.post("/api/provider/coverage_scaffold")
     def post_provider_coverage_scaffold(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         payload = normalize_registry_payload(payload, config)
-        drivers = payload.get("drivers")
+        drivers = resolve_registry_drivers(payload)
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
-        if not isinstance(drivers, list):
-            raise HTTPException(status_code=400, detail="缺少 drivers")
-        audit = build_driver_coverage_audit([str(item or "") for item in drivers], target=target)
+        audit = build_driver_coverage_audit(drivers, target=target)
         audit = filter_driver_coverage_audit(
             audit,
             only_gaps=bool(payload.get("only_gaps")),
@@ -1275,11 +1281,9 @@ def create_app(config_path: Path) -> FastAPI:
     @app.post("/api/provider/coverage_scaffold_markdown")
     def post_provider_coverage_scaffold_markdown(payload: dict[str, Any] | None = None) -> PlainTextResponse:
         payload = normalize_registry_payload(payload, config)
-        drivers = payload.get("drivers")
+        drivers = resolve_registry_drivers(payload)
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
-        if not isinstance(drivers, list):
-            raise HTTPException(status_code=400, detail="缺少 drivers")
-        audit = build_driver_coverage_audit([str(item or "") for item in drivers], target=target)
+        audit = build_driver_coverage_audit(drivers, target=target)
         audit = filter_driver_coverage_audit(
             audit,
             only_gaps=bool(payload.get("only_gaps")),

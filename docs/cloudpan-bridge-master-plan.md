@@ -463,6 +463,7 @@ Guangya 是当前已完成最多的目标端，必须继续保留并增强。
   - guide 查询已支持 canonical key / alias 归一，`123Open / BaiduNetdisk / 189Cloud` 这类别名不再误报缺 guide
   - 当前这批重点驱动的已知显式缺口已清空，后续主要剩全 OpenList 驱动的继续扩面
   - 覆盖审计已新增 `onboardingReady / onboardingStage`，可直接筛出“已具备 profile、可以继续补 guide/capture/capability”的驱动
+  - 覆盖审计 / Scaffold 现在在未手工传 `drivers` 时，可直接读取当前 OpenList 驱动列表生成缺口视图，便于后续跟进 OpenList 新增驱动
 - `Phase 6`
   - 已有静态能力矩阵与基于目录分析结果的动态策略建议
   - 覆盖审计已支持 `nextAction / missingItem / capabilityLevel / profileKey` 高级筛选，且 backlog/导出保持一致

@@ -2278,6 +2278,71 @@ def test_provider_coverage_audit_accepts_grouped_filters(tmp_path: Path) -> None
     assert all(item["nextAction"] == "add_profile_first" for item in payload["backlog"])
 
 
+def test_provider_coverage_audit_uses_live_openlist_drivers_when_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "targets": {
+    "active_target": "guangya"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge import webapp as webapp_module
+
+    monkeypatch.setattr(webapp_module.OpenListAdminClient, "driver_names", lambda self: ["Thunder", "UnknownDrive"])
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_audit",
+        json={
+            "grouped_config": {
+                "targets": {
+                    "active_target": "guangya"
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    drivers = {item["driver"] for item in payload["rows"]}
+    assert "Thunder" in drivers
+    assert "UnknownDrive" in drivers
+
+
+def test_provider_coverage_scaffold_markdown_uses_live_openlist_drivers_when_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "targets": {
+    "active_target": "guangya"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge import webapp as webapp_module
+
+    monkeypatch.setattr(webapp_module.OpenListAdminClient, "driver_names", lambda self: ["UnknownDrive"])
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_scaffold_markdown",
+        json={
+            "grouped_config": {
+                "targets": {
+                    "active_target": "guangya"
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    text = response.text
+    assert "# CloudPan Bridge 驱动补全任务" in text
+    assert "`UnknownDrive`" in text
+
+
 def test_provider_capture_prefill_accepts_grouped_provider_and_driver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
