@@ -353,6 +353,72 @@ DRIVER_GUIDES: dict[str, dict[str, Any]] = {
         },
         "defaults": {},
     },
+    "smb": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/smb",
+        "summary": {
+            "zh": "SMB 是典型的局域网/文件共享型驱动，核心是 host、share、username、password，以及必要时的 workgroup 等连接参数。",
+            "en": "SMB is a classic LAN file-share driver. The core fields are host, share, username, password, and sometimes workgroup-related options.",
+        },
+        "steps": {
+            "zh": [
+                "先确认 OpenList 所在环境能够连通 SMB 服务端，并且共享名、账号密码都准确。",
+                "手动填写 host、share、username、password，必要时补 port、workgroup 等字段。",
+                "先小目录验证列目录、下载和中文文件名，再扩大范围。",
+                "默认按保守补传处理，不要在没有源分析时直接期待它能提供适合 Guangya 秒传的稳定哈希。"
+            ],
+            "en": [
+                "Confirm that the OpenList host can really reach the SMB server and that the share name plus credentials are correct.",
+                "Fill host, share, username, and password manually, then add port or workgroup only when needed.",
+                "Validate listing, download, and non-ASCII filenames on a small directory first before scaling up.",
+                "Treat it conservatively by default instead of expecting stable Guangya fast-upload-ready hashes without source analysis."
+            ],
+        },
+        "defaults": {},
+    },
+    "azureblob": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/azure_blob",
+        "summary": {
+            "zh": "Azure Blob 属于对象存储凭证型驱动，重点是 account name、account key、container 和 endpoint 配置。",
+            "en": "Azure Blob is an object-storage credential driver. The key fields are account name, account key, container, and endpoint-related options.",
+        },
+        "steps": {
+            "zh": [
+                "先确认 account name、account key、container 以及 endpoint 是否准确。",
+                "按驱动说明手动填写这些字段，再先用一个小目录或小 container 前缀验证列目录与下载。",
+                "如果对象来自多段上传或特殊网关，不要把 ETag 直接当稳定 MD5。",
+                "默认先按保守补传处理，除非你已经验证当前对象可以稳定给出适合 Guangya 的 MD5。"
+            ],
+            "en": [
+                "Confirm account name, account key, container, and endpoint values first.",
+                "Fill them manually and validate listing plus download on a small path or container prefix first.",
+                "If the objects are exposed through multipart uploads or special gateways, do not interpret ETag as stable MD5 by default.",
+                "Default to conservative fallback upload unless you have verified that the current objects expose Guangya-usable MD5 values."
+            ],
+        },
+        "defaults": {},
+    },
+    "mega": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/mega",
+        "summary": {
+            "zh": "MEGA 当前更适合凭证型接入，重点是账号、密码以及根目录相关配置。浏览器登录页可以参考，但正式挂载仍建议按驱动字段手动填写。",
+            "en": "MEGA is currently better handled as a credential-oriented driver. The key fields are account, password, and root-directory related settings. The web login page is a useful reference, but the final mount should still be filled manually.",
+        },
+        "steps": {
+            "zh": [
+                "先确认 MEGA 账号本身可以正常登录，并确认 OpenList 版本与当前驱动要求相符。",
+                "按驱动说明手动填写 email、password、root 等字段。",
+                "先挂一个小目录验证列目录和下载，再考虑扩大同步范围。",
+                "默认按保守补传处理，不要在没有源分析前直接把它规划成 Guangya 秒传来源。"
+            ],
+            "en": [
+                "Confirm that the MEGA account can log in normally and that the OpenList version matches the driver requirements.",
+                "Fill email, password, root, and related fields manually according to the driver documentation.",
+                "Validate listing and download on a small directory first before scaling up.",
+                "Default to conservative fallback upload instead of presenting it as a Guangya fast-upload source without source-analysis proof."
+            ],
+        },
+        "defaults": {},
+    },
     "pikpak": {
         "doc_url": "https://doc.oplist.org/guide/drivers/pikpak.html",
         "summary": {
@@ -934,6 +1000,96 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
                 "notes": {
                     "zh": "Seafile 在部分场景下可能给出 MD5，但仍建议先做小目录分析验证。",
                     "en": "Seafile may expose MD5 in some environments, but you should still validate on a small library first.",
+                },
+            }
+        },
+    },
+    "smb": {
+        "key": "smb",
+        "label": "SMB",
+        "label_zh": "SMB",
+        "driver_aliases": ["smb"],
+        "login_mode": "manual host + share + username + password",
+        "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "stable",
+        "capture_strategy": "手动填写 host、share、username、password，再按环境补 workgroup / port 等字段。",
+        "capture_strategy_en": "Fill host, share, username, and password manually, then add workgroup or port fields if needed.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/smb"],
+        "default_mount_values": {},
+        "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "SMB 更偏局域网共享接入，哈希能力要靠源分析确认，默认先按保守补传处理。",
+            "en": "SMB is more of a LAN-share source. Confirm hash capability by source analysis and default to conservative fallback upload first.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先验证列目录和下载稳定性，再按补传路径推进。",
+                "recommended_flow_en": "Validate listing and download stability first, then continue through fallback upload.",
+                "notes": {
+                    "zh": "未确认稳定 MD5 前，不应把 SMB 默认规划成 Guangya 秒传来源。",
+                    "en": "Do not treat SMB as a Guangya fast-upload source before stable MD5 is confirmed.",
+                },
+            }
+        },
+    },
+    "azureblob": {
+        "key": "azureblob",
+        "label": "Azure Blob",
+        "label_zh": "Azure Blob",
+        "driver_aliases": ["azureblob"],
+        "login_mode": "manual account name + account key + container",
+        "likely_hashes": ["etag"],
+        "hash_fields_supported": ["etag"],
+        "download_link_supported": "stable",
+        "capture_strategy": "手动填写 account name、account key、container、endpoint 等字段，再做小范围验证。",
+        "capture_strategy_en": "Fill account name, account key, container, endpoint, and related fields manually, then validate on a small scope first.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/azure_blob"],
+        "default_mount_values": {},
+        "recommended_rate_profile": "balanced",
+        "risk_notes": {
+            "zh": "Azure Blob 的 ETag 不一定能直接当稳定 MD5，默认按保守补传处理。",
+            "en": "Azure Blob ETag is not always safe to interpret as stable MD5, so default to conservative fallback upload.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先验证对象列表与下载，再按补传路径推进，不默认承诺秒传。",
+                "recommended_flow_en": "Validate object listing and download first, then continue via fallback upload without promising fast upload by default.",
+                "notes": {
+                    "zh": "只有确认当前对象稳定给出可用 MD5 时，才适合后续再提升能力等级。",
+                    "en": "Only upgrade the capability later if the current objects are proven to expose usable MD5 values consistently.",
+                },
+            }
+        },
+    },
+    "mega": {
+        "key": "mega",
+        "label": "MEGA",
+        "label_zh": "MEGA",
+        "driver_aliases": ["mega"],
+        "login_mode": "manual email + password + root",
+        "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "conditional",
+        "capture_strategy": "按驱动说明手动填写 email、password、root 等字段，网页登录只作为参考入口。",
+        "capture_strategy_en": "Fill email, password, root, and related fields manually. The web login page is a reference only.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/mega"],
+        "default_mount_values": {},
+        "recommended_rate_profile": "balanced",
+        "risk_notes": {
+            "zh": "MEGA 的哈希与下载行为仍应以源分析结果为准，默认先按保守补传处理。",
+            "en": "MEGA hash behavior and download stability should still be verified through source analysis. Default to conservative fallback upload first.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先小目录验证列目录和下载，再按补传路径推进。",
+                "recommended_flow_en": "Validate listing and download on a small directory first, then continue through fallback upload.",
+                "notes": {
+                    "zh": "在没有确认稳定 MD5 / GCID 前，不应把 MEGA 默认宣传成 Guangya 秒传来源。",
+                    "en": "Without confirmed stable MD5 / GCID, MEGA should not be presented as a Guangya fast-upload source by default.",
                 },
             }
         },

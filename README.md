@@ -50,7 +50,7 @@
   - `OneDrive`：优先抓 `refresh_token / access_token`
   - `Google Drive`：优先抓 `refresh_token / access_token`
   - `Dropbox`：优先抓 `refresh_token / access_token`
-  - `WebDAV / S3 / FTP / SFTP / Seafile`：走手动凭证模式
+  - `WebDAV / S3 / FTP / SFTP / Seafile / SMB / Azure Blob / MEGA`：走手动凭证模式
   - `PikPak`：优先抓 `refresh_token / access_token`
   - `115 网盘`：优先抓 `Cookie / token`
   - `139 云盘`：优先抓 `Authorization`
@@ -71,6 +71,9 @@
   - `FTP`
   - `SFTP`
   - `Seafile`
+  - `SMB`
+  - `AzureBlob`
+  - `Mega`
   - `PikPak`
   - `115`
   - `139Yun`

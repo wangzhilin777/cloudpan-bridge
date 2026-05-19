@@ -1247,7 +1247,7 @@ def test_build_storage_payload_serializes_addition_and_types() -> None:
 
 def test_default_provider_specs_cover_major_sources() -> None:
     specs = default_provider_specs()
-    assert {"guangya", "quark", "123pan", "189cloud", "baidu", "thunder", "aliyundriveopen", "onedrive", "googledrive", "dropbox", "webdav", "s3", "ftp", "sftp", "seafile", "pikpak", "115", "139yun"} <= set(specs)
+    assert {"guangya", "quark", "123pan", "189cloud", "baidu", "thunder", "aliyundriveopen", "onedrive", "googledrive", "dropbox", "webdav", "s3", "ftp", "sftp", "seafile", "smb", "azureblob", "mega", "pikpak", "115", "139yun"} <= set(specs)
     assert "cookie_header" in specs["quark"].required_keys
     assert "bdstoken" in specs["baidu"].required_keys
     assert "authorization" in specs["thunder"].required_keys
@@ -1260,6 +1260,9 @@ def test_default_provider_specs_cover_major_sources() -> None:
     assert specs["ftp"].capture_mode == "manual"
     assert specs["sftp"].capture_mode == "manual"
     assert specs["seafile"].capture_mode == "manual"
+    assert specs["smb"].capture_mode == "manual"
+    assert specs["azureblob"].capture_mode == "manual"
+    assert specs["mega"].capture_mode == "manual"
     assert "refresh_token" in specs["pikpak"].required_keys
     assert "cookie_header" in specs["115"].required_keys
     assert "authorization" in specs["139yun"].required_keys
@@ -1280,6 +1283,9 @@ def test_capture_alias_registry_resolves_real_spec_keys() -> None:
     assert alias_map["ftp"] == "ftp"
     assert alias_map["sftp"] == "sftp"
     assert alias_map["seafile"] == "seafile"
+    assert alias_map["smb"] == "smb"
+    assert alias_map["azureblob"] == "azureblob"
+    assert alias_map["mega"] == "mega"
     assert "quarkopen" in supported
     assert "googlephotos" in supported
 
@@ -1329,6 +1335,10 @@ def test_driver_guide_supports_profile_and_alias_resolution() -> None:
     guide_s3 = provider_registry_module.get_driver_guide("S3")
     assert guide_s3 is not None
     assert guide_s3["docUrl"].endswith("/s3")
+
+    guide_smb = provider_registry_module.get_driver_guide("SMB")
+    assert guide_smb is not None
+    assert guide_smb["docUrl"].endswith("/smb")
 
 
 def test_unknown_driver_guide_returns_generic_fallback_without_claiming_full_coverage() -> None:
@@ -1538,6 +1548,9 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["guides"]["googledrive"]["docUrl"] == "https://doc.oplist.org/guide/drivers/google_drive"
     assert payload["guides"]["webdav"]["docUrl"] == "https://doc.oplist.org/guide/drivers/webdav"
     assert payload["guides"]["s3"]["docUrl"] == "https://doc.oplist.org/guide/drivers/s3"
+    assert payload["guides"]["smb"]["docUrl"] == "https://doc.oplist.org/guide/drivers/smb"
+    assert payload["guides"]["azureblob"]["docUrl"] == "https://doc.oplist.org/guide/drivers/azure_blob"
+    assert payload["guides"]["mega"]["docUrl"] == "https://doc.oplist.org/guide/drivers/mega"
     assert payload["guides"]["quark"]["defaults"]["web_proxy"] == "true"
     assert payload["source_profiles"]["189cloud"]["recommendedRateProfile"] == "safe"
     assert payload["source_profiles"]["189cloud"]["loginMode"] == "cookie + sessionKey style fields"
@@ -1546,6 +1559,9 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["source_profiles"]["115"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/115"
     assert payload["source_profiles"]["webdav"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/webdav"
     assert payload["source_profiles"]["s3"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/s3"
+    assert payload["source_profiles"]["smb"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/smb"
+    assert payload["source_profiles"]["azureblob"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/azure_blob"
+    assert payload["source_profiles"]["mega"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/mega"
     assert payload["source_profiles"]["quark"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/quark.html"
     assert payload["source_profiles"]["thunder"]["hashFieldsSupported"] == ["gcid"]
     assert payload["target_profiles"]["guangya"]["fastUploadHashes"] == ["md5", "gcid"]
@@ -1581,6 +1597,9 @@ def test_provider_captures_endpoint_includes_complex_driver_specs(tmp_path: Path
     assert providers["ftp"]["capture_mode"] == "manual"
     assert providers["sftp"]["capture_mode"] == "manual"
     assert providers["seafile"]["capture_mode"] == "manual"
+    assert providers["smb"]["capture_mode"] == "manual"
+    assert providers["azureblob"]["capture_mode"] == "manual"
+    assert providers["mega"]["capture_mode"] == "manual"
     assert providers["115"]["required_keys"] == ["cookie_header"]
     assert providers["pikpak"]["login_url"] == "https://mypikpak.com/drive/all"
     assert providers["139yun"]["required_keys"] == ["authorization"]
@@ -1781,6 +1800,44 @@ def test_provider_coverage_audit_marks_manual_protocol_drivers_as_covered(tmp_pa
     assert rows["sftp"]["hasProfile"] is True
     assert rows["seafile"]["hasProfile"] is True
     assert rows["seafile"]["capabilityLevel"] == "fast_upload_partial"
+
+
+def test_provider_coverage_audit_marks_smb_azureblob_mega_as_covered(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_audit",
+        json={
+            "drivers": ["SMB", "AzureBlob", "Mega"],
+            "target": "guangya",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    rows = {item["normalized"]: item for item in payload["rows"]}
+    assert rows["smb"]["hasProfile"] is True
+    assert rows["smb"]["hasGuide"] is True
+    assert rows["smb"]["hasCapture"] is True
+    assert rows["smb"]["hasCapability"] is True
+    assert rows["azureblob"]["hasProfile"] is True
+    assert rows["azureblob"]["hasGuide"] is True
+    assert rows["azureblob"]["hasCapture"] is True
+    assert rows["azureblob"]["hasCapability"] is True
+    assert rows["mega"]["hasProfile"] is True
+    assert rows["mega"]["hasGuide"] is True
+    assert rows["mega"]["hasCapture"] is True
+    assert rows["mega"]["hasCapability"] is True
 
 
 def test_provider_coverage_audit_can_infer_dynamic_profile_capture_and_capability() -> None:
