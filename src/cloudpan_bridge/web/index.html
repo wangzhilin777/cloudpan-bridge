@@ -802,6 +802,38 @@
       "guangya_device_id", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
       "auto_download_threshold_mb", "rate_limit_mode", "log_file", "temp_dir", "state_file"
     ];
+    const CONFIG_GROUPED_PATHS = {
+      source_path: ["sync", "source_path"],
+      target_path: ["sync", "target_path"],
+      openlist_mode: ["openlist", "mode"],
+      managed_openlist_bin: ["openlist", "managed_runtime", "bin"],
+      managed_openlist_data_dir: ["openlist", "managed_runtime", "data_dir"],
+      managed_openlist_port: ["openlist", "managed_runtime", "port"],
+      openlist_url: ["openlist", "url"],
+      openlist_token: ["openlist", "token"],
+      openlist_username: ["openlist", "username"],
+      openlist_password: ["openlist", "password"],
+      target_key: ["targets", "active_target"],
+      guangya_phone: ["targets", "guangya", "phone"],
+      guangya_authorization: ["targets", "guangya", "authorization"],
+      guangya_access_token: ["targets", "guangya", "access_token"],
+      guangya_refresh_token: ["targets", "guangya", "refresh_token"],
+      guangya_device_id: ["targets", "guangya", "device_id"],
+      openlist_page_size: ["sync", "openlist_page_size"],
+      openlist_request_interval_ms: ["sync", "openlist_request_interval_ms"],
+      queue_interval_ms: ["sync", "queue_interval_ms"],
+      auto_download_threshold_mb: ["sync", "auto_download_threshold_mb"],
+      rate_limit_mode: ["sync", "rate_limit_mode"],
+      temp_dir: ["state", "temp_dir"],
+      state_file: ["state", "state_file"],
+      log_file: ["state", "log_file"],
+    };
+    const CONFIG_FIELD_DEFAULTS = {
+      openlist_mode: "external",
+      managed_openlist_port: 5244,
+      target_key: "guangya",
+      rate_limit_mode: "safe",
+    };
     const PANEL_STATE_KEY = "cloudpan-bridge-panel-state";
     const LEGACY_PANEL_STATE_KEYS = ["cloud2guangya-tabs"];
     const UI_LANGUAGE_KEY = "cloudpan-bridge-ui-language";
@@ -1216,6 +1248,36 @@
       if (last) current[last] = value;
     }
 
+    function normalizeFormValue(field, rawValue) {
+      const el = document.getElementById(field);
+      if (el?.type === "number") return Number(rawValue || 0);
+      return rawValue;
+    }
+
+    function syncConfigFieldsToGrouped(payload) {
+      for (const field of CONFIG_FIELDS) {
+        const path = CONFIG_GROUPED_PATHS[field];
+        if (!path) continue;
+        let value = payload?.[field];
+        if (value === undefined || value === null || value === "") {
+          value = CONFIG_FIELD_DEFAULTS[field] ?? value ?? "";
+        }
+        setGroupedConfigValue(path, value);
+      }
+    }
+
+    function getConfigFieldValue(config, field) {
+      const path = CONFIG_GROUPED_PATHS[field];
+      const fallback = CONFIG_FIELD_DEFAULTS[field] ?? "";
+      if (path && hasGroupedConfigValue(path)) {
+        const groupedValue = getGroupedConfigValue(path, fallback);
+        if (groupedValue !== undefined && groupedValue !== null && groupedValue !== "") return groupedValue;
+      }
+      const directValue = config?.[field];
+      if (directValue !== undefined && directValue !== null && directValue !== "") return directValue;
+      return fallback;
+    }
+
     function readLegacyJsonCache(primaryKey, legacyKeys = [], fallback = {}) {
       try {
         return JSON.parse(getStorageValue(primaryKey, legacyKeys) || JSON.stringify(fallback));
@@ -1479,7 +1541,12 @@
     function populateTargetOptions() {
       const targetProfiles = providerRegistryPayload?.target_profiles || {};
       const implementationStatus = providerRegistryPayload?.target_implementation_status || {};
-      const currentValue = String(document.getElementById("target_key")?.value || configCache?.target_key || providerRegistryPayload?.active_target || "guangya");
+      const currentValue = String(
+        document.getElementById("target_key")?.value
+        || getConfigFieldValue(configCache, "target_key")
+        || providerRegistryPayload?.active_target
+        || "guangya"
+      );
       const options = Object.values(targetProfiles).map((item) => {
         const key = String(item.key || "");
         const selectable = Boolean(implementationStatus?.[key]?.selectable);
@@ -2651,34 +2718,11 @@
       for (const field of CONFIG_FIELDS) {
         const el = document.getElementById(field);
         if (!el) continue;
-        payload[field] = el.type === "number" ? Number(el.value || 0) : el.value;
+        payload[field] = normalizeFormValue(field, el.value);
       }
       payload.grouped_config = payload.grouped_config && typeof payload.grouped_config === "object" ? payload.grouped_config : {};
       configCache = payload;
-      setGroupedConfigValue(["sync", "source_path"], payload.source_path || "");
-      setGroupedConfigValue(["sync", "target_path"], payload.target_path || "");
-      setGroupedConfigValue(["openlist", "mode"], payload.openlist_mode || "external");
-      setGroupedConfigValue(["openlist", "url"], payload.openlist_url || "");
-      setGroupedConfigValue(["openlist", "token"], payload.openlist_token || "");
-      setGroupedConfigValue(["openlist", "username"], payload.openlist_username || "");
-      setGroupedConfigValue(["openlist", "password"], payload.openlist_password || "");
-      setGroupedConfigValue(["openlist", "managed_runtime", "bin"], payload.managed_openlist_bin || "");
-      setGroupedConfigValue(["openlist", "managed_runtime", "data_dir"], payload.managed_openlist_data_dir || "");
-      setGroupedConfigValue(["openlist", "managed_runtime", "port"], Number(payload.managed_openlist_port || 5244));
-      setGroupedConfigValue(["sync", "openlist_page_size"], Number(payload.openlist_page_size || 0));
-      setGroupedConfigValue(["sync", "openlist_request_interval_ms"], Number(payload.openlist_request_interval_ms || 0));
-      setGroupedConfigValue(["sync", "queue_interval_ms"], Number(payload.queue_interval_ms || 0));
-      setGroupedConfigValue(["sync", "auto_download_threshold_mb"], Number(payload.auto_download_threshold_mb || 0));
-      setGroupedConfigValue(["sync", "rate_limit_mode"], payload.rate_limit_mode || "safe");
-      setGroupedConfigValue(["targets", "active_target"], payload.target_key || "guangya");
-      setGroupedConfigValue(["targets", "guangya", "phone"], payload.guangya_phone || "");
-      setGroupedConfigValue(["targets", "guangya", "authorization"], payload.guangya_authorization || "");
-      setGroupedConfigValue(["targets", "guangya", "access_token"], payload.guangya_access_token || "");
-      setGroupedConfigValue(["targets", "guangya", "refresh_token"], payload.guangya_refresh_token || "");
-      setGroupedConfigValue(["targets", "guangya", "device_id"], payload.guangya_device_id || "");
-      setGroupedConfigValue(["state", "temp_dir"], payload.temp_dir || "");
-      setGroupedConfigValue(["state", "state_file"], payload.state_file || "");
-      setGroupedConfigValue(["state", "log_file"], payload.log_file || "");
+      syncConfigFieldsToGrouped(payload);
       setGroupedConfigValue(["ui", "panel_open_states"], getPanelState());
       payload.grouped_config = configCache.grouped_config;
       return payload;
@@ -2700,31 +2744,7 @@
       for (const field of CONFIG_FIELDS) {
         const el = document.getElementById(field);
         if (!el) continue;
-        let value = config?.[field];
-        if ((value === undefined || value === null || value === "") && field === "source_path") value = getGroupedConfigValue(["sync", "source_path"], "");
-        if ((value === undefined || value === null || value === "") && field === "target_path") value = getGroupedConfigValue(["sync", "target_path"], "");
-        if ((value === undefined || value === null || value === "") && field === "openlist_mode") value = getGroupedConfigValue(["openlist", "mode"], "external");
-        if ((value === undefined || value === null || value === "") && field === "openlist_url") value = getGroupedConfigValue(["openlist", "url"], "");
-        if ((value === undefined || value === null || value === "") && field === "openlist_token") value = getGroupedConfigValue(["openlist", "token"], "");
-        if ((value === undefined || value === null || value === "") && field === "openlist_username") value = getGroupedConfigValue(["openlist", "username"], "");
-        if ((value === undefined || value === null || value === "") && field === "openlist_password") value = getGroupedConfigValue(["openlist", "password"], "");
-        if ((value === undefined || value === null || value === "") && field === "managed_openlist_bin") value = getGroupedConfigValue(["openlist", "managed_runtime", "bin"], "");
-        if ((value === undefined || value === null || value === "") && field === "managed_openlist_data_dir") value = getGroupedConfigValue(["openlist", "managed_runtime", "data_dir"], "");
-        if ((value === undefined || value === null || value === "") && field === "managed_openlist_port") value = getGroupedConfigValue(["openlist", "managed_runtime", "port"], "");
-        if ((value === undefined || value === null || value === "") && field === "openlist_page_size") value = getGroupedConfigValue(["sync", "openlist_page_size"], "");
-        if ((value === undefined || value === null || value === "") && field === "openlist_request_interval_ms") value = getGroupedConfigValue(["sync", "openlist_request_interval_ms"], "");
-        if ((value === undefined || value === null || value === "") && field === "queue_interval_ms") value = getGroupedConfigValue(["sync", "queue_interval_ms"], "");
-        if ((value === undefined || value === null || value === "") && field === "auto_download_threshold_mb") value = getGroupedConfigValue(["sync", "auto_download_threshold_mb"], "");
-        if ((value === undefined || value === null || value === "") && field === "rate_limit_mode") value = getGroupedConfigValue(["sync", "rate_limit_mode"], "safe");
-        if ((value === undefined || value === null || value === "") && field === "target_key") value = getGroupedConfigValue(["targets", "active_target"], "guangya");
-        if ((value === undefined || value === null || value === "") && field === "guangya_phone") value = getGroupedConfigValue(["targets", "guangya", "phone"], "");
-        if ((value === undefined || value === null || value === "") && field === "guangya_authorization") value = getGroupedConfigValue(["targets", "guangya", "authorization"], "");
-        if ((value === undefined || value === null || value === "") && field === "guangya_access_token") value = getGroupedConfigValue(["targets", "guangya", "access_token"], "");
-        if ((value === undefined || value === null || value === "") && field === "guangya_refresh_token") value = getGroupedConfigValue(["targets", "guangya", "refresh_token"], "");
-        if ((value === undefined || value === null || value === "") && field === "guangya_device_id") value = getGroupedConfigValue(["targets", "guangya", "device_id"], "");
-        if ((value === undefined || value === null || value === "") && field === "temp_dir") value = getGroupedConfigValue(["state", "temp_dir"], "");
-        if ((value === undefined || value === null || value === "") && field === "state_file") value = getGroupedConfigValue(["state", "state_file"], "");
-        if ((value === undefined || value === null || value === "") && field === "log_file") value = getGroupedConfigValue(["state", "log_file"], "");
+        const value = getConfigFieldValue(config, field);
         el.value = value ?? "";
       }
       document.getElementById("effective_openlist_url").value = config?.effective_openlist_url || "";
