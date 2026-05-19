@@ -346,6 +346,14 @@ def create_app(config_path: Path) -> FastAPI:
         normalized["values"] = dict(raw.get("values") or {})
         return normalized
 
+    def normalize_queue_payload(payload: dict[str, Any] | None, runtime_config: AppConfig) -> dict[str, Any]:
+        raw = dict(payload or {})
+        normalized = dict(raw)
+        normalized["source_path"] = str(
+            resolve_payload_value(raw, "source_path", ("sync", "source_path"), runtime_config.source_path or "")
+        )
+        return normalized
+
     def load_config_payload() -> dict[str, Any]:
         normalized = AppConfig.load(config_path)
         payload = normalized.to_flat_dict()
@@ -573,11 +581,14 @@ def create_app(config_path: Path) -> FastAPI:
         payload = normalize_sync_payload(payload, config)
         active_source = str(payload.get("source_path") or config.source_path)
         source_root_for_target = str(payload.get("source_root_for_target") or active_source)
+        selected_paths = list(payload.get("selected_paths") or [])
+        guangya_authorization = str(payload.get("guangya_authorization") or "").strip()
+        miaochuan_payload = str(payload.get("miaochuan_payload") or "")
         try:
             if mode in {"dry_run", "direct"} and active_source.strip() == "/":
                 raise RuntimeError("当前 source_path 还是 OpenList 根目录 / 。请先进入具体挂载目录，再使用“使用当前目录作为源目录”，或把最底层目录批量入队。")
             logger.info(f"开始同步任务: {mode}")
-            if payload.get("source_path"):
+            if active_source:
                 logger.info(f"本次同步源目录: {active_source}")
             run_config = AppConfig.load(config_path)
             if run_config.openlist_mode == "managed":
@@ -595,16 +606,16 @@ def create_app(config_path: Path) -> FastAPI:
             elif mode == "full":
                 summary = runner.run(allow_download_upload=True, dry_run=False)
             elif mode == "download_selected":
-                summary = runner.run_selected_downloads(list(payload.get("selected_paths") or []))
+                summary = runner.run_selected_downloads(selected_paths)
             elif mode == "miaochuan_import":
                 authorization = (
-                    str(payload.get("guangya_authorization") or "").strip()
+                    guangya_authorization
                     or run_config.guangya_authorization
                     or f"Bearer {run_config.guangya_access_token}".strip()
                 )
                 with GuangyaMiaochuanImporter(authorization) as importer:
                     summary = importer.import_payload(
-                        str(payload.get("miaochuan_payload") or ""),
+                        miaochuan_payload,
                         run_config.target_path,
                     )
             else:
@@ -614,7 +625,7 @@ def create_app(config_path: Path) -> FastAPI:
                 sync_state["last_error"] = ""
                 if mode == "download_selected":
                     previous = list(sync_state.get("pending_downloads", []))
-                    selected = set(payload.get("selected_paths") or [])
+                    selected = set(selected_paths)
                     failed_selected = set(summary.pending_downloads or [])
                     sync_state["pending_downloads"] = [
                         path for path in previous if path not in selected or path in failed_selected
@@ -975,7 +986,7 @@ def create_app(config_path: Path) -> FastAPI:
     @app.post("/api/queue/add")
     def add_queue_item(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         nonlocal config
-        payload = payload or {}
+        payload = normalize_queue_payload(payload, config)
         source_path = str(resolve_payload_value(payload, "source_path", ("sync", "source_path"), config.source_path)).strip()
         if not source_path:
             raise HTTPException(status_code=400, detail="缺少 source_path")
@@ -993,7 +1004,7 @@ def create_app(config_path: Path) -> FastAPI:
     @app.post("/api/queue/remove")
     def remove_queue_item(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         nonlocal config
-        payload = payload or {}
+        payload = normalize_queue_payload(payload, config)
         source_path = "/" + str(payload.get("source_path") or "").lstrip("/")
         state = load_state(config.state_file)
         state.source_queue = [item for item in state.source_queue if item.source_path != source_path]

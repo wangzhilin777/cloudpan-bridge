@@ -769,6 +769,49 @@ def test_queue_add_accepts_grouped_source_path(tmp_path: Path) -> None:
     assert source_queue[0]["source_path"] == "/grouped-source"
 
 
+def test_queue_remove_accepts_grouped_source_path(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/from-config"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    add_response = client.post(
+        "/api/queue/add",
+        json={
+            "grouped_config": {
+                "sync": {
+                    "source_path": "/grouped-source"
+                }
+            }
+        },
+    )
+    assert add_response.status_code == 200
+    remove_response = client.post(
+        "/api/queue/remove",
+        json={
+            "grouped_config": {
+                "sync": {
+                    "source_path": "/grouped-source"
+                }
+            }
+        },
+    )
+    assert remove_response.status_code == 200
+    status_response = client.get("/api/status")
+    assert status_response.status_code == 200
+    source_queue = status_response.json()["sync"]["source_queue"]
+    assert source_queue == []
+
+
 def test_config_endpoint_preserves_and_updates_ui_grouped_state(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
