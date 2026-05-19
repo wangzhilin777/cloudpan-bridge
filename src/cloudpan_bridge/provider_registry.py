@@ -756,6 +756,24 @@ TARGET_PROFILES: dict[str, dict[str, Any]] = {
             "en": "Useful as a target for object-storage buckets, backup buckets, or cloud-native archives. The current capability remains a conservative upload path rather than cross-cloud fast upload.",
         },
     },
+    "azureblob": {
+        "key": "azureblob",
+        "label": "Azure Blob",
+        "label_zh": "Azure Blob 目标",
+        "auth_mode": "account url + container + account key",
+        "token_refresh": "not required",
+        "auto_create_dir": True,
+        "fast_upload_hashes": [],
+        "fallback_modes": ["download_upload", "stream_upload"],
+        "description": {
+            "zh": "第九个正式可写目标端。用于把同步结果写入 Azure Blob 容器，当前只按普通对象上传/覆盖处理，不承诺元数据秒传。",
+            "en": "Ninth built-in writable target. It writes sync results into Azure Blob containers and currently uses normal object upload/overwrite only, without any metadata-based fast-upload promise.",
+        },
+        "research_notes": {
+            "zh": "适合作为 Azure 对象存储、归档容器或备份容器目标端；当前能力定位仍是保守上传链路，不宣传成跨盘秒传。",
+            "en": "Useful as a target for Azure object storage, archive containers, or backup containers. The current capability remains a conservative upload path rather than cross-cloud fast upload.",
+        },
+    },
     "smb": {
         "key": "smb",
         "label": "SMB",
@@ -2067,7 +2085,7 @@ def build_driver_target_capability(
     target_profile = _serialize_target_profile(TARGET_PROFILES.get(target_key, TARGET_PROFILES["guangya"]))
     capability_to_targets = dict(source_profile.get("capabilityToTargets") or {})
     target_capability = dict(capability_to_targets.get(target_key) or {})
-    if not target_capability and target_key in {"openlist", "localfs", "webdav", "s3", "ftp", "sftp", "smb"}:
+    if not target_capability and target_key in {"openlist", "localfs", "webdav", "s3", "azureblob", "ftp", "sftp", "smb"}:
         if target_key == "openlist":
             target_capability = {
                 "level": "download_upload_only",
@@ -2106,6 +2124,16 @@ def build_driver_target_capability(
                 "notes": {
                     "zh": "适合作为对象存储桶、备份桶或云原生归档目标端；如果你要真正秒传，仍应优先选择支持元数据导入的目标端。",
                     "en": "Use it as a target for object-storage buckets, backup buckets, or cloud-native archives. For true fast upload, still prefer a target with metadata-import support.",
+                },
+            }
+        elif target_key == "azureblob":
+            target_capability = {
+                "level": "download_upload_only",
+                "recommendedFlow": "当前组合可写入 Azure Blob 目标端，但只按普通对象上传/覆盖处理，不承诺跨盘秒传。",
+                "recommendedFlowEn": "This combination can write into the Azure Blob target, but it only uses normal object upload/overwrite and does not promise any cross-cloud fast upload.",
+                "notes": {
+                    "zh": "适合作为 Azure 对象存储、归档容器或备份容器目标端；如果你要真正秒传，仍应优先选择支持元数据导入的目标端。",
+                    "en": "Use it as a target for Azure object storage, archive containers, or backup containers. For true fast upload, still prefer a target with metadata-import support.",
                 },
             }
         elif target_key == "smb":

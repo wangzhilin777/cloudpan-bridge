@@ -66,6 +66,11 @@ class AppConfig:
     s3_target_access_key: str = ""
     s3_target_secret_key: str = ""
     s3_target_region: str = ""
+    azureblob_target_account_url: str = ""
+    azureblob_target_container: str = ""
+    azureblob_target_prefix: str = ""
+    azureblob_target_account_name: str = ""
+    azureblob_target_account_key: str = ""
     smb_target_url: str = ""
     smb_target_username: str = ""
     smb_target_password: str = ""
@@ -137,6 +142,11 @@ class AppConfig:
             s3_target_access_key=str(_pick(payload.get("s3_target_access_key"), targets.get("s3", {}).get("access_key"), default="")),
             s3_target_secret_key=str(_pick(payload.get("s3_target_secret_key"), targets.get("s3", {}).get("secret_key"), default="")),
             s3_target_region=str(_pick(payload.get("s3_target_region"), targets.get("s3", {}).get("region"), default="")),
+            azureblob_target_account_url=str(_pick(payload.get("azureblob_target_account_url"), targets.get("azureblob", {}).get("account_url"), default="")),
+            azureblob_target_container=str(_pick(payload.get("azureblob_target_container"), targets.get("azureblob", {}).get("container"), default="")),
+            azureblob_target_prefix=str(_pick(payload.get("azureblob_target_prefix"), targets.get("azureblob", {}).get("prefix"), default="")),
+            azureblob_target_account_name=str(_pick(payload.get("azureblob_target_account_name"), targets.get("azureblob", {}).get("account_name"), default="")),
+            azureblob_target_account_key=str(_pick(payload.get("azureblob_target_account_key"), targets.get("azureblob", {}).get("account_key"), default="")),
             smb_target_url=str(_pick(payload.get("smb_target_url"), targets.get("smb", {}).get("url"), default="")),
             smb_target_username=str(_pick(payload.get("smb_target_username"), targets.get("smb", {}).get("username"), default="")),
             smb_target_password=str(_pick(payload.get("smb_target_password"), targets.get("smb", {}).get("password"), default="")),
@@ -201,6 +211,11 @@ class AppConfig:
             "s3_target_access_key": self.s3_target_access_key,
             "s3_target_secret_key": self.s3_target_secret_key,
             "s3_target_region": self.s3_target_region,
+            "azureblob_target_account_url": self.azureblob_target_account_url,
+            "azureblob_target_container": self.azureblob_target_container,
+            "azureblob_target_prefix": self.azureblob_target_prefix,
+            "azureblob_target_account_name": self.azureblob_target_account_name,
+            "azureblob_target_account_key": self.azureblob_target_account_key,
             "smb_target_url": self.smb_target_url,
             "smb_target_username": self.smb_target_username,
             "smb_target_password": self.smb_target_password,
@@ -280,6 +295,13 @@ class AppConfig:
                     "secret_key": self.s3_target_secret_key,
                     "region": self.s3_target_region,
                 },
+                "azureblob": {
+                    "account_url": self.azureblob_target_account_url,
+                    "container": self.azureblob_target_container,
+                    "prefix": self.azureblob_target_prefix,
+                    "account_name": self.azureblob_target_account_name,
+                    "account_key": self.azureblob_target_account_key,
+                },
                 "smb": {
                     "url": self.smb_target_url,
                     "username": self.smb_target_username,
@@ -348,6 +370,11 @@ def write_example_config(path: Path) -> None:
         s3_target_access_key="",
         s3_target_secret_key="",
         s3_target_region="",
+        azureblob_target_account_url="",
+        azureblob_target_container="",
+        azureblob_target_prefix="",
+        azureblob_target_account_name="",
+        azureblob_target_account_key="",
         smb_target_url="",
         smb_target_username="",
         smb_target_password="",

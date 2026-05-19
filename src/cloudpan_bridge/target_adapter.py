@@ -606,6 +606,123 @@ class SmbTargetAdapter:
         return None
 
 
+class AzureBlobTargetAdapter:
+    def __init__(
+        self,
+        account_url: str,
+        container: str,
+        account_name: str = "",
+        account_key: str = "",
+        prefix: str = "",
+        *,
+        service_factory: Callable[..., Any] | None = None,
+    ) -> None:
+        self.account_url = str(account_url or "").strip()
+        self.container = str(container or "").strip()
+        self.account_name = str(account_name or "").strip()
+        self.account_key = str(account_key or "").strip()
+        self.prefix = str(prefix or "").strip().strip("/")
+        self._service_factory = service_factory or self._default_service_factory
+        self.service_client: Any | None = None
+        self.container_client: Any | None = None
+
+    def _default_service_factory(self, **kwargs: Any) -> Any:
+        try:
+            from azure.storage.blob import BlobServiceClient  # type: ignore[import-not-found]
+        except ImportError as exc:  # pragma: no cover - exercised through runtime selection
+            raise RuntimeError("Azure Blob 目标端需要先安装 azure-storage-blob：pip install azure-storage-blob") from exc
+        return BlobServiceClient(**kwargs)
+
+    def ensure_auth(self) -> None:
+        if not self.account_url:
+            raise RuntimeError("Azure Blob 目标端未配置 account_url。")
+        if not self.container:
+            raise RuntimeError("Azure Blob 目标端未配置 container。")
+        if self.container_client is not None:
+            return
+        kwargs: dict[str, Any] = {"account_url": self.account_url}
+        if self.account_key:
+            kwargs["credential"] = self.account_key
+        self.service_client = self._service_factory(**kwargs)
+        self.container_client = self.service_client.get_container_client(self.container)
+
+    def export_state(self) -> dict[str, str]:
+        return {
+            "account_url": self.account_url,
+            "container": self.container,
+            "prefix": self.prefix,
+            "account_name": self.account_name,
+        }
+
+    def close(self) -> None:
+        self.container_client = None
+        self.service_client = None
+
+    def _normalize_path(self, path: str) -> str:
+        normalized = str(PurePosixPath("/" + str(path or "/").lstrip("/")))
+        return "/" if normalized == "." else normalized
+
+    def _build_blob_name(self, path: str) -> str:
+        normalized = self._normalize_path(path)
+        path_part = normalized.lstrip("/")
+        if self.prefix and path_part:
+            return f"{self.prefix}/{path_part}"
+        if self.prefix:
+            return self.prefix
+        return path_part
+
+    def ensure_target_dir(self, path: str) -> str:
+        self.ensure_auth()
+        return self._normalize_path(path)
+
+    def delete_if_exists(self, parent_id: str, name: str) -> bool:
+        target_path = str(PurePosixPath(self._normalize_path(parent_id)) / name)
+        return self.remove_target_path(target_path)
+
+    def remove_target_path(self, path: str) -> bool:
+        self.ensure_auth()
+        assert self.container_client is not None
+        normalized = self._normalize_path(path)
+        if normalized == "/":
+            return False
+        blob_name = self._build_blob_name(normalized)
+        try:
+            self.container_client.delete_blob(blob_name)
+            return True
+        except Exception:
+            return False
+
+    def try_fast_upload(
+        self,
+        file_name: str,
+        file_size: int,
+        parent_id: str,
+        md5_hex: str = "",
+        gcid: str = "",
+    ) -> DirectImportResult:
+        return DirectImportResult(
+            success=False,
+            reason="Azure Blob 目标端当前只支持普通上传/覆盖，不支持元数据秒传。",
+        )
+
+    def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, Any]:
+        self.ensure_auth()
+        assert self.container_client is not None
+        target_path = str(PurePosixPath(self._normalize_path(target_parent_id)) / target_name)
+        blob_name = self._build_blob_name(target_path)
+        with local_path.open("rb") as handle:
+            self.container_client.upload_blob(blob_name, handle, overwrite=True)
+        return {
+            "path": target_path,
+            "size": local_path.stat().st_size,
+            "container": self.container,
+            "blob_name": blob_name,
+        }
+
+    def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
+        return None
+
+
 class FtpTargetAdapter:
     def __init__(
         self,
@@ -865,7 +982,7 @@ class SftpTargetAdapter:
 
 
 def supported_target_keys() -> list[str]:
-    return ["guangya", "openlist", "localfs", "webdav", "s3", "ftp", "sftp", "smb"]
+    return ["guangya", "openlist", "localfs", "webdav", "s3", "azureblob", "ftp", "sftp", "smb"]
 
 
 def create_target_adapter(config: AppConfig, state: SyncState, target_key: str = "") -> TargetAdapter:
@@ -911,6 +1028,14 @@ def create_target_adapter(config: AppConfig, state: SyncState, target_key: str =
             secret_key=config.s3_target_secret_key,
             region=config.s3_target_region,
             prefix=config.s3_target_prefix,
+        )
+    if normalized == "azureblob":
+        return AzureBlobTargetAdapter(
+            account_url=config.azureblob_target_account_url,
+            container=config.azureblob_target_container,
+            account_name=config.azureblob_target_account_name,
+            account_key=config.azureblob_target_account_key,
+            prefix=config.azureblob_target_prefix,
         )
     if normalized == "smb":
         return SmbTargetAdapter(

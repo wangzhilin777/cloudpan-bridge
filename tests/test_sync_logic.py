@@ -29,7 +29,7 @@ from cloudpan_bridge.syncer import (
     serialize_source_entry,
     summarize_source_entries,
 )
-from cloudpan_bridge.target_adapter import FtpTargetAdapter, GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, S3TargetAdapter, SftpTargetAdapter, SmbTargetAdapter, WebDavTargetAdapter
+from cloudpan_bridge.target_adapter import AzureBlobTargetAdapter, FtpTargetAdapter, GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, S3TargetAdapter, SftpTargetAdapter, SmbTargetAdapter, WebDavTargetAdapter
 from cloudpan_bridge.webapp import (
     build_pending_selected_execution_groups,
     compute_rate_limit_cooldown_ms,
@@ -150,6 +150,13 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
       "secret_key": "SECRET_TEST",
       "region": "ap-southeast-1"
     },
+    "azureblob": {
+      "account_url": "https://demo.blob.core.windows.net",
+      "container": "archive-container",
+      "prefix": "cloudpan-bridge/archive",
+      "account_name": "demo-account",
+      "account_key": "azure-key"
+    },
     "smb": {
       "url": "smb://nas/share/archive",
       "username": "smb-user",
@@ -224,6 +231,11 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert cfg.s3_target_access_key == "AKIA_TEST"
     assert cfg.s3_target_secret_key == "SECRET_TEST"
     assert cfg.s3_target_region == "ap-southeast-1"
+    assert cfg.azureblob_target_account_url == "https://demo.blob.core.windows.net"
+    assert cfg.azureblob_target_container == "archive-container"
+    assert cfg.azureblob_target_prefix == "cloudpan-bridge/archive"
+    assert cfg.azureblob_target_account_name == "demo-account"
+    assert cfg.azureblob_target_account_key == "azure-key"
     assert cfg.smb_target_url == "smb://nas/share/archive"
     assert cfg.smb_target_username == "smb-user"
     assert cfg.smb_target_password == "smb-pass"
@@ -244,6 +256,8 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert nested["targets"]["webdav"]["url"] == "https://dav.example.com/root"
     assert nested["targets"]["s3"]["endpoint"] == "https://s3.example.com"
     assert nested["targets"]["s3"]["bucket"] == "archive-bucket"
+    assert nested["targets"]["azureblob"]["account_url"] == "https://demo.blob.core.windows.net"
+    assert nested["targets"]["azureblob"]["container"] == "archive-container"
     assert nested["targets"]["smb"]["url"] == "smb://nas/share/archive"
     assert nested["targets"]["ftp"]["url"] == "ftp://ftp.example.com:21/root"
     assert nested["targets"]["sftp"]["url"] == "sftp://sftp.example.com:22/root"
@@ -275,6 +289,11 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
   "s3_target_access_key": "legacy-ak",
   "s3_target_secret_key": "legacy-sk",
   "s3_target_region": "cn-test-1",
+  "azureblob_target_account_url": "https://legacy.blob.core.windows.net",
+  "azureblob_target_container": "legacy-container",
+  "azureblob_target_prefix": "legacy-prefix",
+  "azureblob_target_account_name": "legacy-azure",
+  "azureblob_target_account_key": "legacy-azure-key",
   "smb_target_url": "smb://legacy-nas/share/root",
   "smb_target_username": "legacy-smb",
   "smb_target_password": "legacy-smb-pass",
@@ -299,6 +318,9 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
     assert serialized["targets"]["s3"]["endpoint"] == "https://legacy-s3.example.com"
     assert serialized["targets"]["s3"]["bucket"] == "legacy-bucket"
     assert serialized["targets"]["s3"]["access_key"] == "legacy-ak"
+    assert serialized["targets"]["azureblob"]["account_url"] == "https://legacy.blob.core.windows.net"
+    assert serialized["targets"]["azureblob"]["container"] == "legacy-container"
+    assert serialized["targets"]["azureblob"]["account_name"] == "legacy-azure"
     assert serialized["targets"]["smb"]["url"] == "smb://legacy-nas/share/root"
     assert serialized["targets"]["smb"]["username"] == "legacy-smb"
     assert serialized["targets"]["ftp"]["url"] == "ftp://legacy.example.com/root"
@@ -581,6 +603,40 @@ def test_sync_runner_builds_s3_target_adapter(tmp_path) -> None:
     adapter.close()
 
 
+def test_sync_runner_builds_azureblob_target_adapter(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst",
+                },
+                "targets": {
+                    "active_target": "azureblob",
+                    "azureblob": {
+                        "account_url": "https://demo.blob.core.windows.net",
+                        "container": "archive-container",
+                        "prefix": "cloudpan-bridge/archive",
+                        "account_name": "demo-account",
+                        "account_key": "azure-key",
+                    },
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    adapter = runner._build_target_adapter(SyncState())
+    assert isinstance(adapter, AzureBlobTargetAdapter)
+    exported = adapter.export_state()
+    assert exported["account_url"] == "https://demo.blob.core.windows.net"
+    assert exported["container"] == "archive-container"
+    assert exported["prefix"] == "cloudpan-bridge/archive"
+    adapter.close()
+
+
 def test_sync_runner_builds_smb_target_adapter(tmp_path) -> None:
     path = tmp_path / "config.json"
     path.write_text(
@@ -771,6 +827,52 @@ def test_s3_target_adapter_uses_basic_s3_calls(tmp_path) -> None:
     assert ("delete_object", "archive-bucket", "cloudpan-bridge/archive/photos/2026/demo.txt") in fake_client.calls
     adapter.close()
     assert fake_client.closed is True
+
+
+def test_azureblob_target_adapter_uses_basic_blob_calls(tmp_path) -> None:
+    local_file = tmp_path / "demo.txt"
+    local_file.write_text("hello", encoding="utf-8")
+
+    class FakeContainerClient:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str]] = []
+
+        def upload_blob(self, blob_name: str, handle, overwrite: bool = False) -> None:  # type: ignore[no-untyped-def]
+            _ = handle.read()
+            self.calls.append(("upload_blob", f"{blob_name}|{overwrite}"))
+
+        def delete_blob(self, blob_name: str) -> None:
+            self.calls.append(("delete_blob", blob_name))
+
+    class FakeServiceClient:
+        def __init__(self) -> None:
+            self.container = FakeContainerClient()
+
+        def get_container_client(self, name: str) -> FakeContainerClient:
+            self.container.calls.append(("get_container_client", name))
+            return self.container
+
+    fake_service = FakeServiceClient()
+    adapter = AzureBlobTargetAdapter(
+        account_url="https://demo.blob.core.windows.net",
+        container="archive-container",
+        account_name="demo-account",
+        account_key="azure-key",
+        prefix="cloudpan-bridge/archive",
+        service_factory=lambda **kwargs: fake_service,
+    )
+    adapter.ensure_auth()
+    parent_id = adapter.ensure_target_dir("/photos/2026")
+    assert parent_id == "/photos/2026"
+    result = adapter.upload_local_file(local_file, parent_id, "demo.txt")
+    assert result["path"] == "/photos/2026/demo.txt"
+    assert result["container"] == "archive-container"
+    assert result["blob_name"] == "cloudpan-bridge/archive/photos/2026/demo.txt"
+    assert adapter.remove_target_path("/photos/2026/demo.txt") is True
+    assert ("get_container_client", "archive-container") in fake_service.container.calls
+    assert ("upload_blob", "cloudpan-bridge/archive/photos/2026/demo.txt|True") in fake_service.container.calls
+    assert ("delete_blob", "cloudpan-bridge/archive/photos/2026/demo.txt") in fake_service.container.calls
+    adapter.close()
 
 
 def test_smb_target_adapter_uses_basic_smb_calls(tmp_path) -> None:
@@ -1165,7 +1267,7 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     payload = response.json()
     assert payload["active_target"] == "guangya"
     assert payload["driver_matrix"]["thunder"]["targetProfile"]["key"] == "guangya"
-    assert payload["implemented_targets"] == ["guangya", "openlist", "localfs", "webdav", "s3", "ftp", "sftp", "smb"]
+    assert payload["implemented_targets"] == ["guangya", "openlist", "localfs", "webdav", "s3", "azureblob", "ftp", "sftp", "smb"]
     assert payload["target_implementation_status"]["guangya"]["known_profile"] is True
     assert payload["target_implementation_status"]["guangya"]["implemented"] is True
     assert payload["target_implementation_status"]["guangya"]["selectable"] is True
@@ -1178,6 +1280,9 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     assert payload["target_implementation_status"]["s3"]["known_profile"] is True
     assert payload["target_implementation_status"]["s3"]["implemented"] is True
     assert payload["target_implementation_status"]["s3"]["selectable"] is True
+    assert payload["target_implementation_status"]["azureblob"]["known_profile"] is True
+    assert payload["target_implementation_status"]["azureblob"]["implemented"] is True
+    assert payload["target_implementation_status"]["azureblob"]["selectable"] is True
     assert payload["target_implementation_status"]["smb"]["known_profile"] is True
     assert payload["target_implementation_status"]["smb"]["implemented"] is True
     assert payload["target_implementation_status"]["smb"]["selectable"] is True
@@ -2504,6 +2609,8 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["target_profiles"]["webdav"]["autoCreateDir"] is True
     assert payload["target_profiles"]["s3"]["authMode"] == "endpoint + bucket + access key/secret"
     assert payload["target_profiles"]["s3"]["autoCreateDir"] is True
+    assert payload["target_profiles"]["azureblob"]["authMode"] == "account url + container + account key"
+    assert payload["target_profiles"]["azureblob"]["autoCreateDir"] is True
     assert payload["target_profiles"]["smb"]["authMode"] == "smb url + username/password"
     assert payload["target_profiles"]["smb"]["autoCreateDir"] is True
     assert payload["target_profiles"]["ftp"]["authMode"] == "ftp url + username/password"

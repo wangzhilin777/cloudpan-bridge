@@ -23,6 +23,7 @@
 - 以 `SMB` 作为当前第六个已实现的可写目标端
 - 以 `FTP` 作为当前第七个已实现的可写目标端
 - 以 `SFTP` 作为当前第八个已实现的可写目标端
+- 以 `Azure Blob` 作为当前第九个已实现的可写目标端
 - 支持本地 Web 控制台、目录浏览、挂载管理、实时日志
 - 支持托管 OpenList 与外部 OpenList 两种工作模式
 - 支持按目录扫描、最底层目录边扫边同步、目录队列、待补传树
@@ -38,7 +39,7 @@
 补充说明：
 
 - `Provider Registry` 已开始承载复杂驱动说明与推荐默认值
-- `Target Adapter` 已抽出 Guangya 适配层，并补上 OpenList / LocalFS / WebDAV / S3 / SMB / FTP / SFTP 可写目标端
+- `Target Adapter` 已抽出 Guangya 适配层，并补上 OpenList / LocalFS / WebDAV / S3 / SMB / FTP / SFTP / Azure Blob 可写目标端
 - `能力矩阵与建议` 已有第一版页面/接口链路
 - 但“全 OpenList 驱动逐项填实”和“多目标端矩阵”仍未完成
 
@@ -224,6 +225,13 @@ OpenList 不应再被描述成“天然支持所有跨网盘秒传复制”。
 - `SFTP`
   - 用于把结果写入 Linux 主机、NAS 或云服务器目录
   - 当前走普通上传/覆盖链路
+  - 不承诺跨网盘秒传
+
+当前第九个正式可写目标端：
+
+- `Azure Blob`
+  - 用于把结果写入 Azure Blob Storage 容器前缀
+  - 当前走普通对象上传/覆盖链路
   - 不承诺跨网盘秒传
 
 后续可扩：
@@ -533,7 +541,7 @@ Guangya 是当前已完成最多的目标端，必须继续保留并增强。
   - 已有统一指纹模型与 OpenList 哈希字段标准化入口
 - `Phase 4`
   - Guangya 已抽出目标端适配器基础结构
-  - OpenList / LocalFS / WebDAV / S3 / SMB / FTP / SFTP 已具备真实可写目标端适配器
+  - OpenList / LocalFS / WebDAV / S3 / SMB / FTP / SFTP / Azure Blob 已具备真实可写目标端适配器
   - 已新增 `target_key`、目标端工厂与页面目标端选择点，当前默认仍为 `guangya`
   - 页面切换 `target_key` 后，能力矩阵、覆盖审计与导出链路都会按当前目标端实时刷新
 - `Phase 5`
