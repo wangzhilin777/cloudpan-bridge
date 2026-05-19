@@ -755,7 +755,25 @@ TARGET_PROFILES: dict[str, dict[str, Any]] = {
             "zh": "适合作为传统 NAS、主机面板或轻量服务器目录型目标端；当前能力定位仍是保守上传链路，不宣传成跨盘秒传。",
             "en": "Useful as a directory-style target for legacy NAS, hosting panels, or lightweight servers. The current capability remains a conservative upload path rather than cross-cloud fast upload.",
         },
-    }
+    },
+    "sftp": {
+        "key": "sftp",
+        "label": "SFTP",
+        "label_zh": "SFTP 目标端",
+        "auth_mode": "sftp url + username/password",
+        "token_refresh": "not required",
+        "auto_create_dir": True,
+        "fast_upload_hashes": [],
+        "fallback_modes": ["download_upload", "stream_upload"],
+        "description": {
+            "zh": "第六个正式可写目标端。用于把同步结果写入 SFTP 存储，当前只按普通上传/覆盖处理，不承诺元数据秒传。",
+            "en": "Sixth built-in writable target. It writes sync results into SFTP storage and currently uses normal upload/overwrite only, without any metadata-based fast-upload promise.",
+        },
+        "research_notes": {
+            "zh": "适合作为 Linux 主机、NAS 或云服务器目录型目标端；当前能力定位仍是保守上传链路，不宣传成跨盘秒传。",
+            "en": "Useful as a directory-style target for Linux hosts, NAS systems, or cloud servers. The current capability remains a conservative upload path rather than cross-cloud fast upload.",
+        },
+    },
 }
 
 SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
@@ -2013,7 +2031,7 @@ def build_driver_target_capability(
     target_profile = _serialize_target_profile(TARGET_PROFILES.get(target_key, TARGET_PROFILES["guangya"]))
     capability_to_targets = dict(source_profile.get("capabilityToTargets") or {})
     target_capability = dict(capability_to_targets.get(target_key) or {})
-    if not target_capability and target_key in {"openlist", "localfs", "webdav", "ftp"}:
+    if not target_capability and target_key in {"openlist", "localfs", "webdav", "ftp", "sftp"}:
         if target_key == "openlist":
             target_capability = {
                 "level": "download_upload_only",
@@ -2044,7 +2062,7 @@ def build_driver_target_capability(
                     "en": "Use it as a unified target for NAS, private cloud, or third-party WebDAV storage. For true fast upload, still prefer a target with metadata-import support.",
                 },
             }
-        else:
+        elif target_key == "ftp":
             target_capability = {
                 "level": "download_upload_only",
                 "recommendedFlow": "当前组合可写入 FTP 目标端，但只按普通上传/覆盖处理，不承诺跨盘秒传。",
@@ -2052,6 +2070,16 @@ def build_driver_target_capability(
                 "notes": {
                     "zh": "适合作为传统 NAS、服务器目录或轻量存储目标端；如果你要真正秒传，仍应优先选择支持元数据导入的目标端。",
                     "en": "Use it as a target for legacy NAS, server directories, or lightweight storage. For true fast upload, still prefer a target with metadata-import support.",
+                },
+            }
+        else:
+            target_capability = {
+                "level": "download_upload_only",
+                "recommendedFlow": "当前组合可写入 SFTP 目标端，但只按普通上传/覆盖处理，不承诺跨盘秒传。",
+                "recommendedFlowEn": "This combination can write into the SFTP target, but it only uses normal upload/overwrite and does not promise any cross-cloud fast upload.",
+                "notes": {
+                    "zh": "适合作为 Linux 主机、NAS 或云服务器目录目标端；如果你要真正秒传，仍应优先选择支持元数据导入的目标端。",
+                    "en": "Use it as a target for Linux hosts, NAS systems, or cloud-server directories. For true fast upload, still prefer a target with metadata-import support.",
                 },
             }
         source_profile = dict(source_profile)

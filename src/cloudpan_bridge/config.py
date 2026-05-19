@@ -63,6 +63,9 @@ class AppConfig:
     ftp_target_url: str = ""
     ftp_target_username: str = ""
     ftp_target_password: str = ""
+    sftp_target_url: str = ""
+    sftp_target_username: str = ""
+    sftp_target_password: str = ""
     delete_removed: bool = False
     target_delete_removed: bool = False
     openlist_page_size: int = 200
@@ -122,6 +125,9 @@ class AppConfig:
             ftp_target_url=str(_pick(payload.get("ftp_target_url"), targets.get("ftp", {}).get("url"), default="")),
             ftp_target_username=str(_pick(payload.get("ftp_target_username"), targets.get("ftp", {}).get("username"), default="")),
             ftp_target_password=str(_pick(payload.get("ftp_target_password"), targets.get("ftp", {}).get("password"), default="")),
+            sftp_target_url=str(_pick(payload.get("sftp_target_url"), targets.get("sftp", {}).get("url"), default="")),
+            sftp_target_username=str(_pick(payload.get("sftp_target_username"), targets.get("sftp", {}).get("username"), default="")),
+            sftp_target_password=str(_pick(payload.get("sftp_target_password"), targets.get("sftp", {}).get("password"), default="")),
             delete_removed=bool(_pick(payload.get("delete_removed"), sync.get("delete_removed"), default=False)),
             target_delete_removed=bool(_pick(payload.get("target_delete_removed"), sync.get("target_delete_removed"), default=False)),
             openlist_page_size=_int_or_default(_pick(payload.get("openlist_page_size"), sync.get("openlist_page_size"), default=200), 200, minimum=1),
@@ -174,6 +180,9 @@ class AppConfig:
             "ftp_target_url": self.ftp_target_url,
             "ftp_target_username": self.ftp_target_username,
             "ftp_target_password": self.ftp_target_password,
+            "sftp_target_url": self.sftp_target_url,
+            "sftp_target_username": self.sftp_target_username,
+            "sftp_target_password": self.sftp_target_password,
             "delete_removed": self.delete_removed,
             "target_delete_removed": self.target_delete_removed,
             "openlist_page_size": self.openlist_page_size,
@@ -240,6 +249,11 @@ class AppConfig:
                     "url": self.ftp_target_url,
                     "username": self.ftp_target_username,
                     "password": self.ftp_target_password,
+                },
+                "sftp": {
+                    "url": self.sftp_target_url,
+                    "username": self.sftp_target_username,
+                    "password": self.sftp_target_password,
                 }
             },
             "sync": {
@@ -291,6 +305,9 @@ def write_example_config(path: Path) -> None:
         ftp_target_url="",
         ftp_target_username="",
         ftp_target_password="",
+        sftp_target_url="",
+        sftp_target_username="",
+        sftp_target_password="",
         delete_removed=False,
         target_delete_removed=False,
         openlist_page_size=200,

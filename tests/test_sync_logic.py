@@ -29,7 +29,7 @@ from cloudpan_bridge.syncer import (
     serialize_source_entry,
     summarize_source_entries,
 )
-from cloudpan_bridge.target_adapter import FtpTargetAdapter, GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, WebDavTargetAdapter
+from cloudpan_bridge.target_adapter import FtpTargetAdapter, GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, SftpTargetAdapter, WebDavTargetAdapter
 from cloudpan_bridge.webapp import (
     build_pending_selected_execution_groups,
     compute_rate_limit_cooldown_ms,
@@ -146,6 +146,11 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
       "url": "ftp://ftp.example.com:21/root",
       "username": "ftp-user",
       "password": "ftp-pass"
+    },
+    "sftp": {
+      "url": "sftp://sftp.example.com:22/root",
+      "username": "sftp-user",
+      "password": "sftp-pass"
     }
   },
   "sync": {
@@ -203,6 +208,9 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert cfg.ftp_target_url == "ftp://ftp.example.com:21/root"
     assert cfg.ftp_target_username == "ftp-user"
     assert cfg.ftp_target_password == "ftp-pass"
+    assert cfg.sftp_target_url == "sftp://sftp.example.com:22/root"
+    assert cfg.sftp_target_username == "sftp-user"
+    assert cfg.sftp_target_password == "sftp-pass"
     assert cfg.target_delete_removed is False
     assert cfg.provider_captures["quark"]["captured"]["cookie_header"] == "k=v"
     assert cfg.ui_language == "mix"
@@ -213,6 +221,7 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert nested["targets"]["guangya"]["device_id"] == "device"
     assert nested["targets"]["webdav"]["url"] == "https://dav.example.com/root"
     assert nested["targets"]["ftp"]["url"] == "ftp://ftp.example.com:21/root"
+    assert nested["targets"]["sftp"]["url"] == "sftp://sftp.example.com:22/root"
     assert nested["source_session"]["provider_captures"]["quark"]["captured"]["cookie_header"] == "k=v"
     assert nested["ui"]["language"] == "mix"
     assert nested["ui"]["browser"]["mounted_source"] == "/mount"
@@ -237,7 +246,10 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
   "webdav_target_password": "legacy-pass",
   "ftp_target_url": "ftp://legacy.example.com/root",
   "ftp_target_username": "legacy-ftp",
-  "ftp_target_password": "legacy-ftp-pass"
+  "ftp_target_password": "legacy-ftp-pass",
+  "sftp_target_url": "sftp://legacy.example.com/root",
+  "sftp_target_username": "legacy-sftp",
+  "sftp_target_password": "legacy-sftp-pass"
 }
 """.strip(),
         encoding="utf-8",
@@ -252,6 +264,8 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
     assert serialized["targets"]["webdav"]["username"] == "legacy-dav"
     assert serialized["targets"]["ftp"]["url"] == "ftp://legacy.example.com/root"
     assert serialized["targets"]["ftp"]["username"] == "legacy-ftp"
+    assert serialized["targets"]["sftp"]["url"] == "sftp://legacy.example.com/root"
+    assert serialized["targets"]["sftp"]["username"] == "legacy-sftp"
     assert serialized["sync"]["target_delete_removed"] is False
     assert "source_path" not in serialized
 
@@ -524,6 +538,37 @@ def test_sync_runner_builds_ftp_target_adapter(tmp_path) -> None:
     adapter.close()
 
 
+def test_sync_runner_builds_sftp_target_adapter(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst",
+                },
+                "targets": {
+                    "active_target": "sftp",
+                    "sftp": {
+                        "url": "sftp://sftp.example.com:22/root",
+                        "username": "sftp-user",
+                        "password": "sftp-pass",
+                    },
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    adapter = runner._build_target_adapter(SyncState())
+    assert isinstance(adapter, SftpTargetAdapter)
+    exported = adapter.export_state()
+    assert exported["url"] == "sftp://sftp.example.com:22/root"
+    assert exported["username"] == "sftp-user"
+    adapter.close()
+
+
 def test_localfs_target_adapter_can_remove_target_path(tmp_path) -> None:
     root = tmp_path / "exports"
     adapter = LocalFsTargetAdapter(root)
@@ -630,6 +675,61 @@ def test_ftp_target_adapter_uses_basic_ftp_calls(tmp_path) -> None:
     assert ("storbinary", "STOR /root/photos/2026/demo.txt") in fake_ftp.calls
     assert ("delete", "/root/photos/2026/demo.txt") in fake_ftp.calls
     adapter.close()
+
+
+def test_sftp_target_adapter_uses_basic_sftp_calls(tmp_path) -> None:
+    local_file = tmp_path / "demo.txt"
+    local_file.write_text("hello", encoding="utf-8")
+
+    class FakeTransport:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    class FakeSftp:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str]] = []
+            self.closed = False
+
+        def mkdir(self, path: str) -> None:
+            self.calls.append(("mkdir", path))
+
+        def put(self, local_path: str, remote_path: str) -> None:
+            _ = Path(local_path).read_bytes()
+            self.calls.append(("put", remote_path))
+
+        def remove(self, path: str) -> None:
+            self.calls.append(("remove", path))
+
+        def rmdir(self, path: str) -> None:
+            self.calls.append(("rmdir", path))
+
+        def close(self) -> None:
+            self.closed = True
+
+    fake_transport = FakeTransport()
+    fake_sftp = FakeSftp()
+    adapter = SftpTargetAdapter(
+        base_url="sftp://sftp.example.com:22/root",
+        username="demo",
+        password="secret",
+        connect_factory=lambda host, port, username, password: (fake_transport, fake_sftp),
+    )
+    adapter.ensure_auth()
+    parent_id = adapter.ensure_target_dir("/photos/2026")
+    assert parent_id == "/photos/2026"
+    result = adapter.upload_local_file(local_file, parent_id, "demo.txt")
+    assert result["path"] == "/photos/2026/demo.txt"
+    assert adapter.remove_target_path("/photos/2026/demo.txt") is True
+    assert ("mkdir", "/root/photos") in fake_sftp.calls
+    assert ("mkdir", "/root/photos/2026") in fake_sftp.calls
+    assert ("put", "/root/photos/2026/demo.txt") in fake_sftp.calls
+    assert ("remove", "/root/photos/2026/demo.txt") in fake_sftp.calls
+    adapter.close()
+    assert fake_transport.closed is True
+    assert fake_sftp.closed is True
 
 
 def test_delete_removed_does_not_touch_target_when_target_delete_removed_disabled(
@@ -858,7 +958,7 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     payload = response.json()
     assert payload["active_target"] == "guangya"
     assert payload["driver_matrix"]["thunder"]["targetProfile"]["key"] == "guangya"
-    assert payload["implemented_targets"] == ["guangya", "openlist", "localfs", "webdav", "ftp"]
+    assert payload["implemented_targets"] == ["guangya", "openlist", "localfs", "webdav", "ftp", "sftp"]
     assert payload["target_implementation_status"]["guangya"]["known_profile"] is True
     assert payload["target_implementation_status"]["guangya"]["implemented"] is True
     assert payload["target_implementation_status"]["guangya"]["selectable"] is True
@@ -2191,6 +2291,8 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["target_profiles"]["webdav"]["autoCreateDir"] is True
     assert payload["target_profiles"]["ftp"]["authMode"] == "ftp url + username/password"
     assert payload["target_profiles"]["ftp"]["autoCreateDir"] is True
+    assert payload["target_profiles"]["sftp"]["authMode"] == "sftp url + username/password"
+    assert payload["target_profiles"]["sftp"]["autoCreateDir"] is True
     assert payload["driver_matrix"]["thunder"]["level"] == "fast_upload_partial"
 
 

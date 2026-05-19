@@ -12,12 +12,13 @@
 当前主路线：
 
 - 源端统一走 `OpenList`
-- 目标端当前已内置 `Guangya`、`OpenList`、`LocalFS`、`WebDAV` 与 `FTP`
+- 目标端当前已内置 `Guangya`、`OpenList`、`LocalFS`、`WebDAV`、`FTP` 与 `SFTP`
 - 其中 `Guangya` 仍是当前唯一支持元数据秒传/秒传 JSON 直导的正式目标端
 - `OpenList` 目标端已经可写入，但按普通上传/覆盖链路处理，不宣传跨盘秒传
 - `LocalFS` 目标端已经可写入，但只负责把结果落到本地目录，不宣传成跨盘秒传目标
 - `WebDAV` 目标端已经可写入，适合 NAS / 私有云 / 第三方 WebDAV 存储，但当前同样只走普通上传/覆盖
 - `FTP` 目标端已经可写入，适合作为传统 NAS / 主机面板 / 轻量服务器目录型目标，但当前同样只走普通上传/覆盖
+- `SFTP` 目标端已经可写入，适合作为 Linux 主机 / NAS / 云服务器目录型目标，但当前同样只走普通上传/覆盖
 - 优先做 `MD5 / etag / GCID` 秒传
 - 未命中再进入自动补传或待补传目录树
 
@@ -37,7 +38,7 @@
 - 默认同步语义是“新增 + 覆盖”，不会因为源端删除而默认删除目标端文件
 - 支持把“目标端真实删除”作为独立开关启用
   - `delete_removed = true` 只会把已不存在的源文件从同步状态里移除
-  - 只有同时开启 `target_delete_removed = true`，才会尝试删除 `Guangya / OpenList / LocalFS / WebDAV / FTP` 目标端对应文件
+  - 只有同时开启 `target_delete_removed = true`，才会尝试删除 `Guangya / OpenList / LocalFS / WebDAV / FTP / SFTP` 目标端对应文件
   - 如果你当前只需要“改动覆盖，不做删除”，保持默认关闭即可
 - 支持最底层目录边扫边同步
 - 支持最底层目录批量入队
@@ -61,6 +62,11 @@
   - 自动创建目录
   - 已存在文件可先删后传
   - 适合作为传统 NAS、主机面板或轻量服务器目录目标
+  - 当前只走普通上传/覆盖，不支持跨盘元数据秒传
+- 支持把当前源目录写入 `SFTP` 目标端
+  - 自动创建目录
+  - 已存在文件可先删后传
+  - 适合作为 Linux 主机、NAS 或云服务器目录目标
   - 当前只走普通上传/覆盖，不支持跨盘元数据秒传
 - 支持抓取并缓存常见源网盘登录态
   - `夸克`：优先抓 Cookie
@@ -389,7 +395,7 @@
 - 目标端下拉现在会按内置 `target_profiles` 动态生成，后续扩目标端时不需要再手改前端选项
 - 同时只会放出当前真正可选、已实现适配器的目标端，避免页面先暴露还不能写入的目标端
 - 在真正启动同步、队列或最底层边扫边同步前，现在也会先做目标端预检，未实现目标端会直接在入口层返回清晰错误
-- 现阶段正式可写目标端已有 `guangya`、`openlist`、`localfs`、`webdav` 与 `ftp`
+- 现阶段正式可写目标端已有 `guangya`、`openlist`、`localfs`、`webdav`、`ftp` 与 `sftp`
 - 但真正支持秒传 JSON 直导和元数据秒传的目标端仍只有 `guangya`
 - 当前活动 Tab、日志抽屉显隐等页面状态会同步写入 `ui.panel_open_states`
 - 老版本本地缓存键也会自动迁移到新的 `CloudPan Bridge` 命名空间
@@ -422,12 +428,18 @@
     "provider_captures": {}
   },
   "targets": {
+    "active_target": "guangya",
     "guangya": {
       "phone": "+86 13800138000",
       "authorization": "",
       "access_token": "",
       "refresh_token": "",
       "device_id": ""
+    },
+    "sftp": {
+      "url": "",
+      "username": "",
+      "password": ""
     }
   },
   "sync": {

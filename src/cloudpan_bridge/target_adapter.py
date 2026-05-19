@@ -469,8 +469,142 @@ class FtpTargetAdapter:
         return None
 
 
+class SftpTargetAdapter:
+    def __init__(
+        self,
+        base_url: str,
+        username: str = "",
+        password: str = "",
+        *,
+        connect_factory: Callable[[str, int, str, str], tuple[Any, Any]] | None = None,
+    ) -> None:
+        self.base_url = str(base_url or "").strip()
+        self.username = username
+        self.password = password
+        self._connect_factory = connect_factory or self._default_connect_factory
+        self.transport: Any | None = None
+        self.sftp: Any | None = None
+        parsed = urlparse(self.base_url if "://" in self.base_url else f"sftp://{self.base_url.lstrip('/')}")
+        self.host = parsed.hostname or ""
+        self.port = int(parsed.port or 22)
+        self.root_path = str(PurePosixPath("/" + parsed.path.lstrip("/")))
+
+    def _default_connect_factory(self, host: str, port: int, username: str, password: str) -> tuple[Any, Any]:
+        try:
+            import paramiko  # type: ignore[import-not-found]
+        except ImportError as exc:  # pragma: no cover - exercised through runtime selection
+            raise RuntimeError("SFTP 目标端需要先安装 paramiko：pip install paramiko") from exc
+        transport = paramiko.Transport((host, port))
+        transport.connect(username=username, password=password)
+        sftp = paramiko.SFTPClient.from_transport(transport)
+        return transport, sftp
+
+    def ensure_auth(self) -> None:
+        if not self.host:
+            raise RuntimeError("SFTP 目标端未配置 URL。")
+        if self.sftp is not None:
+            return
+        transport, sftp = self._connect_factory(self.host, self.port, self.username, self.password)
+        self.transport = transport
+        self.sftp = sftp
+
+    def export_state(self) -> dict[str, str]:
+        return {
+            "url": self.base_url,
+            "username": self.username,
+        }
+
+    def close(self) -> None:
+        if self.sftp is not None:
+            try:
+                self.sftp.close()
+            except Exception:
+                pass
+        if self.transport is not None:
+            try:
+                self.transport.close()
+            except Exception:
+                pass
+        self.sftp = None
+        self.transport = None
+
+    def _normalize_path(self, path: str) -> str:
+        normalized = str(PurePosixPath("/" + str(path or "/").lstrip("/")))
+        return "/" if normalized == "." else normalized
+
+    def _build_remote_path(self, path: str) -> str:
+        normalized = self._normalize_path(path)
+        if self.root_path == "/":
+            return normalized
+        if normalized == "/":
+            return self.root_path
+        return str(PurePosixPath(self.root_path) / normalized.lstrip("/"))
+
+    def ensure_target_dir(self, path: str) -> str:
+        self.ensure_auth()
+        assert self.sftp is not None
+        normalized = self._normalize_path(path)
+        remote = self._build_remote_path(normalized)
+        current = PurePosixPath("/")
+        for part in PurePosixPath(remote).parts[1:]:
+            current = current / part
+            try:
+                self.sftp.mkdir(str(current))
+            except Exception:
+                pass
+        return normalized
+
+    def delete_if_exists(self, parent_id: str, name: str) -> bool:
+        target_path = str(PurePosixPath(self._normalize_path(parent_id)) / name)
+        return self.remove_target_path(target_path)
+
+    def remove_target_path(self, path: str) -> bool:
+        self.ensure_auth()
+        assert self.sftp is not None
+        normalized = self._normalize_path(path)
+        if normalized == "/":
+            return False
+        remote = self._build_remote_path(normalized)
+        try:
+            self.sftp.remove(remote)
+            return True
+        except Exception:
+            try:
+                self.sftp.rmdir(remote)
+                return True
+            except Exception:
+                return False
+
+    def try_fast_upload(
+        self,
+        file_name: str,
+        file_size: int,
+        parent_id: str,
+        md5_hex: str = "",
+        gcid: str = "",
+    ) -> DirectImportResult:
+        return DirectImportResult(
+            success=False,
+            reason="SFTP 目标端当前只支持普通上传/覆盖，不支持元数据秒传。",
+        )
+
+    def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, Any]:
+        self.ensure_auth()
+        assert self.sftp is not None
+        target_path = str(PurePosixPath(self._normalize_path(target_parent_id)) / target_name)
+        remote = self._build_remote_path(target_path)
+        self.sftp.put(str(local_path), remote)
+        return {
+            "path": target_path,
+            "size": local_path.stat().st_size,
+        }
+
+    def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
+        return None
+
+
 def supported_target_keys() -> list[str]:
-    return ["guangya", "openlist", "localfs", "webdav", "ftp"]
+    return ["guangya", "openlist", "localfs", "webdav", "ftp", "sftp"]
 
 
 def create_target_adapter(config: AppConfig, state: SyncState, target_key: str = "") -> TargetAdapter:
@@ -513,5 +647,11 @@ def create_target_adapter(config: AppConfig, state: SyncState, target_key: str =
             base_url=config.ftp_target_url,
             username=config.ftp_target_username,
             password=config.ftp_target_password,
+        )
+    if normalized == "sftp":
+        return SftpTargetAdapter(
+            base_url=config.sftp_target_url,
+            username=config.sftp_target_username,
+            password=config.sftp_target_password,
         )
     raise NotImplementedError(f"目标端暂未实现: {normalized}")
