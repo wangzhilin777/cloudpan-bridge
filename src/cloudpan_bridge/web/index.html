@@ -407,7 +407,7 @@
             <div class="actions">
               <button class="secondary" id="start-runtime" data-i18n="btn.start_runtime">启动托管 OpenList</button>
               <button class="secondary" id="login-openlist" data-i18n="btn.login_openlist">登录 OpenList 并写回 Token</button>
-              <button class="secondary" id="capture-guangya" data-i18n="btn.capture_guangya">打开光鸭登录并自动抓取</button>
+              <button class="secondary" id="capture-guangya" data-i18n="btn.capture_guangya" data-target-only="guangya">打开光鸭登录并自动抓取</button>
               <button class="warn" id="run-direct-overview" data-i18n="btn.direct_sync">直接同步当前目录</button>
             </div>
           </div>
@@ -681,23 +681,24 @@
               <label data-i18n="label.target_key">当前目标端</label>
                 <select id="target_key"></select>
               </div>
-              <div>
+              <div id="target-auth-guide" class="notice col-span-2">当前目标端说明将显示在这里。</div>
+              <div data-target-only="guangya">
                 <label data-i18n="label.guangya_phone">光鸭手机号</label>
                 <input id="guangya_phone">
               </div>
-              <div>
+              <div data-target-only="guangya">
                 <label data-i18n="label.guangya_device_id">光鸭 Device ID</label>
                 <input id="guangya_device_id">
               </div>
-              <div>
+              <div data-target-only="guangya">
                 <label data-i18n="label.guangya_access_token">光鸭 Access Token</label>
                 <input id="guangya_access_token">
               </div>
-              <div>
+              <div data-target-only="guangya">
                 <label data-i18n="label.guangya_refresh_token">光鸭 Refresh Token</label>
                 <input id="guangya_refresh_token">
               </div>
-              <div class="col-span-2">
+              <div class="col-span-2" data-target-only="guangya">
                 <label data-i18n="label.guangya_authorization">光鸭 Authorization</label>
                 <input id="guangya_authorization" placeholder="Bearer ...">
               </div>
@@ -1303,6 +1304,29 @@
       }
     }
 
+    function renderTargetSpecificControls() {
+      const target = activeTargetKey();
+      const isGuangya = target === "guangya";
+      document.querySelectorAll("[data-target-only]").forEach((el) => {
+        const expected = String(el.getAttribute("data-target-only") || "");
+        el.style.display = expected === target ? "" : "none";
+      });
+      const guide = document.getElementById("target-auth-guide");
+      if (guide) {
+        guide.textContent = isGuangya
+          ? (currentLang() === "en"
+            ? "Guangya is the only built-in writable target right now. Keep Authorization, Access Token, Refresh Token, and Device ID complete before large sync jobs."
+            : currentLang() === "mix"
+              ? "当前只有 Guangya 已正式接通写入。大目录运行前，请先保证 Authorization、Access Token、Refresh Token、Device ID 完整。 / Guangya is the only built-in writable target for now."
+              : "当前只有 Guangya 已正式接通写入。大目录运行前，请先保证 Authorization、Access Token、Refresh Token、Device ID 完整。")
+          : (currentLang() === "en"
+            ? `Target ${target} is not connected as a writable adapter yet. The panel keeps only the target selector and preflight notice to avoid overpromising support.`
+            : currentLang() === "mix"
+              ? `目标端 ${target} 目前还没有接通可写入适配器，因此这里只保留目标端选择和预检提示，避免误导成已可用。 / Target ${target} is not writable yet.`
+              : `目标端 ${target} 目前还没有接通可写入适配器，因此这里只保留目标端选择和预检提示，避免误导成已可用。`);
+      }
+    }
+
     function populateTargetOptions() {
       const targetProfiles = providerRegistryPayload?.target_profiles || {};
       const implementationStatus = providerRegistryPayload?.target_implementation_status || {};
@@ -1509,6 +1533,7 @@
         renderProviderOptions(providerDefinitions);
         renderProviderCapturePanel();
       }
+      renderTargetSpecificControls();
       renderCapabilitySummary();
       renderAboutRegistry();
     }
@@ -3296,6 +3321,7 @@
           active_target: nextTarget,
         };
         await refreshTargetPreflight();
+        renderTargetSpecificControls();
         renderCapabilitySummary();
         renderAboutRegistry();
         await refreshCapabilityAssessment();
