@@ -319,7 +319,7 @@ def create_app(config_path: Path) -> FastAPI:
     def persist_guangya_tokens_to_config() -> None:
         nonlocal config
         state = load_state(config.state_file)
-        tokens = state.guangya_tokens
+        tokens = state.get_target_state("guangya")
         if not tokens:
             return
         payload = load_config_payload()

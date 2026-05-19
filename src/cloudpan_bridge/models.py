@@ -148,6 +148,7 @@ class QueueItemState:
 class SyncState:
     version: int = 1
     guangya_tokens: dict[str, str] = field(default_factory=dict)
+    target_states: dict[str, dict[str, str]] = field(default_factory=dict)
     files: dict[str, SyncFileState] = field(default_factory=dict)
     pending_files: dict[str, PendingFileState] = field(default_factory=dict)
     source_queue: list[QueueItemState] = field(default_factory=list)
@@ -167,22 +168,56 @@ class SyncState:
             for item in payload.get("source_queue", [])
             if isinstance(item, dict) and item.get("source_path")
         ]
+        legacy_guangya_tokens = dict(payload.get("guangya_tokens", {}))
+        target_states = {
+            str(key): dict(value or {})
+            for key, value in dict(payload.get("target_states", {}) or {}).items()
+            if isinstance(value, dict)
+        }
+        if legacy_guangya_tokens and "guangya" not in target_states:
+            target_states["guangya"] = dict(legacy_guangya_tokens)
         return cls(
             version=int(payload.get("version", 1)),
-            guangya_tokens=dict(payload.get("guangya_tokens", {})),
+            guangya_tokens=legacy_guangya_tokens,
+            target_states=target_states,
             files=files,
             pending_files=pending_files,
             source_queue=source_queue,
         )
 
     def to_dict(self) -> dict[str, Any]:
+        target_states = {
+            str(key): dict(value or {})
+            for key, value in dict(self.target_states or {}).items()
+            if isinstance(value, dict)
+        }
+        if self.guangya_tokens:
+            target_states.setdefault("guangya", dict(self.guangya_tokens))
         return {
             "version": self.version,
-            "guangya_tokens": self.guangya_tokens,
+            "guangya_tokens": dict(self.guangya_tokens),
+            "target_states": target_states,
             "files": {path: item.to_dict() for path, item in self.files.items()},
             "pending_files": {path: item.to_dict() for path, item in self.pending_files.items()},
             "source_queue": [item.to_dict() for item in self.source_queue],
         }
+
+    def get_target_state(self, target_key: str) -> dict[str, str]:
+        normalized = str(target_key or "").strip().lower()
+        if not normalized:
+            return {}
+        if normalized == "guangya" and self.guangya_tokens:
+            return dict(self.target_states.get(normalized) or self.guangya_tokens)
+        return dict(self.target_states.get(normalized) or {})
+
+    def set_target_state(self, target_key: str, state: dict[str, str] | None) -> None:
+        normalized = str(target_key or "").strip().lower()
+        if not normalized:
+            return
+        next_state = dict(state or {})
+        self.target_states[normalized] = next_state
+        if normalized == "guangya":
+            self.guangya_tokens = dict(next_state)
 
 
 @dataclass(slots=True)

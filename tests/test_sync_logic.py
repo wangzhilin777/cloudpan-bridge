@@ -255,6 +255,28 @@ def test_config_roundtrip_provider_captures(tmp_path) -> None:
     assert cfg.to_flat_dict()["provider_captures"]["quark"]["captured"]["cookie_header"] == "k=v"
 
 
+def test_sync_state_supports_generic_target_states_and_legacy_guangya_tokens() -> None:
+    restored = SyncState.from_dict(
+        {
+            "guangya_tokens": {
+                "access_token": "legacy-token",
+                "refresh_token": "legacy-refresh",
+            },
+            "target_states": {
+                "demo": {
+                    "token": "demo-token",
+                }
+            },
+        }
+    )
+    assert restored.get_target_state("guangya")["access_token"] == "legacy-token"
+    assert restored.get_target_state("demo")["token"] == "demo-token"
+    restored.set_target_state("guangya", {"access_token": "new-token"})
+    dumped = restored.to_dict()
+    assert dumped["guangya_tokens"]["access_token"] == "new-token"
+    assert dumped["target_states"]["guangya"]["access_token"] == "new-token"
+
+
 def test_auto_download_threshold_zero_disables_fallback(tmp_path) -> None:
     path = tmp_path / "config.json"
     path.write_text(
@@ -322,6 +344,29 @@ def test_sync_runner_builds_guangya_target_adapter(tmp_path) -> None:
     adapter = runner._build_target_adapter(SyncState())
     assert isinstance(adapter, GuangyaTargetAdapter)
     assert adapter.phone_number == "+86 13800138000"
+    adapter.close()
+
+
+def test_sync_runner_builds_guangya_target_adapter_from_generic_target_state(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "guangya_phone": "+86 13800138000"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    state = SyncState(target_states={"guangya": {"access_token": "new-token", "refresh_token": "new-refresh", "device_id": "new-device"}})
+    adapter = runner._build_target_adapter(state)
+    assert isinstance(adapter, GuangyaTargetAdapter)
+    exported = adapter.export_state()
+    assert exported["access_token"] == "new-token"
+    assert exported["refresh_token"] == "new-refresh"
+    assert exported["device_id"] == "new-device"
     adapter.close()
 
 

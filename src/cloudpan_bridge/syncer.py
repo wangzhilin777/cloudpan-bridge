@@ -249,7 +249,7 @@ class SyncRunner:
 
             target = self._build_target_adapter(state)
             target.ensure_auth()
-            state.guangya_tokens = target.export_state()
+            state.set_target_state(self.config.target_key, target.export_state())
 
             need_download: list[SyncPlanItem] = []
             for item in plan:
@@ -336,7 +336,7 @@ class SyncRunner:
 
             target = self._build_target_adapter(state)
             target.ensure_auth()
-            state.guangya_tokens = target.export_state()
+            state.set_target_state(self.config.target_key, target.export_state())
 
             pending: list[str] = []
             for item in plan:
@@ -384,7 +384,7 @@ class SyncRunner:
         try:
             target = self._build_target_adapter(state)
             target.ensure_auth()
-            state.guangya_tokens = target.export_state()
+            state.set_target_state(self.config.target_key, target.export_state())
             self.source.ensure_login()
 
             summary = SyncSummary(source_path=self.config.source_path, total=len(selected_paths), pending_downloads=[])

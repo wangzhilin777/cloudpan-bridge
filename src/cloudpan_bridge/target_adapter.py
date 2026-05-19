@@ -81,8 +81,9 @@ def supported_target_keys() -> list[str]:
 def create_target_adapter(config: AppConfig, state: SyncState, target_key: str = "") -> TargetAdapter:
     normalized = str(target_key or config.target_key or "guangya").strip().lower() or "guangya"
     if normalized == "guangya":
+        target_state = state.get_target_state("guangya")
         access_token = (
-            state.guangya_tokens.get("access_token", "")
+            target_state.get("access_token", "")
             or config.guangya_access_token
             or ""
         )
@@ -90,8 +91,8 @@ def create_target_adapter(config: AppConfig, state: SyncState, target_key: str =
 
         return GuangyaTargetAdapter(
             access_token=access_token or extract_access_token(getattr(config, "guangya_authorization", "")),
-            refresh_token=state.guangya_tokens.get("refresh_token", "") or config.guangya_refresh_token,
-            device_id=state.guangya_tokens.get("device_id", "") or config.guangya_device_id,
+            refresh_token=target_state.get("refresh_token", "") or config.guangya_refresh_token,
+            device_id=target_state.get("device_id", "") or config.guangya_device_id,
             phone_number=config.guangya_phone,
         )
     raise NotImplementedError(f"目标端暂未实现: {normalized}")
