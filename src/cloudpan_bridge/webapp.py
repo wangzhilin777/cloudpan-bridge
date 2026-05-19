@@ -285,7 +285,12 @@ def create_app(config_path: Path) -> FastAPI:
         if not config_path.exists():
             return normalized
         raw_payload = json.loads(config_path.read_text(encoding="utf-8"))
-        return deep_merge_dicts(normalized, raw_payload)
+        raw_grouped = {
+            key: value
+            for key, value in raw_payload.items()
+            if isinstance(value, dict) and key in normalized
+        }
+        return deep_merge_dicts(normalized, raw_grouped)
 
     def save_config_payload(payload: dict[str, Any]) -> None:
         grouped_patch = dict(payload.get("grouped_config", {}) or {}) if isinstance(payload.get("grouped_config"), dict) else {}

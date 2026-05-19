@@ -484,6 +484,8 @@ def test_config_endpoint_returns_flat_and_grouped_views(tmp_path: Path) -> None:
     assert payload["target_path"] == "/dst"
     assert payload["grouped_config"]["sync"]["source_path"] == "/src"
     assert payload["grouped_config"]["targets"]["guangya"]["phone"] == "+86 13800138000"
+    assert "source_path" not in payload["grouped_config"]
+    assert "target_path" not in payload["grouped_config"]
     assert payload["config_meta"]["storage"] == "nested_with_flat_compat"
     assert payload["config_meta"]["active_target"] == "guangya"
 
