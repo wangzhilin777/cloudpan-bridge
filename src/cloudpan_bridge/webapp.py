@@ -380,16 +380,30 @@ def create_app(config_path: Path) -> FastAPI:
     def normalize_provider_capture_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
         raw = dict(payload or {})
         normalized = dict(raw)
-        normalized["provider"] = str(resolve_payload_value(raw, "provider", default="")).strip().lower()
-        normalized["driver"] = str(resolve_payload_value(raw, "driver", default="")).strip()
-        normalized["login_url"] = str(resolve_payload_value(raw, "login_url", default="")).strip()
+        normalized["provider"] = str(
+            resolve_payload_value(raw, "provider", ("ui", "provider_capture", "provider"), default="")
+        ).strip().lower()
+        normalized["driver"] = str(
+            resolve_payload_value(raw, "driver", ("ui", "provider_capture", "driver"), default="")
+        ).strip()
+        normalized["login_url"] = str(
+            resolve_payload_value(raw, "login_url", ("ui", "provider_capture", "login_url"), default="")
+        ).strip()
         return normalized
 
     def normalize_storage_create_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
         raw = dict(payload or {})
         normalized = dict(raw)
-        normalized["driver"] = str(resolve_payload_value(raw, "driver", default="")).strip()
-        normalized["values"] = dict(raw.get("values") or {})
+        normalized["driver"] = str(
+            resolve_payload_value(raw, "driver", ("ui", "storage_create", "driver"), default="")
+        ).strip()
+        grouped_values = payload_nested_get(
+            raw.get("grouped_config") if isinstance(raw.get("grouped_config"), dict) else {},
+            ("ui", "storage_create", "values"),
+            {},
+        )
+        values = raw.get("values")
+        normalized["values"] = dict(values or grouped_values or {})
         return normalized
 
     def normalize_queue_payload(payload: dict[str, Any] | None, runtime_config: AppConfig) -> dict[str, Any]:

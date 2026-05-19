@@ -2851,6 +2851,41 @@ def test_manual_provider_capture_switches_to_manual_snapshot(tmp_path: Path) -> 
     assert "url" in snapshots["webdav"]["message"]
 
 
+def test_manual_provider_capture_start_accepts_grouped_payload(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/capture/start",
+        json={
+            "grouped_config": {
+                "ui": {
+                    "provider_capture": {
+                        "provider": "webdav",
+                        "driver": "WebDav",
+                        "login_url": "https://dav.example.com/login"
+                    }
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    captures = client.get("/api/provider/captures")
+    assert captures.status_code == 200
+    snapshots = captures.json()["snapshots"]
+    assert snapshots["webdav"]["status"] == "manual"
+
+
 def test_provider_capability_endpoint_returns_driver_to_guangya_matrix(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
@@ -4204,6 +4239,56 @@ def test_provider_capture_prefill_accepts_grouped_provider_and_driver(tmp_path: 
     assert payload["missing_required"] == []
 
 
+def test_provider_capture_prefill_accepts_grouped_nested_provider_and_driver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_session": {
+    "provider_captures": {
+      "quark": {
+        "provider": "quark",
+        "status": "captured",
+        "message": "from config",
+        "captured": {
+          "cookie_header": "sid=1; token=2"
+        }
+      }
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge import webapp as webapp_module
+
+    info = OpenListDriverInfo(
+        name="Quark",
+        common=[OpenListDriverField(name="cookie", required=True)],
+        additional=[],
+        config={},
+    )
+    monkeypatch.setattr(webapp_module.OpenListAdminClient, "driver_info", lambda self, driver: info)
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.post(
+        "/api/provider/capture/prefill",
+        json={
+            "grouped_config": {
+                "ui": {
+                    "provider_capture": {
+                        "provider": "quark",
+                        "driver": "Quark"
+                    }
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["values"]["cookie"] == "sid=1; token=2"
+    assert payload["missing_required"] == []
+
+
 def test_pending_run_selected_stream_accepts_grouped_selected_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
@@ -4302,6 +4387,65 @@ def test_openlist_storage_create_accepts_grouped_driver(tmp_path: Path, monkeypa
             "values": {
                 "cookie": "sid=1; token=2"
             },
+        },
+    )
+    assert response.status_code == 200
+    assert seen["driver"] == "Quark"
+    assert seen["driver_name"] == "Quark"
+    assert seen["values"] == {"cookie": "sid=1; token=2"}
+
+
+def test_openlist_storage_create_accepts_grouped_nested_driver_and_values(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge import webapp as webapp_module
+
+    seen: dict[str, object] = {}
+    info = OpenListDriverInfo(
+        name="Quark",
+        common=[OpenListDriverField(name="cookie", required=True)],
+        additional=[],
+        config={},
+    )
+
+    monkeypatch.setattr(webapp_module.OpenListAdminClient, "driver_info", lambda self, driver: info)
+
+    def fake_build_storage_payload(info_obj: OpenListDriverInfo, values: dict[str, object]) -> dict[str, object]:
+        seen["driver_name"] = info_obj.name
+        seen["values"] = values
+        return {"mount_path": "/quark", **values}
+
+    def fake_create_storage(self: object, driver: str, body: dict[str, object]) -> dict[str, object]:
+        seen["driver"] = driver
+        seen["body"] = body
+        return {"ok": True, "driver": driver, "body": body}
+
+    monkeypatch.setattr(webapp_module, "build_storage_payload", fake_build_storage_payload)
+    monkeypatch.setattr(webapp_module.OpenListAdminClient, "create_storage", fake_create_storage)
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.post(
+        "/api/openlist/storage/create",
+        json={
+            "grouped_config": {
+                "ui": {
+                    "storage_create": {
+                        "driver": "Quark",
+                        "values": {
+                            "cookie": "sid=1; token=2"
+                        }
+                    }
+                }
+            }
         },
     )
     assert response.status_code == 200
