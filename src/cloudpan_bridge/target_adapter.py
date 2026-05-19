@@ -17,6 +17,7 @@ class TargetAdapter(Protocol):
     def export_state(self) -> dict[str, str]: ...
     def close(self) -> None: ...
     def ensure_target_dir(self, path: str) -> str: ...
+    def remove_target_path(self, path: str) -> bool: ...
     def delete_if_exists(self, parent_id: str, name: str) -> bool: ...
     def try_fast_upload(self, file_name: str, file_size: int, parent_id: str, md5_hex: str = "", gcid: str = "") -> DirectImportResult: ...
     def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, Any]: ...
@@ -53,6 +54,15 @@ class GuangyaTargetAdapter:
 
     def delete_if_exists(self, parent_id: str, name: str) -> bool:
         return self.service.delete_if_exists(parent_id, name)
+
+    def remove_target_path(self, path: str) -> bool:
+        normalized = str(PurePosixPath("/" + str(path or "/").lstrip("/")))
+        target_name = PurePosixPath(normalized).name
+        parent_path = str(PurePosixPath(normalized).parent)
+        parent_id = self.service.find_directory_id(parent_path)
+        if parent_id is None:
+            return False
+        return self.service.delete_if_exists(parent_id, target_name)
 
     def try_fast_upload(
         self,
@@ -112,6 +122,12 @@ class OpenListTargetAdapter:
     def delete_if_exists(self, parent_id: str, name: str) -> bool:
         return self.client.delete_path_if_exists(parent_id, name)
 
+    def remove_target_path(self, path: str) -> bool:
+        normalized = str(PurePosixPath("/" + str(path or "/").lstrip("/")))
+        target_name = PurePosixPath(normalized).name
+        parent_path = str(PurePosixPath(normalized).parent)
+        return self.client.delete_path_if_exists(parent_path, target_name)
+
     def try_fast_upload(
         self,
         file_name: str,
@@ -156,6 +172,19 @@ class LocalFsTargetAdapter:
 
     def delete_if_exists(self, parent_id: str, name: str) -> bool:
         target_path = Path(parent_id) / name
+        if not target_path.exists():
+            return False
+        if target_path.is_dir():
+            shutil.rmtree(target_path)
+        else:
+            target_path.unlink()
+        return True
+
+    def remove_target_path(self, path: str) -> bool:
+        normalized = str(PurePosixPath("/" + str(path or "/").lstrip("/")))
+        if normalized == "/":
+            return False
+        target_path = self.root_dir.joinpath(*PurePosixPath(normalized).parts[1:])
         if not target_path.exists():
             return False
         if target_path.is_dir():

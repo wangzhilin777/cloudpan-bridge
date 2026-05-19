@@ -8,7 +8,7 @@ import cloudpan_bridge.provider_registry as provider_registry_module
 from cloudpan_bridge.config import AppConfig
 from cloudpan_bridge.guangya_direct import GuangyaMiaochuanImporter
 from cloudpan_bridge.guangya import GuangyaService
-from cloudpan_bridge.models import PendingFileState, QueueItemState, SourceEntry, SyncFileState, SyncPlanItem, SyncState, normalize_posix_path
+from cloudpan_bridge.models import DirectImportResult, PendingFileState, QueueItemState, SourceEntry, SyncFileState, SyncPlanItem, SyncState, normalize_posix_path
 from cloudpan_bridge.openlist_admin import OpenListDriverField, OpenListDriverInfo, build_storage_payload
 from cloudpan_bridge.openlist import OpenListClient
 from cloudpan_bridge.provider_capture import (
@@ -187,6 +187,7 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert cfg.target_key == "guangya"
     assert cfg.guangya_refresh_token == "refresh"
     assert cfg.local_target_root == Path(".exports/localfs")
+    assert cfg.target_delete_removed is False
     assert cfg.provider_captures["quark"]["captured"]["cookie_header"] == "k=v"
     assert cfg.ui_language == "mix"
     assert cfg.coverage_filters["onlyGaps"] is True
@@ -223,6 +224,7 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
     assert serialized["targets"]["active_target"] == "guangya"
     assert serialized["targets"]["guangya"]["refresh_token"] == "legacy-refresh"
     assert serialized["targets"]["localfs"]["root"] == str(Path(".exports/localfs"))
+    assert serialized["sync"]["target_delete_removed"] is False
     assert "source_path" not in serialized
 
 
@@ -430,6 +432,224 @@ def test_sync_runner_builds_localfs_target_adapter(tmp_path) -> None:
     exported = adapter.export_state()
     assert exported["root"] == str(local_root)
     adapter.close()
+
+
+def test_localfs_target_adapter_can_remove_target_path(tmp_path) -> None:
+    root = tmp_path / "exports"
+    adapter = LocalFsTargetAdapter(root)
+    adapter.ensure_auth()
+    nested = root / "a" / "b.txt"
+    nested.parent.mkdir(parents=True, exist_ok=True)
+    nested.write_text("demo", encoding="utf-8")
+    assert adapter.remove_target_path("/a/b.txt") is True
+    assert not nested.exists()
+    assert adapter.remove_target_path("/a/missing.txt") is False
+
+
+def test_delete_removed_does_not_touch_target_when_target_delete_removed_disabled(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "config.json"
+    state_path = tmp_path / "state.json"
+    export_path = tmp_path / "export.jsonl"
+    temp_dir = tmp_path / "tmp"
+    config_path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst",
+                    "delete_removed": True,
+                    "target_delete_removed": False,
+                },
+                "state": {
+                    "state_file": str(state_path),
+                    "export_file": str(export_path),
+                    "temp_dir": str(temp_dir),
+                },
+                "openlist": {
+                    "url": "http://127.0.0.1:5244",
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    state_path.write_text(
+        json.dumps(
+            {
+                "files": {
+                    "/src/old.txt": {
+                        "path": "/src/old.txt",
+                        "md5": "ABC",
+                        "size": 1,
+                        "last_op_time": "1",
+                        "target_path": "/dst/old.txt",
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    from cloudpan_bridge import syncer as syncer_module
+
+    class FakeSource:
+        def ensure_login(self) -> None:
+            return None
+
+        def export_tree(self, _path: str) -> list[SourceEntry]:
+            return []
+
+        def close(self) -> None:
+            return None
+
+    class FakeTarget:
+        removed: list[str]
+
+        def __init__(self) -> None:
+            self.removed = []
+
+        def ensure_auth(self) -> None:
+            return None
+
+        def export_state(self) -> dict[str, str]:
+            return {}
+
+        def close(self) -> None:
+            return None
+
+        def ensure_target_dir(self, path: str) -> str:
+            return path
+
+        def delete_if_exists(self, parent_id: str, name: str) -> bool:
+            return False
+
+        def remove_target_path(self, path: str) -> bool:
+            self.removed.append(path)
+            return True
+
+        def try_fast_upload(self, file_name: str, file_size: int, parent_id: str, md5_hex: str = "", gcid: str = "") -> DirectImportResult:
+            return DirectImportResult(False, "disabled")
+
+        def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, object]:
+            return {}
+
+        def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
+            return None
+
+    fake_target = FakeTarget()
+    monkeypatch.setattr(syncer_module, "create_target_adapter", lambda config, state, target_key="": fake_target)
+    runner = SyncRunner(AppConfig.load(config_path), log=lambda _message: None)
+    runner.source = FakeSource()  # type: ignore[assignment]
+    summary = runner.run(dry_run=False)
+    assert summary.total == 0
+    assert fake_target.removed == []
+
+
+def test_delete_removed_can_remove_target_when_target_delete_removed_enabled(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "config.json"
+    state_path = tmp_path / "state.json"
+    export_path = tmp_path / "export.jsonl"
+    temp_dir = tmp_path / "tmp"
+    config_path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst",
+                    "delete_removed": True,
+                    "target_delete_removed": True,
+                },
+                "state": {
+                    "state_file": str(state_path),
+                    "export_file": str(export_path),
+                    "temp_dir": str(temp_dir),
+                },
+                "openlist": {
+                    "url": "http://127.0.0.1:5244",
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    state_path.write_text(
+        json.dumps(
+            {
+                "files": {
+                    "/src/old.txt": {
+                        "path": "/src/old.txt",
+                        "md5": "ABC",
+                        "size": 1,
+                        "last_op_time": "1",
+                        "target_path": "/dst/old.txt",
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    from cloudpan_bridge import syncer as syncer_module
+
+    class FakeSource:
+        def ensure_login(self) -> None:
+            return None
+
+        def export_tree(self, _path: str) -> list[SourceEntry]:
+            return []
+
+        def close(self) -> None:
+            return None
+
+    class FakeTarget:
+        removed: list[str]
+
+        def __init__(self) -> None:
+            self.removed = []
+
+        def ensure_auth(self) -> None:
+            return None
+
+        def export_state(self) -> dict[str, str]:
+            return {}
+
+        def close(self) -> None:
+            return None
+
+        def ensure_target_dir(self, path: str) -> str:
+            return path
+
+        def delete_if_exists(self, parent_id: str, name: str) -> bool:
+            return False
+
+        def remove_target_path(self, path: str) -> bool:
+            self.removed.append(path)
+            return True
+
+        def try_fast_upload(self, file_name: str, file_size: int, parent_id: str, md5_hex: str = "", gcid: str = "") -> DirectImportResult:
+            return DirectImportResult(False, "disabled")
+
+        def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, object]:
+            return {}
+
+        def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
+            return None
+
+    fake_target = FakeTarget()
+    monkeypatch.setattr(syncer_module, "create_target_adapter", lambda config, state, target_key="": fake_target)
+    runner = SyncRunner(AppConfig.load(config_path), log=lambda _message: None)
+    runner.source = FakeSource()  # type: ignore[assignment]
+    summary = runner.run(dry_run=False)
+    assert summary.total == 0
+    assert fake_target.removed == ["/dst/old.txt"]
 
 
 def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> None:

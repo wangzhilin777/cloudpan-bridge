@@ -155,6 +155,26 @@ class GuangyaService:
     def get_node(self, parent_id: str, name: str) -> TargetNode | None:
         return self._load_children(parent_id).get(name)
 
+    def find_directory_id(self, path: str) -> str | None:
+        normalized = str(PurePosixPath("/" + str(path or "/").lstrip("/")))
+        if normalized == "/":
+            return ""
+        current_id = ""
+        current_path = PurePosixPath("/")
+        for part in [part for part in normalized.strip("/").split("/") if part]:
+            current_path = current_path / part
+            current_key = str(current_path)
+            if current_key in self.dir_cache:
+                current_id = self.dir_cache[current_key]
+                continue
+            children = self._load_children(current_id)
+            existing = children.get(part)
+            if not existing or not existing.is_dir:
+                return None
+            current_id = existing.file_id
+            self.dir_cache[current_key] = current_id
+        return current_id
+
     def delete_if_exists(self, parent_id: str, name: str) -> bool:
         node = self.get_node(parent_id, name)
         if not node:

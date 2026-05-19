@@ -238,8 +238,10 @@ class SyncRunner:
             if removed_paths:
                 self.log("以下文件在 OpenList 源目录已不存在:")
                 self.log(render_tree(removed_paths))
-                if self.config.delete_removed:
-                    self.log("配置开启了 delete_removed，后续会尝试从同步状态移除这些文件。")
+                if self.config.delete_removed and self.config.target_delete_removed:
+                    self.log("配置开启了 delete_removed + target_delete_removed，后续会尝试从目标端真实删除并同步更新状态。")
+                elif self.config.delete_removed:
+                    self.log("配置开启了 delete_removed，但 target_delete_removed 关闭，后续只会从同步状态移除这些文件。")
                 else:
                     self.log("当前不会自动删除光鸭中的旧文件，只会提示。")
 
@@ -289,6 +291,17 @@ class SyncRunner:
 
             if self.config.delete_removed:
                 for removed in removed_paths:
+                    if self.config.target_delete_removed:
+                        removed_state = state.files.get(removed)
+                        target_path = str((removed_state.target_path if removed_state else "") or self._resolve_target_path(removed))
+                        try:
+                            deleted = target.remove_target_path(target_path)
+                            if deleted:
+                                self.log(f"[删除目标端旧文件] {removed} -> {target_path}")
+                            else:
+                                self.log(f"[跳过删除目标端旧文件] {removed}: 目标端未找到 {target_path}")
+                        except Exception as exc:  # noqa: BLE001
+                            self.log(f"[警告] 删除目标端旧文件失败 {removed} -> {target_path}: {exc}")
                     state.files.pop(removed, None)
 
             save_state(self.config.state_file, state)
