@@ -485,6 +485,10 @@ def test_config_endpoint_preserves_and_updates_ui_grouped_state(tmp_path: Path) 
     "coverage_filters": {
       "onlyGaps": true,
       "nextAction": "add_guide"
+    },
+    "browser": {
+      "current_path": "/old-browser",
+      "mounted_source": "/old-mount"
     }
   }
 }
@@ -504,6 +508,10 @@ def test_config_endpoint_preserves_and_updates_ui_grouped_state(tmp_path: Path) 
                         "onlyGaps": False,
                         "profileKey": "aliyundriveopen",
                     },
+                    "browser": {
+                        "current_path": "/new-browser",
+                        "mounted_source": "/new-mount",
+                    },
                 }
             }
         },
@@ -513,6 +521,8 @@ def test_config_endpoint_preserves_and_updates_ui_grouped_state(tmp_path: Path) 
     assert saved["ui"]["language"] == "mix"
     assert saved["ui"]["coverage_filters"]["onlyGaps"] is False
     assert saved["ui"]["coverage_filters"]["profileKey"] == "aliyundriveopen"
+    assert saved["ui"]["browser"]["current_path"] == "/new-browser"
+    assert saved["ui"]["browser"]["mounted_source"] == "/new-mount"
 
 
 def test_state_supports_pending_and_queue_roundtrip() -> None:

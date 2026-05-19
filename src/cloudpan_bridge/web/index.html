@@ -1239,6 +1239,11 @@
                 ui: {
                   language: currentLang(),
                   coverage_filters: getCoverageFilterState(),
+                  browser: {
+                    current_path: String(currentDirectoryPath || "/"),
+                    current_parent_path: currentParentPath ? String(currentParentPath) : "",
+                    mounted_source: String(document.getElementById("mounted_source_select")?.value || ""),
+                  },
                 },
               },
             }),
@@ -2511,6 +2516,11 @@
       if (groupedCoverageFilters && typeof groupedCoverageFilters === "object") {
         localStorage.setItem(COVERAGE_FILTERS_KEY, JSON.stringify(groupedCoverageFilters));
       }
+      const groupedMountedSource = getGroupedConfigValue(["ui", "browser", "mounted_source"], "");
+      if (typeof groupedMountedSource === "string" && groupedMountedSource) {
+        const mountedSelect = document.getElementById("mounted_source_select");
+        if (mountedSelect) mountedSelect.value = groupedMountedSource;
+      }
       const panelState = configCache.panel_open_states || {};
       if (panelState && typeof panelState === "object") {
         setPanelState({ ...getPanelState(), ...panelState });
@@ -2579,15 +2589,17 @@
 
     async function ensureDirectoryBrowserReady(force = false) {
       const sourcePath = String(document.getElementById("source_path").value || "/").trim() || "/";
-      if (!force && currentDirectoryPath && currentDirectoryPath !== "/" && currentDirectoryPath === sourcePath) {
+      const browserPath = String(getGroupedConfigValue(["ui", "browser", "current_path"], "") || "").trim();
+      const restorePath = browserPath || sourcePath;
+      if (!force && currentDirectoryPath && currentDirectoryPath !== "/" && currentDirectoryPath === restorePath) {
         return;
       }
       try {
-        await browseDirectory(sourcePath);
-        setNotice("dir-notice", `已按配置恢复目录浏览位置: ${sourcePath}`);
+        await browseDirectory(restorePath);
+        setNotice("dir-notice", `已恢复目录浏览位置: ${restorePath}`);
       } catch (error) {
         await browseDirectory("/");
-        setNotice("dir-notice", `按配置恢复目录失败，已回退到根目录: ${error.message}`);
+        setNotice("dir-notice", `恢复目录浏览位置失败，已回退到根目录: ${error.message}`);
       }
     }
 
@@ -2609,6 +2621,9 @@
       currentDirectoryPath = data?.path || "/";
       currentParentPath = data?.parent_path || null;
       document.getElementById("dir-current").textContent = `当前浏览: ${currentDirectoryPath}`;
+      setGroupedConfigValue(["ui", "browser", "current_path"], currentDirectoryPath || "/");
+      setGroupedConfigValue(["ui", "browser", "current_parent_path"], currentParentPath || "");
+      scheduleUiPrefsPersist();
       const root = document.getElementById("dir-browser-list");
       const dirs = Array.isArray(data?.directories) ? data.directories : [];
       if (!dirs.length) {
@@ -2764,10 +2779,13 @@
         return;
       }
       const sourcePath = String(document.getElementById("source_path").value || "").trim();
+      const mountedSource = String(getGroupedConfigValue(["ui", "browser", "mounted_source"], "") || "").trim();
       select.innerHTML = list.map((item) => {
         const mountPath = item.mount_path || item.mountPath || item.path || "/";
         const driver = item.driver || item.driver_name || item.driverName || "-";
-        const selected = sourcePath.startsWith(String(mountPath)) ? "selected" : "";
+        const selected = mountedSource
+          ? (mountedSource === String(mountPath) ? "selected" : "")
+          : (sourcePath.startsWith(String(mountPath)) ? "selected" : "");
         return `<option value="${escapeHtml(mountPath)}" ${selected}>${escapeHtml(mountPath)} | ${escapeHtml(driver)}</option>`;
       }).join("");
     }
@@ -3263,6 +3281,8 @@
       document.getElementById("save-config-bottom").onclick = withBusy("save-config-bottom", "保存中...", saveConfig);
       document.getElementById("mounted_source_select").addEventListener("change", (event) => {
         applyRatePresetForMount(event.target.value);
+        setGroupedConfigValue(["ui", "browser", "mounted_source"], String(event.target.value || ""));
+        scheduleUiPrefsPersist();
         const selected = storageRecords.find((item) => String(item.mount_path || item.mountPath || item.path || "/") === String(event.target.value || ""));
         if (selected) applyProviderSelectionFromDriver(selected.driver || selected.driver_name || selected.driverName || "");
       });
@@ -3287,6 +3307,7 @@
       });
       document.getElementById("use-mounted-source").onclick = withBusy("use-mounted-source", "处理中...", async () => {
         const selected = document.getElementById("mounted_source_select").value || "/";
+        setGroupedConfigValue(["ui", "browser", "mounted_source"], selected);
         document.getElementById("source_path").value = selected;
         await saveConfig();
         await browseDirectory(selected);
