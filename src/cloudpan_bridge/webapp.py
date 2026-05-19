@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import json
+import secrets
 import time
 from pathlib import Path, PurePosixPath
 from threading import Lock, Thread
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
 from .config import AppConfig, write_example_config
 from .guangya_direct import GuangyaMiaochuanImporter, normalize_guangya_authorization
@@ -167,8 +168,33 @@ def create_app(config_path: Path) -> FastAPI:
         binary_path=config.managed_openlist_bin,
         port=config.managed_openlist_port,
     )
+    auth_cookie_name = "cpb_session"
+    auth_sessions: set[str] = set()
 
     app = FastAPI(title="CloudPan Bridge Sync Console")
+
+    def admin_auth_enabled() -> bool:
+        return bool(str(config.app_admin_username or "").strip() and str(config.app_admin_password or "").strip())
+
+    def get_authenticated_username(request: Request) -> str:
+        if not admin_auth_enabled():
+            return ""
+        session_token = str(request.cookies.get(auth_cookie_name) or "").strip()
+        if not session_token or session_token not in auth_sessions:
+            return ""
+        return str(config.app_admin_username or "").strip()
+
+    @app.middleware("http")
+    async def require_console_auth(request: Request, call_next):  # type: ignore[no-untyped-def]
+        path = request.url.path
+        if (
+            admin_auth_enabled()
+            and path.startswith("/api/")
+            and path not in {"/api/auth/login", "/api/auth/status"}
+            and not get_authenticated_username(request)
+        ):
+            return JSONResponse(status_code=401, content={"detail": "请先登录控制台。"})
+        return await call_next(request)
 
     def is_guangya_auth_error(message: str) -> bool:
         text = (message or "").lower()
@@ -889,6 +915,53 @@ def create_app(config_path: Path) -> FastAPI:
         html_path = Path(__file__).with_name("web").joinpath("index.html")
         return html_path.read_text(encoding="utf-8")
 
+    @app.get("/api/auth/status")
+    def auth_status(request: Request) -> dict[str, Any]:
+        username = get_authenticated_username(request)
+        return {
+            "enabled": admin_auth_enabled(),
+            "authenticated": bool(username) or not admin_auth_enabled(),
+            "username": username,
+        }
+
+    @app.post("/api/auth/login")
+    def auth_login(payload: dict[str, Any] | None = None) -> Response:
+        payload = dict(payload or {})
+        if not admin_auth_enabled():
+            return JSONResponse({"ok": True, "enabled": False, "authenticated": True, "username": ""})
+        username = str(payload.get("username") or "").strip()
+        password = str(payload.get("password") or "")
+        if username != str(config.app_admin_username or "").strip() or password != str(config.app_admin_password or ""):
+            raise HTTPException(status_code=401, detail="控制台账号或密码错误。")
+        session_token = secrets.token_urlsafe(32)
+        auth_sessions.add(session_token)
+        response = JSONResponse(
+            {
+                "ok": True,
+                "enabled": True,
+                "authenticated": True,
+                "username": str(config.app_admin_username or "").strip(),
+            }
+        )
+        response.set_cookie(
+            auth_cookie_name,
+            session_token,
+            httponly=True,
+            samesite="lax",
+            secure=False,
+            path="/",
+        )
+        return response
+
+    @app.post("/api/auth/logout")
+    def auth_logout(request: Request) -> Response:
+        session_token = str(request.cookies.get(auth_cookie_name) or "").strip()
+        if session_token:
+            auth_sessions.discard(session_token)
+        response = JSONResponse({"ok": True})
+        response.delete_cookie(auth_cookie_name, path="/")
+        return response
+
     @app.get("/api/config")
     def get_config() -> dict[str, Any]:
         payload = load_config_payload()
@@ -902,10 +975,14 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.post("/api/config")
     def save_config(payload: dict[str, Any]) -> dict[str, Any]:
-        save_config_payload(payload)
         nonlocal config
+        previous_auth = (str(config.app_admin_username or ""), str(config.app_admin_password or ""))
+        save_config_payload(payload)
         config = AppConfig.load(config_path)
         config.ensure_parent_dirs()
+        current_auth = (str(config.app_admin_username or ""), str(config.app_admin_password or ""))
+        if current_auth != previous_auth:
+            auth_sessions.clear()
         refresh_runtime()
         logger.info("配置已更新")
         return {"ok": True}

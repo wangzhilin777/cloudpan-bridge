@@ -4768,3 +4768,122 @@ def test_build_source_miaochuan_payload_uses_relative_paths() -> None:
     assert payload["files"][0]["etag"] == "abcdef0123456789abcdef0123456789"
     assert payload["files"][1]["gcid"] == "E" * 40
     assert payload["skipped"][0]["path"] == "/root/sub/c.bin"
+
+
+def test_app_config_roundtrip_supports_console_admin_credentials() -> None:
+    config = AppConfig.from_payload(
+        {
+            "app": {
+                "bind_host": "0.0.0.0",
+                "bind_port": 9000,
+                "admin_username": "bridge-admin",
+                "admin_password": "secret-pass",
+            },
+            "sync": {
+                "source_path": "/src",
+                "target_path": "/dst",
+            },
+            "state": {
+                "state_file": ".state/sync-state.json",
+                "export_file": ".work/source-export.jsonl",
+                "temp_dir": ".work/download-cache",
+                "log_file": ".state/sync.log",
+            },
+        }
+    )
+    assert config.app_admin_username == "bridge-admin"
+    assert config.app_admin_password == "secret-pass"
+    grouped = config.to_dict()
+    assert grouped["app"]["admin_username"] == "bridge-admin"
+    assert grouped["app"]["admin_password"] == "secret-pass"
+
+
+def test_console_auth_disabled_keeps_api_open(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "app": {
+                    "bind_host": "127.0.0.1",
+                    "bind_port": 8765,
+                    "admin_username": "",
+                    "admin_password": "",
+                },
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst",
+                },
+                "state": {
+                    "state_file": str(tmp_path / "sync-state.json"),
+                    "export_file": str(tmp_path / "source-export.jsonl"),
+                    "temp_dir": str(tmp_path / "download-cache"),
+                    "log_file": str(tmp_path / "sync.log"),
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    status = client.get("/api/auth/status")
+    assert status.status_code == 200
+    assert status.json()["enabled"] is False
+    response = client.get("/api/config")
+    assert response.status_code == 200
+
+
+def test_console_auth_login_logout_flow(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "app": {
+                    "bind_host": "127.0.0.1",
+                    "bind_port": 8765,
+                    "admin_username": "admin",
+                    "admin_password": "pass123",
+                },
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst",
+                },
+                "state": {
+                    "state_file": str(tmp_path / "sync-state.json"),
+                    "export_file": str(tmp_path / "source-export.jsonl"),
+                    "temp_dir": str(tmp_path / "download-cache"),
+                    "log_file": str(tmp_path / "sync.log"),
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+
+    unauthorized = client.get("/api/config")
+    assert unauthorized.status_code == 401
+
+    status = client.get("/api/auth/status")
+    assert status.status_code == 200
+    assert status.json()["enabled"] is True
+    assert status.json()["authenticated"] is False
+
+    wrong_login = client.post("/api/auth/login", json={"username": "admin", "password": "wrong"})
+    assert wrong_login.status_code == 401
+
+    login = client.post("/api/auth/login", json={"username": "admin", "password": "pass123"})
+    assert login.status_code == 200
+    assert login.json()["authenticated"] is True
+
+    authorized = client.get("/api/config")
+    assert authorized.status_code == 200
+
+    logout = client.post("/api/auth/logout")
+    assert logout.status_code == 200
+
+    unauthorized_again = client.get("/api/config")
+    assert unauthorized_again.status_code == 401

@@ -56,6 +56,13 @@
       gap: 10px;
       justify-content: flex-end;
     }
+    .auth-stack {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
     .shell {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 360px;
@@ -330,6 +337,9 @@
       background: rgba(255,255,255,.64);
       line-height: 1.7;
     }
+    .auth-dialog-card {
+      width: min(420px, 100%);
+    }
     @media (max-width: 1180px) {
       .shell {
         grid-template-columns: 1fr;
@@ -363,6 +373,11 @@
         <div class="lead">统一读取 OpenList 挂载源，优先做秒传，未命中再进入自动补传或待补传目录树。页面会按配置恢复当前目录浏览位置，并把日志单独放到右侧抽屉，避免整页长滚动。</div>
       </div>
       <div class="hero-actions">
+        <div class="auth-stack">
+          <span class="badge" id="auth-status-badge">控制台未加锁</span>
+          <button class="secondary" id="open-auth-login">控制台登录</button>
+          <button class="secondary hidden" id="logout-auth">退出登录</button>
+        </div>
         <select id="ui_language" style="width:auto;min-width:140px;">
           <option value="zh">中文</option>
           <option value="en">English</option>
@@ -662,6 +677,14 @@
                 <input id="managed_openlist_port" type="number" min="1">
               </div>
               <div>
+                <label>控制台管理员账号</label>
+                <input id="app_admin_username" placeholder="留空表示不启用控制台登录">
+              </div>
+              <div>
+                <label>控制台管理员密码</label>
+                <input id="app_admin_password" type="password" placeholder="留空表示不启用控制台登录">
+              </div>
+              <div>
                 <label data-i18n="label.log_file">日志文件</label>
                 <input id="log_file">
               </div>
@@ -928,13 +951,39 @@
     </div>
   </div>
 
+  <div class="dialog-backdrop hidden" id="auth-dialog">
+    <div class="dialog-card auth-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <h3 style="margin:0;">控制台登录</h3>
+          <div class="subtle" id="auth-dialog-desc">如果你在配置里设置了控制台管理员账号密码，这里需要先登录后才能继续调用接口。</div>
+        </div>
+      </div>
+      <div class="stack">
+        <div>
+          <label>用户名</label>
+          <input id="auth-username" autocomplete="username">
+        </div>
+        <div>
+          <label>密码</label>
+          <input id="auth-password" type="password" autocomplete="current-password">
+        </div>
+        <div class="notice" id="auth-notice">等待登录。</div>
+        <div class="actions">
+          <button class="accent" id="submit-auth-login">登录控制台</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const CONFIG_FIELDS = [
       "source_path", "target_path", "openlist_mode", "managed_openlist_bin", "managed_openlist_data_dir",
       "managed_openlist_port", "openlist_url", "openlist_token", "openlist_username", "openlist_password",
       "target_key", "guangya_phone", "guangya_authorization", "guangya_access_token", "guangya_refresh_token",
       "guangya_device_id", "local_target_root", "webdav_target_url", "webdav_target_username", "webdav_target_password", "s3_target_endpoint", "s3_target_bucket", "s3_target_prefix", "s3_target_access_key", "s3_target_secret_key", "s3_target_region", "seafile_target_url", "seafile_target_token", "seafile_target_username", "seafile_target_password", "seafile_target_repo_id", "seafile_target_repo_name", "azureblob_target_account_url", "azureblob_target_container", "azureblob_target_prefix", "azureblob_target_account_name", "azureblob_target_account_key", "smb_target_url", "smb_target_username", "smb_target_password", "ftp_target_url", "ftp_target_username", "ftp_target_password", "sftp_target_url", "sftp_target_username", "sftp_target_password", "delete_removed", "target_delete_removed", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
-      "auto_download_threshold_mb", "rate_limit_mode", "log_file", "temp_dir", "state_file"
+      "auto_download_threshold_mb", "rate_limit_mode", "log_file", "temp_dir", "state_file",
+      "app_admin_username", "app_admin_password"
     ];
     const CONFIG_GROUPED_PATHS = {
       source_path: ["sync", "source_path"],
@@ -993,6 +1042,8 @@
       temp_dir: ["state", "temp_dir"],
       state_file: ["state", "state_file"],
       log_file: ["state", "log_file"],
+      app_admin_username: ["app", "admin_username"],
+      app_admin_password: ["app", "admin_password"],
     };
     const CONFIG_FIELD_DEFAULTS = {
       openlist_mode: "external",
@@ -1438,6 +1489,97 @@
     let coverageAuditCache = null;
     let panelStatePersistTimer = null;
     let uiPrefsPersistTimer = null;
+    let authState = { enabled: false, authenticated: true, username: "" };
+    let appBootstrapped = false;
+
+    function setAuthNotice(message) {
+      const el = document.getElementById("auth-notice");
+      if (el) el.textContent = message;
+    }
+
+    function showAuthDialog(message = "") {
+      document.getElementById("auth-dialog").classList.remove("hidden");
+      if (message) setAuthNotice(message);
+      const userInput = document.getElementById("auth-username");
+      if (userInput && authState?.username) userInput.value = authState.username;
+      setTimeout(() => document.getElementById("auth-password")?.focus(), 0);
+    }
+
+    function hideAuthDialog() {
+      document.getElementById("auth-dialog").classList.add("hidden");
+    }
+
+    function stopAutoRefresher() {
+      if (autoRefresher) {
+        clearInterval(autoRefresher);
+        autoRefresher = null;
+      }
+    }
+
+    function startAutoRefresher() {
+      stopAutoRefresher();
+      autoRefresher = setInterval(async () => {
+        try {
+          await refreshStatus();
+        } catch (_error) {
+        }
+      }, 2000);
+    }
+
+    function updateAuthUi(nextState = {}) {
+      authState = {
+        enabled: Boolean(nextState?.enabled),
+        authenticated: Boolean(nextState?.authenticated),
+        username: String(nextState?.username || ""),
+      };
+      const badge = document.getElementById("auth-status-badge");
+      const loginBtn = document.getElementById("open-auth-login");
+      const logoutBtn = document.getElementById("logout-auth");
+      if (badge) {
+        if (!authState.enabled) badge.textContent = "控制台未加锁";
+        else if (authState.authenticated) badge.textContent = `已登录: ${authState.username || "admin"}`;
+        else badge.textContent = "控制台已加锁";
+      }
+      if (loginBtn) loginBtn.classList.toggle("hidden", authState.enabled && authState.authenticated);
+      if (logoutBtn) logoutBtn.classList.toggle("hidden", !authState.enabled || !authState.authenticated);
+    }
+
+    async function fetchAuthStatus() {
+      const response = await fetch("/api/auth/status", { credentials: "same-origin" });
+      if (!response.ok) throw new Error(response.statusText || "Auth status failed");
+      const data = await response.json();
+      updateAuthUi(data || {});
+      return data;
+    }
+
+    async function bootstrapProtectedApp(forceReload = false) {
+      if (forceReload || !appBootstrapped) {
+        await loadConfig();
+        await attemptAutoOpenListLogin();
+        await attemptAutoGuangyaCapture();
+        await loadDrivers();
+        await refreshStorages();
+        await ensureDirectoryBrowserReady(true);
+        await refreshStatus();
+        await loadProviderRegistry();
+        await refreshCoverageAudit();
+        startAutoRefresher();
+        appBootstrapped = true;
+      }
+    }
+
+    async function ensureAuthorizedAndBootstrap(forceReload = false) {
+      const status = await fetchAuthStatus();
+      if (status.enabled && !status.authenticated) {
+        stopAutoRefresher();
+        appBootstrapped = false;
+        showAuthDialog("控制台已开启登录保护，请先登录。");
+        return false;
+      }
+      hideAuthDialog();
+      await bootstrapProtectedApp(forceReload);
+      return true;
+    }
 
     function getGroupedConfigValue(path, fallback = "") {
       let current = configCache?.grouped_config;
@@ -1891,6 +2033,7 @@
     async function call(url, options = {}) {
       const response = await fetch(url, {
         headers: { "content-type": "application/json", ...(options.headers || {}) },
+        credentials: "same-origin",
         ...options,
       });
       if (!response.ok) {
@@ -1899,6 +2042,10 @@
           const data = await response.json();
           detail = data.detail || data.message || JSON.stringify(data);
         } catch {}
+        if (response.status === 401) {
+          updateAuthUi({ ...(authState || {}), authenticated: false });
+          showAuthDialog(detail || "控制台登录已失效，请重新登录。");
+        }
         throw new Error(detail);
       }
       const contentType = response.headers.get("content-type") || "";
@@ -3729,6 +3876,32 @@
     }
 
     function bindEvents() {
+      document.getElementById("open-auth-login").onclick = () => {
+        setAuthNotice("请输入控制台账号密码。");
+        showAuthDialog();
+      };
+      document.getElementById("submit-auth-login").onclick = withBusy("submit-auth-login", "登录中...", async () => {
+        await call("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify({
+            username: document.getElementById("auth-username").value,
+            password: document.getElementById("auth-password").value,
+          }),
+        });
+        document.getElementById("auth-password").value = "";
+        setAuthNotice("登录成功，正在载入控制台...");
+        await ensureAuthorizedAndBootstrap(true);
+      });
+      document.getElementById("auth-password").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") document.getElementById("submit-auth-login")?.click();
+      });
+      document.getElementById("logout-auth").onclick = withBusy("logout-auth", "退出中...", async () => {
+        await call("/api/auth/logout", { method: "POST" });
+        updateAuthUi({ ...(authState || {}), authenticated: false });
+        appBootstrapped = false;
+        stopAutoRefresher();
+        showAuthDialog("已退出登录。");
+      });
       document.getElementById("toggle-logs").onclick = () => toggleDrawer();
       document.getElementById("capability-quick-actions").onclick = (event) => {
         const target = event.target?.closest?.("[data-capability-action]");
@@ -4077,16 +4250,9 @@
       initTabs();
       applyI18n();
       bindEvents();
-      await loadConfig();
       const panelState = getPanelState();
       toggleDrawer(panelState.logsVisible !== false);
-      await attemptAutoOpenListLogin();
-      await attemptAutoGuangyaCapture();
-      await loadDrivers();
-      await refreshStorages();
-      await ensureDirectoryBrowserReady(true);
-      await refreshStatus();
-      autoRefresher = setInterval(refreshStatus, 2000);
+      await ensureAuthorizedAndBootstrap(true);
     }
 
     bootstrap().catch((error) => {

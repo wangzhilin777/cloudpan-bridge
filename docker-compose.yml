@@ -4,11 +4,18 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: cloudpan-bridge
+    # 首次启动会在 /app/.work/openlist-config.json 自动生成示例配置。
+    # 如需启用控制台登录，请编辑该文件里的:
+    # app.admin_username
+    # app.admin_password
     ports:
       - "8765:8765"
+    environment:
+      TZ: Asia/Shanghai
     volumes:
       - ./.work:/app/.work
       - ./.state:/app/.state
       - ./.runtime:/app/.runtime
       - ./.exports:/app/.exports
+    command: ["python", "-m", "cloudpan_bridge.cli", "serve", "--config", "/app/.work/openlist-config.json", "--host", "0.0.0.0", "--port", "8765"]
     restart: unless-stopped

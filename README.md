@@ -422,7 +422,9 @@
   "app": {
     "name": "CloudPan Bridge",
     "bind_host": "127.0.0.1",
-    "bind_port": 8765
+    "bind_port": 8765,
+    "admin_username": "",
+    "admin_password": ""
   },
   "ui": {
     "panel_open_states": {}
@@ -503,6 +505,23 @@
   }
 }
 ```
+
+如果你希望管理页面本身也加一层登录保护，可以直接在同一个配置文件里填写：
+
+```json
+{
+  "app": {
+    "admin_username": "admin",
+    "admin_password": "change-me"
+  }
+}
+```
+
+说明：
+
+- 两个字段都留空：控制台不加锁，直接打开页面即可使用
+- 两个字段都填写：页面右上角会出现控制台登录入口，未登录前不能调用 `/api/*`
+- 这是 CloudPan Bridge 控制台自己的登录，不是 OpenList 登录，也不是光鸭登录
 
 ### 关键参数建议
 
@@ -635,6 +654,29 @@
 - `start_cloudpan_bridge.bat`
 - `start_cloudpan_bridge.ps1`
 
+如果你用的是桌面 Windows 环境，这仍然是当前最省心的非 Docker 启动方式。
+
+### Windows 本机启动
+
+1. 双击 `start_cloudpan_bridge.bat`
+2. 脚本会优先尝试 `pwsh`，没有再回退到 Windows PowerShell
+3. 首次启动会自动：
+   - 创建 `.venv`
+   - 安装当前项目依赖
+   - 生成 `.work/openlist-config.json`
+   - 启动 Web 控制台
+   - 自动打开 `http://127.0.0.1:8765`
+4. 如需控制台登录保护，先编辑 `.work/openlist-config.json` 里的 `app.admin_username / app.admin_password`
+
+### PowerShell 手动启动
+
+适合想自己看启动过程或手动调试的人：
+
+```powershell
+Set-Location E:\Workspace\VSCode\CloudPan Bridge
+.\start_cloudpan_bridge.ps1
+```
+
 ## 使用建议优先级
 
 推荐顺序：
@@ -706,6 +748,12 @@ pip install -e .
 cloudpan-bridge init-config --path .work/openlist-config.json
 ```
 
+初始化后，建议先打开 `.work/openlist-config.json` 补这些内容：
+
+- `openlist.url / username / password / token`
+- 目标端配置，例如 `targets.guangya.*`
+- 如需页面自身登录，再补 `app.admin_username / app.admin_password`
+
 启动页面：
 
 ```powershell
@@ -766,6 +814,39 @@ docker run --rm -p 8765:8765 ^
 ```powershell
 docker compose up -d --build
 ```
+
+建议的容器配置流程：
+
+1. 先执行一次 `docker compose up -d --build`
+2. 容器会自动生成 `/app/.work/openlist-config.json`
+3. 对应到宿主机就是项目目录下的 `.work/openlist-config.json`
+4. 编辑这个文件，补齐：
+   - `openlist.url / username / password / token`
+   - 目标端凭据
+   - 可选的 `app.admin_username / app.admin_password`
+5. 重启容器：
+
+```powershell
+docker compose restart cloudpan-bridge
+```
+
+一个完整的 Compose 使用示例可以直接参考仓库内的 [docker-compose.yml](docker-compose.yml)。
+
+最关键的是配置文件中的控制台登录段：
+
+```json
+{
+  "app": {
+    "name": "CloudPan Bridge",
+    "bind_host": "0.0.0.0",
+    "bind_port": 8765,
+    "admin_username": "admin",
+    "admin_password": "change-me"
+  }
+}
+```
+
+如果只想跑容器但不启用页面登录，把 `admin_username / admin_password` 留空即可。
 
 容器版当前建议用途：
 

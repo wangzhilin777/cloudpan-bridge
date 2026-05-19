@@ -100,6 +100,8 @@ class AppConfig:
     panel_open_states: dict[str, bool] | None = None
     bind_host: str = "127.0.0.1"
     bind_port: int = 8765
+    app_admin_username: str = ""
+    app_admin_password: str = ""
     log_file: Path = Path(".state/sync.log")
 
     @classmethod
@@ -182,6 +184,8 @@ class AppConfig:
             panel_open_states=dict(_pick(payload.get("panel_open_states"), ui.get("panel_open_states"), default={}) or {}),
             bind_host=str(_pick(payload.get("bind_host"), app.get("bind_host"), default="127.0.0.1")),
             bind_port=_int_or_default(_pick(payload.get("bind_port"), app.get("bind_port"), default=8765), 8765, minimum=1),
+            app_admin_username=str(_pick(payload.get("app_admin_username"), app.get("admin_username"), default="")),
+            app_admin_password=str(_pick(payload.get("app_admin_password"), app.get("admin_password"), default="")),
             log_file=Path(_pick(payload.get("log_file"), state_cfg.get("log_file"), default=".state/sync.log")),
         )
 
@@ -257,6 +261,8 @@ class AppConfig:
             "panel_open_states": dict(self.panel_open_states or {}),
             "bind_host": self.bind_host,
             "bind_port": self.bind_port,
+            "app_admin_username": self.app_admin_username,
+            "app_admin_password": self.app_admin_password,
             "log_file": str(self.log_file),
         }
 
@@ -266,6 +272,8 @@ class AppConfig:
                 "name": "CloudPan Bridge",
                 "bind_host": self.bind_host,
                 "bind_port": self.bind_port,
+                "admin_username": self.app_admin_username,
+                "admin_password": self.app_admin_password,
             },
             "ui": {
                 "language": self.ui_language,
@@ -424,6 +432,8 @@ def write_example_config(path: Path) -> None:
         panel_open_states={},
         bind_host="127.0.0.1",
         bind_port=8765,
+        app_admin_username="",
+        app_admin_password="",
         log_file=Path(".state/sync.log"),
     ).to_dict()
     path.write_text(
