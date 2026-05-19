@@ -3513,6 +3513,44 @@ def test_provider_coverage_audit_uses_live_openlist_drivers_when_missing(tmp_pat
     assert rows["UnknownDrive"]["nextAction"] == "add_guide"
 
 
+def test_provider_coverage_scaffold_accepts_grouped_filters(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "targets": {
+    "active_target": "guangya"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_scaffold",
+        json={
+            "drivers": ["UnknownDrive", "Thunder"],
+            "grouped_config": {
+                "targets": {
+                    "active_target": "guangya"
+                },
+                "ui": {
+                    "coverage_filters": {
+                        "onlyGaps": True,
+                        "nextAction": "add_profile_first",
+                    }
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["totalBacklog"] >= 1
+    assert all(item["nextAction"] == "add_profile_first" for item in payload["items"])
+
+
 def test_provider_coverage_scaffold_markdown_uses_live_openlist_drivers_when_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(

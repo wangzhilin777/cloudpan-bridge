@@ -359,6 +359,24 @@ def create_app(config_path: Path) -> FastAPI:
         normalized["onboarding_stage"] = str(resolve_payload_value(raw, "onboarding_stage", ("ui", "coverage_filters", "onboardingStage"), raw.get("onboarding_stage") or ""))
         return normalized
 
+    def build_registry_filter_kwargs(payload: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "only_gaps": bool(payload.get("only_gaps")),
+            "only_onboarding_ready": bool(payload.get("only_onboarding_ready")),
+            "next_action": str(payload.get("next_action") or ""),
+            "missing_item": str(payload.get("missing_item") or ""),
+            "capability_level": str(payload.get("capability_level") or ""),
+            "profile_key": str(payload.get("profile_key") or ""),
+            "onboarding_stage": str(payload.get("onboarding_stage") or ""),
+        }
+
+    def normalize_capability_payload(payload: dict[str, Any] | None, runtime_config: AppConfig) -> dict[str, Any]:
+        raw = normalize_registry_payload(payload, runtime_config)
+        raw["driver"] = str(resolve_payload_value(raw, "driver", default="")).strip()
+        analysis_summary = raw.get("analysis_summary")
+        raw["analysis_summary"] = analysis_summary if isinstance(analysis_summary, dict) else {}
+        return raw
+
     def normalize_provider_capture_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
         raw = dict(payload or {})
         normalized = dict(raw)
@@ -1263,16 +1281,7 @@ def create_app(config_path: Path) -> FastAPI:
         drivers = resolve_registry_drivers(payload)
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
         audit = build_driver_coverage_audit(drivers, target=target, live_driver_fields_map=build_live_driver_fields_map(drivers))
-        return filter_driver_coverage_audit(
-            audit,
-            only_gaps=bool(payload.get("only_gaps")),
-            only_onboarding_ready=bool(payload.get("only_onboarding_ready")),
-            next_action=str(payload.get("next_action") or ""),
-            missing_item=str(payload.get("missing_item") or ""),
-            capability_level=str(payload.get("capability_level") or ""),
-            profile_key=str(payload.get("profile_key") or ""),
-            onboarding_stage=str(payload.get("onboarding_stage") or ""),
-        )
+        return filter_driver_coverage_audit(audit, **build_registry_filter_kwargs(payload))
 
     @app.post("/api/provider/coverage_audit_markdown")
     def post_provider_coverage_audit_markdown(payload: dict[str, Any] | None = None) -> PlainTextResponse:
@@ -1280,16 +1289,7 @@ def create_app(config_path: Path) -> FastAPI:
         drivers = resolve_registry_drivers(payload)
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
         audit = build_driver_coverage_audit(drivers, target=target, live_driver_fields_map=build_live_driver_fields_map(drivers))
-        audit = filter_driver_coverage_audit(
-            audit,
-            only_gaps=bool(payload.get("only_gaps")),
-            only_onboarding_ready=bool(payload.get("only_onboarding_ready")),
-            next_action=str(payload.get("next_action") or ""),
-            missing_item=str(payload.get("missing_item") or ""),
-            capability_level=str(payload.get("capability_level") or ""),
-            profile_key=str(payload.get("profile_key") or ""),
-            onboarding_stage=str(payload.get("onboarding_stage") or ""),
-        )
+        audit = filter_driver_coverage_audit(audit, **build_registry_filter_kwargs(payload))
         markdown = render_driver_coverage_audit_markdown(audit)
         return PlainTextResponse(markdown, media_type="text/markdown; charset=utf-8")
 
@@ -1299,16 +1299,7 @@ def create_app(config_path: Path) -> FastAPI:
         drivers = resolve_registry_drivers(payload)
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
         audit = build_driver_coverage_audit(drivers, target=target, live_driver_fields_map=build_live_driver_fields_map(drivers))
-        audit = filter_driver_coverage_audit(
-            audit,
-            only_gaps=bool(payload.get("only_gaps")),
-            only_onboarding_ready=bool(payload.get("only_onboarding_ready")),
-            next_action=str(payload.get("next_action") or ""),
-            missing_item=str(payload.get("missing_item") or ""),
-            capability_level=str(payload.get("capability_level") or ""),
-            profile_key=str(payload.get("profile_key") or ""),
-            onboarding_stage=str(payload.get("onboarding_stage") or ""),
-        )
+        audit = filter_driver_coverage_audit(audit, **build_registry_filter_kwargs(payload))
         return build_driver_coverage_scaffold(audit)
 
     @app.post("/api/provider/coverage_scaffold_markdown")
@@ -1317,28 +1308,19 @@ def create_app(config_path: Path) -> FastAPI:
         drivers = resolve_registry_drivers(payload)
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
         audit = build_driver_coverage_audit(drivers, target=target, live_driver_fields_map=build_live_driver_fields_map(drivers))
-        audit = filter_driver_coverage_audit(
-            audit,
-            only_gaps=bool(payload.get("only_gaps")),
-            only_onboarding_ready=bool(payload.get("only_onboarding_ready")),
-            next_action=str(payload.get("next_action") or ""),
-            missing_item=str(payload.get("missing_item") or ""),
-            capability_level=str(payload.get("capability_level") or ""),
-            profile_key=str(payload.get("profile_key") or ""),
-            onboarding_stage=str(payload.get("onboarding_stage") or ""),
-        )
+        audit = filter_driver_coverage_audit(audit, **build_registry_filter_kwargs(payload))
         scaffold = build_driver_coverage_scaffold(audit)
         markdown = render_driver_coverage_scaffold_markdown(scaffold)
         return PlainTextResponse(markdown, media_type="text/markdown; charset=utf-8")
 
     @app.post("/api/provider/capability_assess")
     def post_provider_capability_assess(payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        payload = normalize_registry_payload(payload, config)
+        payload = normalize_capability_payload(payload, config)
         driver = str(payload.get("driver") or "").strip()
         target = str(payload.get("target") or config.target_key or "guangya").strip() or "guangya"
         if not driver:
             raise HTTPException(status_code=400, detail="缺少 driver")
-        summary = payload.get("analysis_summary") if isinstance(payload.get("analysis_summary"), dict) else {}
+        summary = dict(payload.get("analysis_summary") or {})
         return assess_driver_target_capability(
             driver,
             analysis_summary=summary,

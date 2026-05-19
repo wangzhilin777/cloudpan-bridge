@@ -38,6 +38,7 @@
 - 支持把“目标端真实删除”作为独立开关启用
   - `delete_removed = true` 只会把已不存在的源文件从同步状态里移除
   - 只有同时开启 `target_delete_removed = true`，才会尝试删除 `Guangya / OpenList / LocalFS / WebDAV / FTP` 目标端对应文件
+  - 如果你当前只需要“改动覆盖，不做删除”，保持默认关闭即可
 - 支持最底层目录边扫边同步
 - 支持最底层目录批量入队
 - 支持待补传目录树勾选
