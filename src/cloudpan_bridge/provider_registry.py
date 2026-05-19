@@ -72,6 +72,33 @@ DRIVER_GUIDES: dict[str, dict[str, Any]] = {
             "root_folder_id": "0",
         },
     },
+    "p123": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/123.html",
+        "summary": {
+            "zh": "P123 更接近 123 网盘的网页登录 / 分享链路驱动，而不是开放平台驱动。重点是账号密码或分享参数，以及本地代理和防盗链相关设置。",
+            "en": "P123 is closer to the web-login / share-link style 123 driver rather than the Open Platform driver. The key parts are account/password or share parameters plus local-proxy and anti-hotlink related settings.",
+        },
+        "steps": {
+            "zh": [
+                "先确认你要挂的是个人盘还是分享链接，并按文档选择账号密码模式或 share key / share password 模式。",
+                "按文档手动填写 username、password 或分享参数，再确认 root_folder_file_id 等目录字段。",
+                "优先启用文档要求的本地代理 / WebDAV 策略，不要把它当成简单网页登录抓取后就稳定可用的驱动。",
+                "正式跑大目录前，先小目录验证列目录、下载、防盗链和分页稳定性。"
+            ],
+            "en": [
+                "Decide first whether you are mounting a personal drive or a share link, then choose account/password mode or share-key/share-password mode accordingly.",
+                "Fill username, password, or share parameters manually and confirm directory fields such as root_folder_file_id.",
+                "Enable the local proxy / WebDAV strategy required by the documentation instead of treating it as a simple web-login-capture driver.",
+                "Before running large trees, validate listing, download, anti-hotlink behavior, and pagination on a small directory first."
+            ],
+        },
+        "defaults": {
+            "web_proxy": "true",
+            "webdav_policy": "native_proxy",
+            "proxy_range": "true",
+            "root_folder_file_id": "0",
+        },
+    },
     "189cloud": {
         "doc_url": "https://doc.oplist.org/guide/drivers/189",
         "summary": {
@@ -314,6 +341,32 @@ DRIVER_GUIDES: dict[str, dict[str, Any]] = {
         },
         "defaults": {
             "ref": "main",
+        },
+    },
+    "alias": {
+        "doc_url": "https://doc.oplist.org/guide/advanced/alias",
+        "summary": {
+            "zh": "Alias 不是单一网盘驱动，而是把多个后端路径重新组合成一个逻辑入口。重点是 paths 列表，以及读取、写入、上传冲突时的策略配置。",
+            "en": "Alias is not a single cloud driver. It re-combines multiple backend paths into one logical entry. The key pieces are the paths list plus read, write, and upload conflict policies.",
+        },
+        "steps": {
+            "zh": [
+                "先确认 Alias 背后的每个后端路径本身都能稳定列目录和下载，再来配置 Alias 聚合层。",
+                "按文档手动填写 paths 列表，并明确 read / write / put 等策略，不要默认沿用单盘思维。",
+                "如果 Alias 背后混合了多个哈希能力不同的源端，先对小目录做源分析，不要直接把聚合结果宣传成 Guangya 秒传来源。",
+                "正式跑大目录前，先用一个小 Alias 目录验证冲突策略、分页与下载行为。"
+            ],
+            "en": [
+                "Confirm that each backend path behind the Alias can already list and download stably before configuring the Alias aggregation layer.",
+                "Fill the paths list manually and define read / write / put policies explicitly instead of assuming single-drive defaults.",
+                "If the Alias mixes multiple sources with different hash capabilities, analyze a small directory first and do not present the aggregated result as Guangya fast-upload capable by default.",
+                "Before running large trees, validate conflict policy, pagination, and download behavior on a small Alias directory."
+            ],
+        },
+        "defaults": {
+            "read_policy": "fcfs",
+            "write_policy": "fcfs",
+            "put_policy": "fcfs",
         },
     },
     "terabox": {
@@ -796,6 +849,41 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
             }
         },
     },
+    "p123": {
+        "key": "p123",
+        "label": "P123",
+        "label_zh": "123 网盘网页/分享驱动",
+        "driver_aliases": ["p123", "123sharelink"],
+        "login_mode": "manual username/password or share params",
+        "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "proxy_sensitive",
+        "capture_strategy": "优先手动填写账号密码或分享参数，再按文档启用本地代理与 WebDAV 策略。",
+        "capture_strategy_en": "Fill account/password or share parameters manually first, then enable the local-proxy and WebDAV strategy required by the documentation.",
+        "doc_links": ["https://doc.oplist.org/guide/drivers/123.html"],
+        "default_mount_values": {
+            "web_proxy": "true",
+            "webdav_policy": "native_proxy",
+            "proxy_range": "true",
+            "root_folder_file_id": "0",
+        },
+        "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "P123 更偏网页登录与本地代理调优型驱动，默认不应承诺对 Guangya 秒传。",
+            "en": "P123 is more of a web-login and local-proxy-tuning driver, so it should not promise Guangya fast upload by default.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先完成账号/分享参数与本地代理校验，再按保守补传路径推进。",
+                "recommended_flow_en": "Validate account/share parameters and local-proxy behavior first, then continue through conservative fallback upload.",
+                "notes": {
+                    "zh": "在没有确认稳定 MD5 / GCID 前，不应把 P123 默认宣传成 Guangya 秒传来源。",
+                    "en": "Without confirmed stable MD5 / GCID, P123 should not be presented as a Guangya fast-upload source by default.",
+                },
+            }
+        },
+    },
     "baidu": {
         "key": "baidu",
         "label": "Baidu",
@@ -1084,6 +1172,40 @@ SOURCE_PROVIDER_PROFILES: dict[str, dict[str, Any]] = {
                 "notes": {
                     "zh": "GitHub 常见是 sha1 而不是稳定 MD5，默认不应当作 Guangya 秒传来源。",
                     "en": "GitHub commonly exposes sha1 rather than stable MD5, so it should not be treated as a Guangya fast-upload source by default.",
+                },
+            }
+        },
+    },
+    "alias": {
+        "key": "alias",
+        "label": "Alias",
+        "label_zh": "Alias 聚合目录",
+        "driver_aliases": ["alias"],
+        "login_mode": "manual alias path list + policy",
+        "likely_hashes": [],
+        "hash_fields_supported": [],
+        "download_link_supported": "depends_on_backend",
+        "capture_strategy": "手动填写后端 paths 列表与读写冲突策略，再结合底层真实后端做小目录验证。",
+        "capture_strategy_en": "Fill backend paths plus read/write conflict policy manually, then validate on a small directory against the real underlying backends.",
+        "doc_links": ["https://doc.oplist.org/guide/advanced/alias"],
+        "default_mount_values": {
+            "read_policy": "fcfs",
+            "write_policy": "fcfs",
+            "put_policy": "fcfs",
+        },
+        "recommended_rate_profile": "safe",
+        "risk_notes": {
+            "zh": "Alias 的真实哈希能力取决于背后的源端组合，默认不能把它直接宣传成 Guangya 秒传来源。",
+            "en": "The real hash capability of Alias depends on the underlying source combination, so it must not be presented as a Guangya fast-upload source by default.",
+        },
+        "capability_to_targets": {
+            "guangya": {
+                "level": "download_upload_only",
+                "recommended_flow": "先分析 Alias 背后的实际后端与哈希覆盖率，再按保守补传路径推进。",
+                "recommended_flow_en": "Analyze the real backends and fingerprint coverage behind the Alias first, then continue through conservative fallback upload.",
+                "notes": {
+                    "zh": "只有确认 Alias 背后的实际源端稳定给出 MD5 / GCID 时，才适合后续再提升能力判断。",
+                    "en": "Only upgrade the capability later if the actual sources behind the Alias are proven to expose stable MD5 / GCID values.",
                 },
             }
         },

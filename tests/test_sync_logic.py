@@ -1282,7 +1282,7 @@ def test_build_storage_payload_serializes_addition_and_types() -> None:
 
 def test_default_provider_specs_cover_major_sources() -> None:
     specs = default_provider_specs()
-    assert {"guangya", "quark", "123pan", "189cloud", "baidu", "thunder", "aliyundriveopen", "onedrive", "googledrive", "dropbox", "openlist", "cloudreve", "github", "terabox", "yandexdisk", "webdav", "s3", "ftp", "sftp", "seafile", "smb", "azureblob", "mega", "pikpak", "115", "139yun"} <= set(specs)
+    assert {"guangya", "quark", "123pan", "p123", "189cloud", "baidu", "thunder", "aliyundriveopen", "onedrive", "googledrive", "dropbox", "openlist", "cloudreve", "github", "alias", "terabox", "yandexdisk", "webdav", "s3", "ftp", "sftp", "seafile", "smb", "azureblob", "mega", "pikpak", "115", "139yun"} <= set(specs)
     assert "cookie_header" in specs["quark"].required_keys
     assert "bdstoken" in specs["baidu"].required_keys
     assert "authorization" in specs["thunder"].required_keys
@@ -1290,9 +1290,11 @@ def test_default_provider_specs_cover_major_sources() -> None:
     assert "refresh_token" in specs["onedrive"].required_keys
     assert "refresh_token" in specs["googledrive"].required_keys
     assert "refresh_token" in specs["dropbox"].required_keys
+    assert specs["p123"].capture_mode == "manual"
     assert specs["openlist"].capture_mode == "manual"
     assert "refresh_token" in specs["cloudreve"].required_keys
     assert specs["github"].capture_mode == "manual"
+    assert specs["alias"].capture_mode == "manual"
     assert "cookie_header" in specs["terabox"].required_keys
     assert "refresh_token" in specs["yandexdisk"].required_keys
     assert specs["webdav"].capture_mode == "manual"
@@ -1315,12 +1317,14 @@ def test_capture_alias_registry_resolves_real_spec_keys() -> None:
     assert alias_map["alipan"] == "aliyundriveopen"
     assert alias_map["baidunetdisk"] == "baidu"
     assert alias_map["123open"] == "123pan"
+    assert alias_map["p123"] == "p123"
     assert alias_map["googledrive"] == "googledrive"
     assert alias_map["dropbox"] == "dropbox"
     assert alias_map["sharepoint"] == "onedrive"
     assert alias_map["alistv3"] == "openlist"
     assert alias_map["cloudreve"] == "cloudreve"
     assert alias_map["github"] == "github"
+    assert alias_map["alias"] == "alias"
     assert alias_map["terabox"] == "terabox"
     assert alias_map["yandexdisk"] == "yandexdisk"
     assert alias_map["115share"] == "115"
@@ -1370,6 +1374,10 @@ def test_driver_guide_supports_profile_and_alias_resolution() -> None:
     assert guide_google is not None
     assert guide_google["docUrl"].endswith("/google_drive")
 
+    guide_p123 = provider_registry_module.get_driver_guide("P123")
+    assert guide_p123 is not None
+    assert guide_p123["docUrl"].endswith("/123.html")
+
     guide_115 = provider_registry_module.get_driver_guide("115Share")
     assert guide_115 is not None
     assert guide_115["docUrl"].endswith("/115")
@@ -1393,6 +1401,10 @@ def test_driver_guide_supports_profile_and_alias_resolution() -> None:
     guide_terabox = provider_registry_module.get_driver_guide("TeraBox")
     assert guide_terabox is not None
     assert guide_terabox["docUrl"].endswith("/terabox")
+
+    guide_alias = provider_registry_module.get_driver_guide("Alias")
+    assert guide_alias is not None
+    assert guide_alias["docUrl"].endswith("/advanced/alias")
 
 
 def test_unknown_driver_guide_returns_generic_fallback_without_claiming_full_coverage() -> None:
@@ -1599,12 +1611,14 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert response.status_code == 200
     payload = response.json()
     assert payload["guides"]["aliyundriveopen"]["docUrl"] == "https://doc.oplist.org/guide/drivers/aliyundrive_open"
+    assert payload["guides"]["p123"]["docUrl"] == "https://doc.oplist.org/guide/drivers/123.html"
     assert payload["guides"]["googledrive"]["docUrl"] == "https://doc.oplist.org/guide/drivers/google_drive"
     assert payload["guides"]["webdav"]["docUrl"] == "https://doc.oplist.org/guide/drivers/webdav"
     assert payload["guides"]["s3"]["docUrl"] == "https://doc.oplist.org/guide/drivers/s3"
     assert payload["guides"]["openlist"]["docUrl"] == "https://doc.oplist.org/guide/drivers/openlist"
     assert payload["guides"]["cloudreve"]["docUrl"] == "https://doc.oplist.org/guide/drivers/cloudreve_v4"
     assert payload["guides"]["github"]["docUrl"] == "https://doc.oplist.org/guide/drivers/github"
+    assert payload["guides"]["alias"]["docUrl"] == "https://doc.oplist.org/guide/advanced/alias"
     assert payload["guides"]["terabox"]["docUrl"] == "https://doc.oplist.org/guide/drivers/terabox"
     assert payload["guides"]["yandexdisk"]["docUrl"] == "https://doc.oplist.org/guide/drivers/yandex"
     assert payload["guides"]["smb"]["docUrl"] == "https://doc.oplist.org/guide/drivers/smb"
@@ -1612,12 +1626,14 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["guides"]["mega"]["docUrl"] == "https://doc.oplist.org/guide/drivers/mega"
     assert payload["guides"]["quark"]["defaults"]["web_proxy"] == "true"
     assert payload["source_profiles"]["189cloud"]["recommendedRateProfile"] == "safe"
+    assert payload["source_profiles"]["p123"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/123.html"
     assert payload["source_profiles"]["189cloud"]["loginMode"] == "cookie + sessionKey style fields"
     assert payload["source_profiles"]["googledrive"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/google_drive"
     assert payload["source_profiles"]["dropbox"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/dropbox"
     assert payload["source_profiles"]["openlist"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/openlist"
     assert payload["source_profiles"]["cloudreve"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/cloudreve_v4"
     assert payload["source_profiles"]["github"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/github"
+    assert payload["source_profiles"]["alias"]["docLinks"][0] == "https://doc.oplist.org/guide/advanced/alias"
     assert payload["source_profiles"]["terabox"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/terabox"
     assert payload["source_profiles"]["yandexdisk"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/yandex"
     assert payload["source_profiles"]["115"]["docLinks"][0] == "https://doc.oplist.org/guide/drivers/115"
@@ -1655,12 +1671,14 @@ def test_provider_captures_endpoint_includes_complex_driver_specs(tmp_path: Path
     payload = response.json()
     providers = {item["key"]: item for item in payload["providers"]}
     assert providers["aliyundriveopen"]["recommended_drivers"] == ["AliyundriveOpen", "AliyunDrive", "Alipan"]
+    assert providers["p123"]["capture_mode"] == "manual"
     assert providers["onedrive"]["required_keys"] == ["refresh_token"]
     assert providers["googledrive"]["required_keys"] == ["refresh_token"]
     assert providers["dropbox"]["required_keys"] == ["refresh_token"]
     assert providers["openlist"]["capture_mode"] == "manual"
     assert providers["cloudreve"]["required_keys"] == ["refresh_token"]
     assert providers["github"]["capture_mode"] == "manual"
+    assert providers["alias"]["capture_mode"] == "manual"
     assert providers["terabox"]["required_keys"] == ["cookie_header"]
     assert providers["yandexdisk"]["required_keys"] == ["refresh_token"]
     assert providers["webdav"]["capture_mode"] == "manual"
@@ -1675,14 +1693,17 @@ def test_provider_captures_endpoint_includes_complex_driver_specs(tmp_path: Path
     assert providers["pikpak"]["login_url"] == "https://mypikpak.com/drive/all"
     assert providers["139yun"]["required_keys"] == ["authorization"]
     assert providers["aliyundriveopen"]["source_profile"]["key"] == "aliyundriveopen"
+    assert providers["p123"]["source_profile"]["key"] == "p123"
     assert providers["googledrive"]["source_profile"]["key"] == "googledrive"
     assert providers["onedrive"]["source_profile"]["recommendedRateProfile"] == "balanced"
     assert providers["139yun"]["source_profile"]["docLinks"] == ["https://doc.oplist.org/guide/drivers/139.html"]
     assert providers["aliyundriveopen"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/aliyundrive_open"
+    assert providers["p123"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/123.html"
     assert providers["googledrive"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/google_drive"
     assert providers["openlist"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/openlist"
     assert providers["cloudreve"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/cloudreve_v4"
     assert providers["github"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/github"
+    assert providers["alias"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/advanced/alias"
     assert providers["terabox"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/terabox"
     assert providers["yandexdisk"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/yandex"
     assert providers["115"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/115"
@@ -1965,6 +1986,68 @@ def test_provider_coverage_audit_marks_openlist_cloudreve_terabox_yandex_as_cove
     assert rows["github"]["hasGuide"] is True
     assert rows["github"]["hasCapture"] is True
     assert rows["github"]["hasCapability"] is True
+
+
+def test_provider_coverage_audit_marks_alias_as_covered(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_audit",
+        json={
+            "drivers": ["Alias"],
+            "target": "guangya",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    rows = {item["normalized"]: item for item in payload["rows"]}
+    assert rows["alias"]["hasProfile"] is True
+    assert rows["alias"]["hasGuide"] is True
+    assert rows["alias"]["hasCapture"] is True
+    assert rows["alias"]["hasCapability"] is True
+    assert rows["alias"]["capabilityLevel"] == "download_upload_only"
+
+
+def test_provider_coverage_audit_marks_p123_as_covered(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/coverage_audit",
+        json={
+            "drivers": ["P123"],
+            "target": "guangya",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    rows = {item["normalized"]: item for item in payload["rows"]}
+    assert rows["p123"]["hasProfile"] is True
+    assert rows["p123"]["hasGuide"] is True
+    assert rows["p123"]["hasCapture"] is True
+    assert rows["p123"]["hasCapability"] is True
+    assert rows["p123"]["capabilityLevel"] == "download_upload_only"
 
 
 def test_provider_coverage_audit_can_infer_dynamic_profile_capture_and_capability() -> None:

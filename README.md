@@ -56,6 +56,8 @@
   - `Google Drive`：优先抓 `refresh_token / access_token`
   - `Dropbox`：优先抓 `refresh_token / access_token`
   - `Cloudreve`：优先抓 `refresh_token / access_token`，必要时回退 Cookie 或用户名密码
+  - `Alias`：走手动策略配置模式
+  - `P123`：走手动账号/分享参数模式，并配合本地代理策略
   - `TeraBox`：优先抓 `Cookie`
   - `Yandex Disk`：优先抓 `refresh_token / access_token`
   - `WebDAV / S3 / FTP / SFTP / Seafile / SMB / Azure Blob / MEGA`：走手动凭证模式
@@ -87,6 +89,8 @@
   - `OpenList`
   - `Cloudreve`
   - `Github`
+  - `Alias`
+  - `P123`
   - `TeraBox`
   - `YandexDisk`
   - `PikPak`
@@ -95,6 +99,7 @@
   - `Sharepoint`
   - `AListV3`
 - 对还没补到专用说明的驱动，也会给出通用 OpenList 接入兜底说明和官方驱动文档入口
+- 当前这批常见样本驱动在覆盖审计里已做到 `missing=0`
 - guide 数据现在还会额外携带 `docUrlCandidates`，方便后续继续扩页面时直接接官方文档候选链路
 - 页面里的驱动接入弹窗现在也会直接列出这些文档候选链接，并默认打开第一条最可信候选
 - 支持源驱动到当前目标端的基础能力矩阵提示
