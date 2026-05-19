@@ -831,7 +831,8 @@
       "guangya_device_id", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
       "auto_download_threshold_mb", "rate_limit_mode", "log_file", "temp_dir", "state_file"
     ];
-    const PANEL_STATE_KEY = "cloud2guangya-tabs";
+    const PANEL_STATE_KEY = "cloudpan-bridge-panel-state";
+    const LEGACY_PANEL_STATE_KEYS = ["cloud2guangya-tabs"];
     const UI_LANGUAGE_KEY = "cloud2guangya-ui-language";
     const AUTO_GUANGYA_CAPTURE_KEY = "cloud2guangya-auto-guangya-capture";
     const COVERAGE_FILTERS_KEY = "cloudpan-bridge-coverage-filters";
@@ -1168,6 +1169,7 @@
     let currentDriverGuide = null;
     let currentProviderGuide = null;
     let coverageAuditCache = null;
+    let panelStatePersistTimer = null;
 
     function getCoverageFilterState() {
       try {
@@ -1262,7 +1264,16 @@
 
     function getPanelState() {
       try {
-        return JSON.parse(localStorage.getItem(PANEL_STATE_KEY) || "{}");
+        const direct = localStorage.getItem(PANEL_STATE_KEY);
+        if (direct) return JSON.parse(direct || "{}");
+        for (const legacyKey of LEGACY_PANEL_STATE_KEYS) {
+          const legacyValue = localStorage.getItem(legacyKey);
+          if (!legacyValue) continue;
+          const parsed = JSON.parse(legacyValue || "{}");
+          localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(parsed));
+          return parsed;
+        }
+        return {};
       } catch {
         return {};
       }
@@ -1272,6 +1283,35 @@
       localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(nextState));
     }
 
+    function schedulePanelStatePersist() {
+      if (panelStatePersistTimer) clearTimeout(panelStatePersistTimer);
+      panelStatePersistTimer = setTimeout(async () => {
+        try {
+          await call("/api/config", {
+            method: "POST",
+            body: JSON.stringify({
+              panel_open_states: { ...(configCache?.panel_open_states || {}) },
+            }),
+          });
+        } catch (_error) {
+        }
+      }, 180);
+    }
+
+    function updatePanelState(patch) {
+      const nextState = { ...getPanelState(), ...(patch || {}) };
+      setPanelState(nextState);
+      configCache = {
+        ...(configCache || {}),
+        panel_open_states: {
+          ...((configCache && configCache.panel_open_states) || {}),
+          ...nextState,
+        },
+      };
+      schedulePanelStatePersist();
+      return nextState;
+    }
+
     function activateTab(tabId) {
       document.querySelectorAll(".tab").forEach((tab) => {
         tab.classList.toggle("active", tab.dataset.tab === tabId);
@@ -1279,9 +1319,7 @@
       document.querySelectorAll(".tab-panel").forEach((panel) => {
         panel.classList.toggle("active", panel.dataset.panel === tabId);
       });
-      const state = getPanelState();
-      state.activeTab = tabId;
-      setPanelState(state);
+      updatePanelState({ activeTab: tabId });
     }
 
     function t(key) {
@@ -2187,6 +2225,7 @@
       const drawer = document.getElementById("log-drawer");
       const hidden = forceVisible === null ? !drawer.classList.contains("hidden") : !forceVisible;
       drawer.classList.toggle("hidden", hidden);
+      updatePanelState({ logsVisible: !hidden });
       applyI18n();
     }
 
@@ -2203,6 +2242,11 @@
 
     function applyConfigToForm(config) {
       configCache = { ...(config || {}) };
+      const panelState = configCache.panel_open_states || {};
+      if (panelState && typeof panelState === "object") {
+        setPanelState({ ...getPanelState(), ...panelState });
+        if (panelState.activeTab) activateTab(panelState.activeTab);
+      }
       for (const field of CONFIG_FIELDS) {
         const el = document.getElementById(field);
         if (!el) continue;
@@ -3226,8 +3270,9 @@
       initTabs();
       applyI18n();
       bindEvents();
-      toggleDrawer(true);
       await loadConfig();
+      const panelState = getPanelState();
+      toggleDrawer(panelState.logsVisible !== false);
       await attemptAutoOpenListLogin();
       await attemptAutoGuangyaCapture();
       await loadDrivers();
