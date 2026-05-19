@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import shutil
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
@@ -130,8 +132,73 @@ class OpenListTargetAdapter:
         return None
 
 
+class LocalFsTargetAdapter:
+    def __init__(self, root_dir: Path) -> None:
+        self.root_dir = Path(root_dir).expanduser()
+
+    def ensure_auth(self) -> None:
+        self.root_dir.mkdir(parents=True, exist_ok=True)
+
+    def export_state(self) -> dict[str, str]:
+        return {"root": str(self.root_dir)}
+
+    def close(self) -> None:
+        return None
+
+    def ensure_target_dir(self, path: str) -> str:
+        normalized = str(PurePosixPath("/" + str(path or "/").lstrip("/")))
+        if normalized == "/":
+            target_dir = self.root_dir
+        else:
+            target_dir = self.root_dir.joinpath(*PurePosixPath(normalized).parts[1:])
+        target_dir.mkdir(parents=True, exist_ok=True)
+        return str(target_dir)
+
+    def delete_if_exists(self, parent_id: str, name: str) -> bool:
+        target_path = Path(parent_id) / name
+        if not target_path.exists():
+            return False
+        if target_path.is_dir():
+            shutil.rmtree(target_path)
+        else:
+            target_path.unlink()
+        return True
+
+    def try_fast_upload(
+        self,
+        file_name: str,
+        file_size: int,
+        parent_id: str,
+        md5_hex: str = "",
+        gcid: str = "",
+    ) -> DirectImportResult:
+        return DirectImportResult(
+            success=False,
+            reason="LocalFS 目标端当前只支持普通写入/覆盖，不支持元数据秒传。",
+        )
+
+    def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, Any]:
+        target_dir = Path(target_parent_id)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        destination = target_dir / target_name
+        shutil.copy2(local_path, destination)
+        return {
+            "path": str(destination),
+            "size": destination.stat().st_size,
+        }
+
+    def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
+        expected = str(md5_hex or "").strip().upper()
+        if not expected:
+            return None
+        digest = hashlib.md5(local_path.read_bytes()).hexdigest().upper()
+        if digest != expected:
+            raise RuntimeError(f"本地文件 MD5 校验失败: expected={expected}, actual={digest}")
+        return None
+
+
 def supported_target_keys() -> list[str]:
-    return ["guangya", "openlist"]
+    return ["guangya", "openlist", "localfs"]
 
 
 def create_target_adapter(config: AppConfig, state: SyncState, target_key: str = "") -> TargetAdapter:
@@ -161,4 +228,6 @@ def create_target_adapter(config: AppConfig, state: SyncState, target_key: str =
             page_size=config.openlist_page_size,
             request_interval_ms=config.openlist_request_interval_ms,
         )
+    if normalized == "localfs":
+        return LocalFsTargetAdapter(config.local_target_root)
     raise NotImplementedError(f"目标端暂未实现: {normalized}")

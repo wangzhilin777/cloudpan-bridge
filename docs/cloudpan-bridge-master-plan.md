@@ -17,6 +17,7 @@
 - 以 `OpenList` 作为源端统一接入层
 - 以 `Guangya` 作为当前主秒传目标端
 - 以 `OpenList` 作为当前第二个已实现的可写目标端
+- 以 `LocalFS` 作为当前第三个已实现的可写目标端
 - 支持本地 Web 控制台、目录浏览、挂载管理、实时日志
 - 支持托管 OpenList 与外部 OpenList 两种工作模式
 - 支持按目录扫描、最底层目录边扫边同步、目录队列、待补传树
@@ -32,7 +33,7 @@
 补充说明：
 
 - `Provider Registry` 已开始承载复杂驱动说明与推荐默认值
-- `Target Adapter` 已抽出 Guangya 适配层，并补上 OpenList 可写目标端
+- `Target Adapter` 已抽出 Guangya 适配层，并补上 OpenList / LocalFS 可写目标端
 - `能力矩阵与建议` 已有第一版页面/接口链路
 - 但“全 OpenList 驱动逐项填实”和“多目标端矩阵”仍未完成
 

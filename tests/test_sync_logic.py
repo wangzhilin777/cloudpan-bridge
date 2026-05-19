@@ -29,7 +29,7 @@ from cloudpan_bridge.syncer import (
     serialize_source_entry,
     summarize_source_entries,
 )
-from cloudpan_bridge.target_adapter import GuangyaTargetAdapter, OpenListTargetAdapter
+from cloudpan_bridge.target_adapter import GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter
 from cloudpan_bridge.webapp import (
     build_pending_selected_execution_groups,
     compute_rate_limit_cooldown_ms,
@@ -186,6 +186,7 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert cfg.openlist_password == "demo"
     assert cfg.target_key == "guangya"
     assert cfg.guangya_refresh_token == "refresh"
+    assert cfg.local_target_root == Path(".exports/localfs")
     assert cfg.provider_captures["quark"]["captured"]["cookie_header"] == "k=v"
     assert cfg.ui_language == "mix"
     assert cfg.coverage_filters["onlyGaps"] is True
@@ -221,6 +222,7 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
     assert serialized["sync"]["source_path"] == "/src"
     assert serialized["targets"]["active_target"] == "guangya"
     assert serialized["targets"]["guangya"]["refresh_token"] == "legacy-refresh"
+    assert serialized["targets"]["localfs"]["root"] == str(Path(".exports/localfs"))
     assert "source_path" not in serialized
 
 
@@ -400,6 +402,36 @@ def test_sync_runner_builds_openlist_target_adapter(tmp_path) -> None:
     adapter.close()
 
 
+def test_sync_runner_builds_localfs_target_adapter(tmp_path) -> None:
+    local_root = tmp_path / "exports"
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst",
+                },
+                "targets": {
+                    "active_target": "localfs",
+                    "localfs": {
+                        "root": str(local_root),
+                    },
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    adapter = runner._build_target_adapter(SyncState())
+    assert isinstance(adapter, LocalFsTargetAdapter)
+    adapter.ensure_auth()
+    exported = adapter.export_state()
+    assert exported["root"] == str(local_root)
+    adapter.close()
+
+
 def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
@@ -420,13 +452,16 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     payload = response.json()
     assert payload["active_target"] == "guangya"
     assert payload["driver_matrix"]["thunder"]["targetProfile"]["key"] == "guangya"
-    assert payload["implemented_targets"] == ["guangya", "openlist"]
+    assert payload["implemented_targets"] == ["guangya", "openlist", "localfs"]
     assert payload["target_implementation_status"]["guangya"]["known_profile"] is True
     assert payload["target_implementation_status"]["guangya"]["implemented"] is True
     assert payload["target_implementation_status"]["guangya"]["selectable"] is True
     assert payload["target_implementation_status"]["openlist"]["known_profile"] is True
     assert payload["target_implementation_status"]["openlist"]["implemented"] is True
     assert payload["target_implementation_status"]["openlist"]["selectable"] is True
+    assert payload["target_implementation_status"]["localfs"]["known_profile"] is True
+    assert payload["target_implementation_status"]["localfs"]["implemented"] is True
+    assert payload["target_implementation_status"]["localfs"]["selectable"] is True
 
 
 def test_target_preflight_endpoint_reports_supported_target(tmp_path: Path) -> None:
@@ -1596,6 +1631,8 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["target_profiles"]["guangya"]["fastUploadHashes"] == ["md5", "gcid"]
     assert payload["target_profiles"]["guangya"]["authMode"] == "authorization + access_token + refresh_token + device_id"
     assert payload["target_profiles"]["guangya"]["autoCreateDir"] is True
+    assert payload["target_profiles"]["localfs"]["authMode"] == "local filesystem path"
+    assert payload["target_profiles"]["localfs"]["autoCreateDir"] is True
     assert payload["driver_matrix"]["thunder"]["level"] == "fast_upload_partial"
 
 

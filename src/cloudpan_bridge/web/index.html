@@ -702,6 +702,10 @@
                 <label data-i18n="label.guangya_authorization">光鸭 Authorization</label>
                 <input id="guangya_authorization" placeholder="Bearer ...">
               </div>
+              <div class="col-span-2" data-target-only="localfs">
+                <label data-i18n="label.local_target_root">本地目标根目录</label>
+                <input id="local_target_root" placeholder="E:\\CloudPanBridge\\Exports">
+              </div>
             </div>
             <div class="notice" id="target-preflight-notice">等待目标端检查...</div>
             <div class="actions">
@@ -799,7 +803,7 @@
       "source_path", "target_path", "openlist_mode", "managed_openlist_bin", "managed_openlist_data_dir",
       "managed_openlist_port", "openlist_url", "openlist_token", "openlist_username", "openlist_password",
       "target_key", "guangya_phone", "guangya_authorization", "guangya_access_token", "guangya_refresh_token",
-      "guangya_device_id", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
+      "guangya_device_id", "local_target_root", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
       "auto_download_threshold_mb", "rate_limit_mode", "log_file", "temp_dir", "state_file"
     ];
     const CONFIG_GROUPED_PATHS = {
@@ -819,6 +823,7 @@
       guangya_access_token: ["targets", "guangya", "access_token"],
       guangya_refresh_token: ["targets", "guangya", "refresh_token"],
       guangya_device_id: ["targets", "guangya", "device_id"],
+      local_target_root: ["targets", "localfs", "root"],
       openlist_page_size: ["sync", "openlist_page_size"],
       openlist_request_interval_ms: ["sync", "openlist_request_interval_ms"],
       queue_interval_ms: ["sync", "queue_interval_ms"],
@@ -959,6 +964,7 @@
         "label.guangya_access_token": "光鸭 Access Token",
         "label.guangya_refresh_token": "光鸭 Refresh Token",
         "label.guangya_authorization": "光鸭 Authorization",
+        "label.local_target_root": "本地目标根目录",
         "desc.source_browser": "页面进入时会优先按配置里的 source_path 恢复当前浏览目录；如果该目录读取失败，再回退到挂载根目录。",
         "desc.source_analyze": "开始真正同步前，先做一次源目录分析。这里会统计当前目录中有多少文件带 MD5、多少文件带 GCID、各 provider 占比，以及抽样展示前几条源文件元数据。",
         "desc.leaf_mode": "适合防风控慢跑。可以直接边扫边同步，也可以先把叶子目录加入队列后分批执行。",
@@ -968,7 +974,7 @@
         "desc.capability": "根据当前选择的源驱动和现有目标端 Guangya，给出诚实降级后的推荐路径。这里不会把“只能补传”的组合误导成可秒传。",
         "desc.logs": "这里会自动滚动到最新日志。同步、队列、挂载和目标端状态都可以从这里看。",
         "desc.source_profiles": "这里列出当前内置的 OpenList 源端 profile、常见哈希和推荐频率。后续继续扩全驱动时，就往这层补。",
-        "desc.target_profiles": "这里列出当前目标端适配器支持的快传指纹和降级方式。当前内置目标端包括 Guangya 与 OpenList，其中只有 Guangya 支持元数据秒传。",
+        "desc.target_profiles": "这里列出当前目标端适配器支持的快传指纹和降级方式。当前内置目标端包括 Guangya、OpenList 与 LocalFS，其中只有 Guangya 支持元数据秒传。",
         "desc.driver_matrix": "这是当前内置的“源驱动 -> Guangya”能力矩阵，只表示当前项目的真实支持判断，不等于所有跨网盘都能秒传。",
         "desc.coverage_audit": "这里会把当前 OpenList 实际驱动列表和内置 registry 对比，直接看出哪些驱动已经具备 profile、guide、capture、capability，方便后续继续补全。",
         "btn.export_coverage_json": "导出覆盖审计 JSON",
@@ -1087,6 +1093,7 @@
         "label.guangya_access_token": "Guangya Access Token",
         "label.guangya_refresh_token": "Guangya Refresh Token",
         "label.guangya_authorization": "Guangya Authorization",
+        "label.local_target_root": "Local Target Root",
         "desc.source_browser": "On load, the page restores the browser to source_path first. If that path fails, it falls back to the mount root.",
         "desc.source_analyze": "Before starting a real sync, run a source analysis first. It counts how many files have MD5, how many have GCID, shows provider distribution, and previews the first few source file metadata rows.",
         "desc.leaf_mode": "Best for throttled syncing. You can sync while scanning, or queue leaf directories first.",
@@ -1096,7 +1103,7 @@
         "desc.capability": "Show the honest recommendation for the current source driver to Guangya, including fallback behavior instead of overpromising fast upload.",
         "desc.logs": "Logs auto-scroll to the newest line. Sync, queue, mount, and target-state activity all appear here.",
         "desc.source_profiles": "This lists the built-in OpenList source profiles, likely hashes, and recommended rate presets. Keep extending this layer as more drivers are covered.",
-        "desc.target_profiles": "This lists the current target adapters, their fast-upload hashes, and fallback modes. Built-in targets now include Guangya and OpenList, while only Guangya supports metadata-based fast upload.",
+        "desc.target_profiles": "This lists the current target adapters, their fast-upload hashes, and fallback modes. Built-in targets now include Guangya, OpenList, and LocalFS, while only Guangya supports metadata-based fast upload.",
         "desc.driver_matrix": "This is the current built-in source-driver to Guangya matrix. It reflects this project's real support judgment, not a promise that all cross-cloud copies can fast upload.",
         "desc.coverage_audit": "This compares the live OpenList driver list with the built-in registry so you can see which drivers already have profiles, guides, capture, and capability coverage.",
         "btn.export_coverage_json": "Export Coverage JSON",

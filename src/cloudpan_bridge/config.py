@@ -56,6 +56,7 @@ class AppConfig:
     guangya_access_token: str = ""
     guangya_refresh_token: str = ""
     guangya_device_id: str = ""
+    local_target_root: Path = Path(".exports/localfs")
     delete_removed: bool = False
     openlist_page_size: int = 200
     openlist_request_interval_ms: int = 300
@@ -84,6 +85,7 @@ class AppConfig:
         managed_runtime = dict(openlist.get("managed_runtime", {}) or {})
         targets = dict(payload.get("targets", {}) or {})
         guangya = dict(targets.get("guangya", {}) or {})
+        localfs = dict(targets.get("localfs", {}) or {})
         sync = dict(payload.get("sync", {}) or {})
         state_cfg = dict(payload.get("state", {}) or {})
         return cls(
@@ -106,6 +108,7 @@ class AppConfig:
             guangya_access_token=str(_pick(payload.get("guangya_access_token"), guangya.get("access_token"), default="")),
             guangya_refresh_token=str(_pick(payload.get("guangya_refresh_token"), guangya.get("refresh_token"), default="")),
             guangya_device_id=str(_pick(payload.get("guangya_device_id"), guangya.get("device_id"), default="")),
+            local_target_root=Path(_pick(payload.get("local_target_root"), localfs.get("root"), default=".exports/localfs")),
             delete_removed=bool(_pick(payload.get("delete_removed"), sync.get("delete_removed"), default=False)),
             openlist_page_size=_int_or_default(_pick(payload.get("openlist_page_size"), sync.get("openlist_page_size"), default=200), 200, minimum=1),
             openlist_request_interval_ms=_int_or_default(_pick(payload.get("openlist_request_interval_ms"), sync.get("openlist_request_interval_ms"), default=300), 300, minimum=0),
@@ -127,6 +130,7 @@ class AppConfig:
             target.parent.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.managed_openlist_data_dir.mkdir(parents=True, exist_ok=True)
+        self.local_target_root.mkdir(parents=True, exist_ok=True)
 
     def to_flat_dict(self) -> dict[str, Any]:
         return {
@@ -149,6 +153,7 @@ class AppConfig:
             "guangya_access_token": self.guangya_access_token,
             "guangya_refresh_token": self.guangya_refresh_token,
             "guangya_device_id": self.guangya_device_id,
+            "local_target_root": str(self.local_target_root),
             "delete_removed": self.delete_removed,
             "openlist_page_size": self.openlist_page_size,
             "openlist_request_interval_ms": self.openlist_request_interval_ms,
@@ -201,6 +206,9 @@ class AppConfig:
                     "access_token": self.guangya_access_token,
                     "refresh_token": self.guangya_refresh_token,
                     "device_id": self.guangya_device_id,
+                },
+                "localfs": {
+                    "root": str(self.local_target_root),
                 }
             },
             "sync": {
@@ -244,6 +252,7 @@ def write_example_config(path: Path) -> None:
         guangya_access_token="",
         guangya_refresh_token="",
         guangya_device_id="",
+        local_target_root=Path(".exports/localfs"),
         delete_removed=False,
         openlist_page_size=200,
         openlist_request_interval_ms=300,
