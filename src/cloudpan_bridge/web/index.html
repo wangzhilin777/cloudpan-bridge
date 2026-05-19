@@ -1549,7 +1549,11 @@
           await call("/api/config", {
             method: "POST",
             body: JSON.stringify({
-              panel_open_states: { ...(configCache?.panel_open_states || {}) },
+              grouped_config: {
+                ui: {
+                  panel_open_states: { ...getPanelState() },
+                },
+              },
             }),
           });
         } catch (_error) {
@@ -1567,6 +1571,7 @@
           ...nextState,
         },
       };
+      setGroupedConfigValue(["ui", "panel_open_states"], { ...nextState });
       schedulePanelStatePersist();
       return nextState;
     }
@@ -2609,7 +2614,7 @@
       setGroupedConfigValue(["state", "temp_dir"], payload.temp_dir || "");
       setGroupedConfigValue(["state", "state_file"], payload.state_file || "");
       setGroupedConfigValue(["state", "log_file"], payload.log_file || "");
-      setGroupedConfigValue(["ui", "panel_open_states"], payload.panel_open_states || {});
+      setGroupedConfigValue(["ui", "panel_open_states"], getPanelState());
       payload.grouped_config = configCache.grouped_config;
       return payload;
     }
@@ -2629,7 +2634,7 @@
         const mountedSelect = document.getElementById("mounted_source_select");
         if (mountedSelect) mountedSelect.value = groupedMountedSource;
       }
-      const panelState = configCache.panel_open_states || {};
+      const panelState = getGroupedConfigValue(["ui", "panel_open_states"], configCache.panel_open_states || {});
       if (panelState && typeof panelState === "object") {
         setPanelState({ ...getPanelState(), ...panelState });
         if (panelState.activeTab) activateTab(panelState.activeTab);

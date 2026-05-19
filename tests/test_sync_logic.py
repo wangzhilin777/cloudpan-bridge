@@ -584,6 +584,43 @@ def test_config_endpoint_preserves_and_updates_ui_grouped_state(tmp_path: Path) 
     assert saved["ui"]["browser"]["mounted_source"] == "/new-mount"
 
 
+def test_config_endpoint_updates_grouped_panel_open_states(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "ui": {
+    "panel_open_states": {
+      "activeTab": "overview",
+      "logsVisible": true
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/config",
+        json={
+            "grouped_config": {
+                "ui": {
+                    "panel_open_states": {
+                        "activeTab": "sync",
+                        "logsVisible": False,
+                    }
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    saved = json.loads(config_path.read_text(encoding="utf-8"))
+    assert saved["ui"]["panel_open_states"]["activeTab"] == "sync"
+    assert saved["ui"]["panel_open_states"]["logsVisible"] is False
+
+
 def test_state_supports_pending_and_queue_roundtrip() -> None:
     state = SyncState(
         pending_files={
