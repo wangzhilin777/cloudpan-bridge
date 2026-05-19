@@ -1869,13 +1869,15 @@
 
     function strategyQuickActions(mode, strategy) {
       const actions = [];
+      const isGuangya = activeTargetKey() === "guangya";
       const push = (key, labelZh, labelEn) => actions.push({
         key,
         label: currentLang() === "en" ? labelEn : currentLang() === "mix" ? `${labelZh} / ${labelEn}` : labelZh,
       });
       if (strategy?.shouldAnalyzeFirst) push("analyze", "先分析当前目录", "Analyze current directory");
       if (mode === "direct_metadata_first") {
-        push("to-miaochuan", "去秒传页", "Open flash-upload tab");
+        if (isGuangya) push("to-miaochuan", "去秒传页", "Open flash-upload tab");
+        else push("to-sync", "去同步页", "Open sync tab");
         push("run-direct", "直接同步当前目录", "Run direct sync");
       } else if (mode === "leaf_metadata_then_pending") {
         push("run-leaf-direct", "最底层边扫边秒传", "Run leaf scan sync");
