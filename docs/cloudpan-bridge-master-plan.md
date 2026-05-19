@@ -468,6 +468,8 @@ Guangya 是当前已完成最多的目标端，必须继续保留并增强。
   - 覆盖审计已支持 `nextAction / missingItem / capabilityLevel / profileKey` 高级筛选，且 backlog/导出保持一致
   - 页面状态恢复链路已进一步收口到 `grouped_config.ui`
   - `language / coverage_filters / browser / panel_open_states` 现在以正式分组配置为主，`localStorage` 仅保留迁移与启动兜底角色
+  - 高频后端入口已大面积兼容 `grouped_config`
+  - 已覆盖同步启动、执行链路、目录浏览、源分析、秒传诊断/导入、OpenList 登录、覆盖审计、能力判断、挂载与抓取辅助入口
 
 仍未完成的重点：
 
