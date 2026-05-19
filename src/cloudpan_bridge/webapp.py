@@ -225,6 +225,15 @@ def create_app(config_path: Path) -> FastAPI:
             token=str(token if token is not None else config.openlist_token),
         )
 
+    def deep_merge_dicts(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
+        merged = dict(base)
+        for key, value in patch.items():
+            if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                merged[key] = deep_merge_dicts(dict(merged.get(key) or {}), value)
+            else:
+                merged[key] = value
+        return merged
+
     def load_config_payload() -> dict[str, Any]:
         normalized = AppConfig.load(config_path)
         payload = normalized.to_flat_dict()
@@ -235,9 +244,22 @@ def create_app(config_path: Path) -> FastAPI:
                     payload[key] = raw_payload.get(key, payload.get(key, ""))
         return payload
 
+    def load_grouped_config_payload() -> dict[str, Any]:
+        return AppConfig.load(config_path).to_dict()
+
     def save_config_payload(payload: dict[str, Any]) -> None:
-        merged = load_config_payload()
-        merged.update(payload)
+        grouped_patch = dict(payload.get("grouped_config", {}) or {}) if isinstance(payload.get("grouped_config"), dict) else {}
+        current_grouped = load_grouped_config_payload()
+        if grouped_patch:
+            current_grouped = deep_merge_dicts(current_grouped, grouped_patch)
+        merged = AppConfig.from_payload(current_grouped).to_flat_dict()
+        merged.update(
+            {
+                key: value
+                for key, value in payload.items()
+                if key not in {"grouped_config", "config_meta", "effective_openlist_url"}
+            }
+        )
         normalized = AppConfig.from_payload(merged)
         config_path.write_text(json.dumps(normalized.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -648,6 +670,11 @@ def create_app(config_path: Path) -> FastAPI:
     def get_config() -> dict[str, Any]:
         payload = load_config_payload()
         payload["effective_openlist_url"] = effective_openlist_url()
+        payload["grouped_config"] = load_grouped_config_payload()
+        payload["config_meta"] = {
+            "storage": "nested_with_flat_compat",
+            "active_target": config.target_key,
+        }
         return payload
 
     @app.post("/api/config")

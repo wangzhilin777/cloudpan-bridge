@@ -336,6 +336,92 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     assert payload["target_implementation_status"]["guangya"]["selectable"] is True
 
 
+def test_config_endpoint_returns_flat_and_grouped_views(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "app": {
+    "bind_port": 9999
+  },
+  "openlist": {
+    "url": "http://127.0.0.1:5244",
+    "username": "admin"
+  },
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  },
+  "targets": {
+    "active_target": "guangya",
+    "guangya": {
+      "phone": "+86 13800138000"
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/config")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source_path"] == "/src"
+    assert payload["target_path"] == "/dst"
+    assert payload["grouped_config"]["sync"]["source_path"] == "/src"
+    assert payload["grouped_config"]["targets"]["guangya"]["phone"] == "+86 13800138000"
+    assert payload["config_meta"]["storage"] == "nested_with_flat_compat"
+    assert payload["config_meta"]["active_target"] == "guangya"
+
+
+def test_config_endpoint_accepts_grouped_partial_update(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  },
+  "targets": {
+    "active_target": "guangya",
+    "guangya": {
+      "phone": "+86 13800138000",
+      "refresh_token": "old-refresh"
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/config",
+        json={
+            "grouped_config": {
+                "targets": {
+                    "guangya": {
+                        "refresh_token": "new-refresh",
+                    }
+                },
+                "sync": {
+                    "target_path": "/dst-2",
+                },
+            }
+        },
+    )
+    assert response.status_code == 200
+    saved = json.loads(config_path.read_text(encoding="utf-8"))
+    assert saved["targets"]["guangya"]["phone"] == "+86 13800138000"
+    assert saved["targets"]["guangya"]["refresh_token"] == "new-refresh"
+    assert saved["sync"]["source_path"] == "/src"
+    assert saved["sync"]["target_path"] == "/dst-2"
+
+
 def test_state_supports_pending_and_queue_roundtrip() -> None:
     state = SyncState(
         pending_files={
