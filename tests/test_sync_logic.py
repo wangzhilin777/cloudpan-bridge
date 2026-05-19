@@ -663,6 +663,41 @@ def test_config_endpoint_accepts_grouped_partial_update(tmp_path: Path) -> None:
     assert saved["sync"]["target_path"] == "/dst-2"
 
 
+def test_queue_add_accepts_grouped_source_path(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/from-config"
+  },
+  "state": {
+    "state_file": ".state/test-state.json"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/queue/add",
+        json={
+            "grouped_config": {
+                "sync": {
+                    "source_path": "/grouped-source"
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    status_response = client.get("/api/status")
+    assert status_response.status_code == 200
+    source_queue = status_response.json()["sync"]["source_queue"]
+    assert source_queue[0]["source_path"] == "/grouped-source"
+
+
 def test_config_endpoint_preserves_and_updates_ui_grouped_state(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
@@ -711,6 +746,65 @@ def test_config_endpoint_preserves_and_updates_ui_grouped_state(tmp_path: Path) 
     assert saved["ui"]["coverage_filters"]["profileKey"] == "aliyundriveopen"
     assert saved["ui"]["browser"]["current_path"] == "/new-browser"
     assert saved["ui"]["browser"]["mounted_source"] == "/new-mount"
+
+
+def test_openlist_login_accepts_grouped_openlist_fields(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "openlist": {
+    "url": "http://127.0.0.1:5244",
+    "username": "admin",
+    "password": ""
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge import webapp as webapp_module
+
+    captured: dict[str, str] = {}
+
+    class FakeOpenListClient:
+        def __init__(self, base_url: str, username: str, password: str, token: str, **_: object) -> None:
+            captured["base_url"] = base_url
+            captured["username"] = username
+            captured["password"] = password
+            captured["token"] = token
+            self.base_url = base_url.rstrip("/")
+            self.username = username
+            self.password = password
+            self.token = "grouped-token"
+
+        def ensure_login(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(webapp_module, "OpenListClient", FakeOpenListClient)
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.post(
+        "/api/openlist/login",
+        json={
+            "grouped_config": {
+                "openlist": {
+                    "url": "http://127.0.0.1:5245",
+                    "username": "grouped-admin",
+                    "password": "grouped-pass"
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    assert captured["base_url"] == "http://127.0.0.1:5245"
+    assert captured["username"] == "grouped-admin"
+    assert captured["password"] == "grouped-pass"
+    saved = json.loads(config_path.read_text(encoding="utf-8"))
+    assert saved["openlist"]["url"] == "http://127.0.0.1:5245"
+    assert saved["openlist"]["username"] == "grouped-admin"
+    assert saved["openlist"]["token"] == "grouped-token"
 
 
 def test_config_endpoint_updates_grouped_panel_open_states(tmp_path: Path) -> None:

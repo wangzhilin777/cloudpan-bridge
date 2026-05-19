@@ -270,6 +270,30 @@ def create_app(config_path: Path) -> FastAPI:
                 merged[key] = value
         return merged
 
+    def payload_nested_get(payload: dict[str, Any] | None, path: tuple[str, ...], default: Any = "") -> Any:
+        current: Any = payload or {}
+        for key in path:
+            if not isinstance(current, dict) or key not in current:
+                return default
+            current = current[key]
+        return current
+
+    def resolve_payload_value(
+        payload: dict[str, Any] | None,
+        flat_key: str,
+        grouped_path: tuple[str, ...] | None = None,
+        default: Any = "",
+    ) -> Any:
+        raw = payload or {}
+        flat_value = raw.get(flat_key)
+        if flat_value not in ("", None):
+            return flat_value
+        if grouped_path:
+            grouped_value = payload_nested_get(raw.get("grouped_config") if isinstance(raw.get("grouped_config"), dict) else {}, grouped_path, None)
+            if grouped_value not in ("", None):
+                return grouped_value
+        return default
+
     def load_config_payload() -> dict[str, Any]:
         normalized = AppConfig.load(config_path)
         payload = normalized.to_flat_dict()
@@ -774,7 +798,7 @@ def create_app(config_path: Path) -> FastAPI:
         nonlocal config
         payload = payload or {}
         config = AppConfig.load(config_path)
-        require_selectable_target(str(payload.get("target_key") or config.target_key or "guangya"))
+        require_selectable_target(str(resolve_payload_value(payload, "target_key", ("targets", "active_target"), config.target_key or "guangya")))
         with sync_lock:
             if sync_state["running"]:
                 raise HTTPException(status_code=409, detail="同步任务正在运行")
@@ -794,7 +818,7 @@ def create_app(config_path: Path) -> FastAPI:
         nonlocal config
         payload = payload or {}
         config = AppConfig.load(config_path)
-        require_miaochuan_target(str(payload.get("target_key") or config.target_key or "guangya"))
+        require_miaochuan_target(str(resolve_payload_value(payload, "target_key", ("targets", "active_target"), config.target_key or "guangya")))
         miaochuan_payload = str(payload.get("miaochuan_payload") or "").strip()
         if not miaochuan_payload:
             raise HTTPException(status_code=400, detail="请先粘贴秒传 JSON。")
@@ -809,7 +833,14 @@ def create_app(config_path: Path) -> FastAPI:
                 "miaochuan_import",
                 {
                     "miaochuan_payload": miaochuan_payload,
-                    "guangya_authorization": str(payload.get("guangya_authorization") or config.guangya_authorization or "").strip(),
+                    "guangya_authorization": str(
+                        resolve_payload_value(
+                            payload,
+                            "guangya_authorization",
+                            ("targets", "guangya", "authorization"),
+                            config.guangya_authorization or "",
+                        )
+                    ).strip(),
                 },
             ),
             daemon=True,
@@ -834,8 +865,8 @@ def create_app(config_path: Path) -> FastAPI:
         nonlocal config
         payload = payload or {}
         config = AppConfig.load(config_path)
-        require_selectable_target(str(payload.get("target_key") or config.target_key or "guangya"))
-        root_path = str(payload.get("source_path") or config.source_path or "/").strip()
+        require_selectable_target(str(resolve_payload_value(payload, "target_key", ("targets", "active_target"), config.target_key or "guangya")))
+        root_path = str(resolve_payload_value(payload, "source_path", ("sync", "source_path"), config.source_path or "/")).strip()
         normalized = "/" + root_path.lstrip("/")
         if normalized == "/":
             raise HTTPException(status_code=400, detail="不能从 OpenList 根目录 / 开始边扫边同步，请先进入具体挂载目录。")
@@ -854,8 +885,8 @@ def create_app(config_path: Path) -> FastAPI:
         nonlocal config
         payload = payload or {}
         config = AppConfig.load(config_path)
-        require_selectable_target(str(payload.get("target_key") or config.target_key or "guangya"))
-        root_path = str(payload.get("source_path") or config.source_path or "/").strip()
+        require_selectable_target(str(resolve_payload_value(payload, "target_key", ("targets", "active_target"), config.target_key or "guangya")))
+        root_path = str(resolve_payload_value(payload, "source_path", ("sync", "source_path"), config.source_path or "/")).strip()
         normalized = "/" + root_path.lstrip("/")
         if normalized == "/":
             raise HTTPException(status_code=400, detail="不能从 OpenList 根目录 / 开始边扫边同步+补传，请先进入具体挂载目录。")
@@ -890,7 +921,7 @@ def create_app(config_path: Path) -> FastAPI:
     def add_queue_item(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         nonlocal config
         payload = payload or {}
-        source_path = str(payload.get("source_path") or config.source_path).strip()
+        source_path = str(resolve_payload_value(payload, "source_path", ("sync", "source_path"), config.source_path)).strip()
         if not source_path:
             raise HTTPException(status_code=400, detail="缺少 source_path")
         state = load_state(config.state_file)
@@ -951,16 +982,16 @@ def create_app(config_path: Path) -> FastAPI:
     def add_queue_leaf_units(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         nonlocal config
         payload = payload or {}
-        root_path = str(payload.get("source_path") or config.source_path or "/").strip()
+        root_path = str(resolve_payload_value(payload, "source_path", ("sync", "source_path"), config.source_path or "/")).strip()
         if not root_path:
             raise HTTPException(status_code=400, detail="缺少 source_path")
         if ("/" + root_path.lstrip("/")) == "/":
             raise HTTPException(status_code=400, detail="不能从 OpenList 根目录 / 收集最底层目录，请先进入具体挂载目录。")
         client = build_openlist_client(
-            openlist_url=str(payload.get("openlist_url") or effective_openlist_url()),
-            openlist_username=str(payload.get("openlist_username") or config.openlist_username),
-            openlist_password=str(payload.get("openlist_password") or config.openlist_password),
-            openlist_token=str(payload.get("openlist_token") or config.openlist_token),
+            openlist_url=str(resolve_payload_value(payload, "openlist_url", ("openlist", "url"), effective_openlist_url())),
+            openlist_username=str(resolve_payload_value(payload, "openlist_username", ("openlist", "username"), config.openlist_username)),
+            openlist_password=str(resolve_payload_value(payload, "openlist_password", ("openlist", "password"), config.openlist_password)),
+            openlist_token=str(resolve_payload_value(payload, "openlist_token", ("openlist", "token"), config.openlist_token)),
         )
         try:
             leaf_units = client.collect_leaf_directories(root_path)
@@ -1003,17 +1034,17 @@ def create_app(config_path: Path) -> FastAPI:
         nonlocal config
         payload = payload or {}
         client = OpenListClient(
-            base_url=str(payload.get("openlist_url") or config.openlist_url),
-            username=str(payload.get("openlist_username") or config.openlist_username),
-            password=str(payload.get("openlist_password") or config.openlist_password),
-            token=str(payload.get("openlist_token") or ""),
+            base_url=str(resolve_payload_value(payload, "openlist_url", ("openlist", "url"), config.openlist_url)),
+            username=str(resolve_payload_value(payload, "openlist_username", ("openlist", "username"), config.openlist_username)),
+            password=str(resolve_payload_value(payload, "openlist_password", ("openlist", "password"), config.openlist_password)),
+            token=str(resolve_payload_value(payload, "openlist_token", ("openlist", "token"), "")),
         )
         try:
             client.ensure_login()
             cfg = load_config_payload()
             cfg["openlist_url"] = client.base_url
             cfg["openlist_username"] = client.username
-            if payload.get("openlist_password"):
+            if resolve_payload_value(payload, "openlist_password", ("openlist", "password"), ""):
                 cfg["openlist_password"] = client.password
             cfg["openlist_token"] = client.token
             save_config_payload(cfg)
