@@ -294,6 +294,30 @@ def create_app(config_path: Path) -> FastAPI:
                 return grouped_value
         return default
 
+    def normalize_sync_payload(payload: dict[str, Any] | None, runtime_config: AppConfig) -> dict[str, Any]:
+        raw = dict(payload or {})
+        normalized = dict(raw)
+        normalized["source_path"] = str(
+            resolve_payload_value(raw, "source_path", ("sync", "source_path"), runtime_config.source_path or "/")
+        )
+        normalized["source_root_for_target"] = str(
+            resolve_payload_value(raw, "source_root_for_target", default=normalized["source_path"])
+        )
+        normalized["target_key"] = str(
+            resolve_payload_value(raw, "target_key", ("targets", "active_target"), runtime_config.target_key or "guangya")
+        )
+        normalized["guangya_authorization"] = str(
+            resolve_payload_value(
+                raw,
+                "guangya_authorization",
+                ("targets", "guangya", "authorization"),
+                runtime_config.guangya_authorization or "",
+            )
+        )
+        normalized["miaochuan_payload"] = str(resolve_payload_value(raw, "miaochuan_payload", default=raw.get("miaochuan_payload") or ""))
+        normalized["selected_paths"] = list(raw.get("selected_paths") or [])
+        return normalized
+
     def load_config_payload() -> dict[str, Any]:
         normalized = AppConfig.load(config_path)
         payload = normalized.to_flat_dict()
@@ -517,7 +541,8 @@ def create_app(config_path: Path) -> FastAPI:
 
     def run_sync_job(mode: str, payload: dict[str, Any] | None = None) -> bool:
         nonlocal config
-        payload = payload or {}
+        config = AppConfig.load(config_path)
+        payload = normalize_sync_payload(payload, config)
         active_source = str(payload.get("source_path") or config.source_path)
         source_root_for_target = str(payload.get("source_root_for_target") or active_source)
         try:
@@ -798,7 +823,8 @@ def create_app(config_path: Path) -> FastAPI:
         nonlocal config
         payload = payload or {}
         config = AppConfig.load(config_path)
-        require_selectable_target(str(resolve_payload_value(payload, "target_key", ("targets", "active_target"), config.target_key or "guangya")))
+        payload = normalize_sync_payload(payload, config)
+        require_selectable_target(str(payload.get("target_key") or config.target_key or "guangya"))
         with sync_lock:
             if sync_state["running"]:
                 raise HTTPException(status_code=409, detail="同步任务正在运行")

@@ -448,6 +448,77 @@ def test_target_preflight_endpoint_rejects_unknown_target(tmp_path: Path) -> Non
     assert "目标端 quark 当前既没有内置档案，也没有实现可写入适配器" in sync_response.json()["detail"]
 
 
+def test_sync_start_accepts_grouped_source_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/from-config",
+    "target_path": "/dst"
+  },
+  "targets": {
+    "active_target": "guangya",
+    "guangya": {}
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge import webapp as webapp_module
+
+    seen: dict[str, object] = {}
+
+    class FakeSummary:
+        pending_downloads: list[str] = []
+
+        def to_dict(self) -> dict[str, object]:
+            return {"total": 0, "direct_success": 0, "downloaded_success": 0, "failed": 0}
+
+    class DummySource:
+        def close(self) -> None:
+            return None
+
+    class FakeRunner:
+        def __init__(self, config: AppConfig, log: object | None = None, source_root_for_target: str = "") -> None:
+            seen["source_path"] = config.source_path
+            seen["source_root_for_target"] = source_root_for_target
+            self.source = DummySource()
+
+        def run(self, allow_download_upload: bool = False, dry_run: bool = False) -> FakeSummary:
+            seen["allow_download_upload"] = allow_download_upload
+            seen["dry_run"] = dry_run
+            return FakeSummary()
+
+    class ImmediateThread:
+        def __init__(self, target: object, args: tuple[object, ...] = (), daemon: bool = False) -> None:
+            self._target = target
+            self._args = args
+
+        def start(self) -> None:
+            self._target(*self._args)
+
+    monkeypatch.setattr(webapp_module, "SyncRunner", FakeRunner)
+    monkeypatch.setattr(webapp_module, "Thread", ImmediateThread)
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.post(
+        "/api/sync/start",
+        json={
+            "mode": "dry_run",
+            "grouped_config": {
+                "sync": {
+                    "source_path": "/grouped-sync"
+                }
+            }
+        },
+    )
+    assert response.status_code == 200
+    assert seen["source_path"] == "/grouped-sync"
+    assert seen["source_root_for_target"] == "/grouped-sync"
+    assert seen["dry_run"] is True
+    assert seen["allow_download_upload"] is False
+
+
 def test_config_endpoint_returns_flat_and_grouped_views(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
