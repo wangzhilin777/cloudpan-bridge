@@ -2783,12 +2783,20 @@
       const activeTarget = String(targetStateSummary?.target_key || activeTargetKey() || "guangya");
       const targetFields = Array.isArray(targetStateSummary?.fields) ? targetStateSummary.fields : [];
       const isGuangya = activeTarget === "guangya";
+      const nonGuangyaBadge = targetStateSummary?.has_state
+        ? (currentLang() === "en" ? "configured" : currentLang() === "mix" ? "已配置 / configured" : "已配置")
+        : (currentLang() === "en" ? "empty" : currentLang() === "mix" ? "未配置 / empty" : "未配置");
+      const nonGuangyaMessage = currentLang() === "en"
+        ? `Current target is ${activeTarget}. Guangya capture details are hidden because this target is not using Guangya auth fields.`
+        : currentLang() === "mix"
+          ? `当前目标端为 ${activeTarget}，这里不再展示 Guangya 抓取细节，因为该目标端不使用 Guangya 鉴权字段。 / Guangya capture details are hidden.`
+          : `当前目标端为 ${activeTarget}，这里不再展示 Guangya 抓取细节，因为该目标端不使用 Guangya 鉴权字段。`;
       const targetStateLine = targetStateSummary
         ? `<div class="mono">${currentLang() === "en" ? "Active target state" : currentLang() === "mix" ? "当前目标端状态 / Active target state" : "当前目标端状态"}: ${escapeHtml(activeTarget)} | ${currentLang() === "en" ? "fields" : currentLang() === "mix" ? "字段 / fields" : "字段"}=${targetStateSummary.field_count ?? 0} | ${escapeHtml(targetFields.join(", ") || "-")}</div>`
         : "";
       document.getElementById("capture-summary").innerHTML = `
-        <div class="badge">${escapeHtml(capture?.status || "idle")}</div>
-        <div class="mono">${escapeHtml(capture?.message || "")}</div>
+        <div class="badge">${escapeHtml(isGuangya ? (capture?.status || "idle") : nonGuangyaBadge)}</div>
+        <div class="mono">${escapeHtml(isGuangya ? (capture?.message || "") : nonGuangyaMessage)}</div>
         ${targetStateLine}
         ${isGuangya ? `<div class="mono">Authorization: ${captured.authorization ? (currentLang() === "en" ? "captured" : currentLang() === "mix" ? "已抓取 / captured" : "已抓取") : (currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未抓取 / missing" : "未抓取")}</div>` : ""}
         ${isGuangya ? `<div class="mono">Access Token: ${captured.access_token ? (currentLang() === "en" ? "captured" : currentLang() === "mix" ? "已抓取 / captured" : "已抓取") : (currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未抓取 / missing" : "未抓取")}</div>` : ""}
@@ -3217,6 +3225,7 @@
     }
 
     async function attemptAutoGuangyaCapture() {
+      if (activeTargetKey() !== "guangya") return false;
       const values = [
         document.getElementById("guangya_authorization").value,
         document.getElementById("guangya_access_token").value,
@@ -3416,6 +3425,9 @@
         renderAboutRegistry();
         await refreshCapabilityAssessment();
         await refreshCoverageAudit();
+        if (nextTarget === "guangya") {
+          await attemptAutoGuangyaCapture();
+        }
       });
       document.getElementById("rate_limit_mode").addEventListener("change", () => {
         const selected = document.getElementById("mounted_source_select").value || document.getElementById("source_path").value || "/";
