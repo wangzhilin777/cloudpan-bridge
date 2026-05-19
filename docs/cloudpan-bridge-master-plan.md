@@ -466,6 +466,8 @@ Guangya 是当前已完成最多的目标端，必须继续保留并增强。
 - `Phase 6`
   - 已有静态能力矩阵与基于目录分析结果的动态策略建议
   - 覆盖审计已支持 `nextAction / missingItem / capabilityLevel / profileKey` 高级筛选，且 backlog/导出保持一致
+  - 页面状态恢复链路已进一步收口到 `grouped_config.ui`
+  - `language / coverage_filters / browser / panel_open_states` 现在以正式分组配置为主，`localStorage` 仅保留迁移与启动兜底角色
 
 仍未完成的重点：
 

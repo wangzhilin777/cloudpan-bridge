@@ -1148,12 +1148,6 @@
       }
       return null;
     }
-    const currentLang = () => {
-      const groupedLanguage = typeof configCache?.grouped_config?.ui?.language === "string"
-        ? configCache.grouped_config.ui.language
-        : "";
-      return groupedLanguage || getStorageValue(UI_LANGUAGE_KEY, LEGACY_UI_LANGUAGE_KEYS) || "zh";
-    };
     let configCache = {};
     let currentDirectoryPath = "/";
     let currentParentPath = null;
@@ -1186,6 +1180,15 @@
       return current ?? fallback;
     }
 
+    function hasGroupedConfigValue(path) {
+      let current = configCache?.grouped_config;
+      for (const key of Array.isArray(path) ? path : []) {
+        if (!current || typeof current !== "object" || !(key in current)) return false;
+        current = current[key];
+      }
+      return current !== undefined;
+    }
+
     function ensureGroupedConfigShape() {
       const grouped = (configCache.grouped_config && typeof configCache.grouped_config === "object") ? configCache.grouped_config : {};
       grouped.app = grouped.app || {};
@@ -1213,14 +1216,42 @@
       if (last) current[last] = value;
     }
 
-    function getCoverageFilterState() {
-      const groupedFilters = getGroupedConfigValue(["ui", "coverage_filters"], null);
-      if (groupedFilters && typeof groupedFilters === "object") return { ...groupedFilters };
+    function readLegacyJsonCache(primaryKey, legacyKeys = [], fallback = {}) {
       try {
-        return JSON.parse(localStorage.getItem(COVERAGE_FILTERS_KEY) || "{}");
+        return JSON.parse(getStorageValue(primaryKey, legacyKeys) || JSON.stringify(fallback));
       } catch {
-        return {};
+        return { ...(fallback || {}) };
       }
+    }
+
+    function syncUiPreferenceCache() {
+      const groupedLanguage = getGroupedConfigValue(["ui", "language"], "");
+      if (typeof groupedLanguage === "string" && groupedLanguage) {
+        localStorage.setItem(UI_LANGUAGE_KEY, groupedLanguage);
+      }
+      const groupedCoverageFilters = getGroupedConfigValue(["ui", "coverage_filters"], null);
+      if (groupedCoverageFilters && typeof groupedCoverageFilters === "object") {
+        localStorage.setItem(COVERAGE_FILTERS_KEY, JSON.stringify(groupedCoverageFilters));
+      }
+      const groupedPanelState = getGroupedConfigValue(["ui", "panel_open_states"], null);
+      if (groupedPanelState && typeof groupedPanelState === "object") {
+        localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(groupedPanelState));
+      }
+    }
+
+    const currentLang = () => {
+      const groupedLanguage = typeof getGroupedConfigValue(["ui", "language"], "") === "string"
+        ? getGroupedConfigValue(["ui", "language"], "")
+        : "";
+      return groupedLanguage || getStorageValue(UI_LANGUAGE_KEY, LEGACY_UI_LANGUAGE_KEYS) || "zh";
+    };
+
+    function getCoverageFilterState() {
+      const groupedFilters = hasGroupedConfigValue(["ui", "coverage_filters"])
+        ? getGroupedConfigValue(["ui", "coverage_filters"], null)
+        : null;
+      if (groupedFilters && typeof groupedFilters === "object") return { ...groupedFilters };
+      return readLegacyJsonCache(COVERAGE_FILTERS_KEY, [], {});
     }
 
     function setCoverageFilterState(nextState) {
@@ -1522,24 +1553,16 @@
     }
 
     function getPanelState() {
-      try {
-        const direct = localStorage.getItem(PANEL_STATE_KEY);
-        if (direct) return JSON.parse(direct || "{}");
-        for (const legacyKey of LEGACY_PANEL_STATE_KEYS) {
-          const legacyValue = localStorage.getItem(legacyKey);
-          if (!legacyValue) continue;
-          const parsed = JSON.parse(legacyValue || "{}");
-          localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(parsed));
-          return parsed;
-        }
-        return {};
-      } catch {
-        return {};
-      }
+      const groupedState = hasGroupedConfigValue(["ui", "panel_open_states"])
+        ? getGroupedConfigValue(["ui", "panel_open_states"], null)
+        : null;
+      if (groupedState && typeof groupedState === "object") return { ...groupedState };
+      return readLegacyJsonCache(PANEL_STATE_KEY, LEGACY_PANEL_STATE_KEYS, {});
     }
 
     function setPanelState(nextState) {
       localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(nextState));
+      setGroupedConfigValue(["ui", "panel_open_states"], { ...(nextState || {}) });
     }
 
     function schedulePanelStatePersist() {
@@ -1565,7 +1588,6 @@
       const nextState = { ...getPanelState(), ...(patch || {}) };
       setPanelState(nextState);
       configCache = { ...(configCache || {}) };
-      setGroupedConfigValue(["ui", "panel_open_states"], { ...nextState });
       schedulePanelStatePersist();
       return nextState;
     }
@@ -1627,8 +1649,8 @@
       const langSelect = document.getElementById("ui_language");
       langSelect.value = currentLang();
       langSelect.addEventListener("change", () => {
-        localStorage.setItem(UI_LANGUAGE_KEY, langSelect.value);
         setGroupedConfigValue(["ui", "language"], langSelect.value);
+        localStorage.setItem(UI_LANGUAGE_KEY, langSelect.value);
         scheduleUiPrefsPersist();
         applyI18n();
       });
@@ -2614,14 +2636,7 @@
 
     function applyConfigToForm(config) {
       configCache = { ...(config || {}) };
-      const groupedLanguage = getGroupedConfigValue(["ui", "language"], "");
-      if (typeof groupedLanguage === "string" && groupedLanguage) {
-        localStorage.setItem(UI_LANGUAGE_KEY, groupedLanguage);
-      }
-      const groupedCoverageFilters = getGroupedConfigValue(["ui", "coverage_filters"], null);
-      if (groupedCoverageFilters && typeof groupedCoverageFilters === "object") {
-        localStorage.setItem(COVERAGE_FILTERS_KEY, JSON.stringify(groupedCoverageFilters));
-      }
+      syncUiPreferenceCache();
       const groupedMountedSource = getGroupedConfigValue(["ui", "browser", "mounted_source"], "");
       if (typeof groupedMountedSource === "string" && groupedMountedSource) {
         const mountedSelect = document.getElementById("mounted_source_select");
@@ -2629,7 +2644,7 @@
       }
       const panelState = getGroupedConfigValue(["ui", "panel_open_states"], {});
       if (panelState && typeof panelState === "object") {
-        setPanelState({ ...getPanelState(), ...panelState });
+        setPanelState({ ...panelState });
         if (panelState.activeTab) activateTab(panelState.activeTab);
       }
       for (const field of CONFIG_FIELDS) {

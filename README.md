@@ -278,6 +278,9 @@
 - 前端关键配置字段现在也已经开始优先读取/回写 `grouped_config`，同时继续兼容平面字段
 - 当前语言、覆盖审计筛选、目录浏览位置、挂载选择也已经进入正式 `ui` 分组
 - 这些 UI 状态不再只是依赖页面侧临时透传保存
+- 页面状态恢复现在也以 `grouped_config.ui` 为主
+  - `language / coverage_filters / browser / panel_open_states` 会优先从正式配置恢复
+  - `localStorage` 只保留为旧版本迁移和页面刚启动时的轻量缓存兜底
 - `targets.active_target` 当前默认是 `guangya`
 - 配置页里已经有“当前目标端”选择点
 - 当前切换目标端后，页面里的能力矩阵、覆盖审计与导出都会立即跟随这个选择刷新
