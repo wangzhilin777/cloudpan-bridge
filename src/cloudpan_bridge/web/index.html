@@ -1564,13 +1564,7 @@
     function updatePanelState(patch) {
       const nextState = { ...getPanelState(), ...(patch || {}) };
       setPanelState(nextState);
-      configCache = {
-        ...(configCache || {}),
-        panel_open_states: {
-          ...((configCache && configCache.panel_open_states) || {}),
-          ...nextState,
-        },
-      };
+      configCache = { ...(configCache || {}) };
       setGroupedConfigValue(["ui", "panel_open_states"], { ...nextState });
       schedulePanelStatePersist();
       return nextState;
@@ -2587,7 +2581,6 @@
         if (!el) continue;
         payload[field] = el.type === "number" ? Number(el.value || 0) : el.value;
       }
-      payload.panel_open_states = payload.panel_open_states || {};
       payload.grouped_config = payload.grouped_config && typeof payload.grouped_config === "object" ? payload.grouped_config : {};
       configCache = payload;
       setGroupedConfigValue(["sync", "source_path"], payload.source_path || "");
@@ -2634,7 +2627,7 @@
         const mountedSelect = document.getElementById("mounted_source_select");
         if (mountedSelect) mountedSelect.value = groupedMountedSource;
       }
-      const panelState = getGroupedConfigValue(["ui", "panel_open_states"], configCache.panel_open_states || {});
+      const panelState = getGroupedConfigValue(["ui", "panel_open_states"], {});
       if (panelState && typeof panelState === "object") {
         setPanelState({ ...getPanelState(), ...panelState });
         if (panelState.activeTab) activateTab(panelState.activeTab);
