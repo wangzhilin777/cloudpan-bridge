@@ -2114,6 +2114,71 @@ def test_status_persists_grouped_capture_updates(tmp_path: Path, monkeypatch: py
     assert "provider_captures" not in saved
 
 
+def test_status_persists_explicit_empty_guangya_fields(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    state_path = tmp_path / "sync-state.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  },
+  "state": {
+    "state_file": "__STATE_FILE__"
+  },
+  "targets": {
+    "active_target": "guangya",
+    "guangya": {
+      "authorization": "Bearer stale-auth",
+      "access_token": "stale-token",
+      "refresh_token": "stale-refresh",
+      "device_id": "stale-device"
+    }
+  }
+}
+""".replace("__STATE_FILE__", str(state_path).replace("\\", "\\\\")).strip(),
+        encoding="utf-8",
+    )
+    state_path.write_text(json.dumps({"target_states": {}}, ensure_ascii=False), encoding="utf-8")
+    from cloudpan_bridge import webapp as webapp_module
+
+    class FakeProviderCaptureManager:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        def snapshots(self) -> dict[str, dict[str, object]]:
+            return {}
+
+        def snapshot(self, provider: str) -> dict[str, object]:
+            if provider == "guangya":
+                return {
+                    "provider": "guangya",
+                    "status": "captured",
+                    "message": "guangya live",
+                    "captured": {
+                        "authorization": "Bearer refreshed-auth",
+                        "access_token": "",
+                        "refresh_token": "fresh-refresh",
+                        "device_id": "fresh-device",
+                    },
+                }
+            return {}
+
+        def definitions_payload(self) -> list[dict[str, object]]:
+            return []
+
+    monkeypatch.setattr(webapp_module, "ProviderCaptureManager", FakeProviderCaptureManager)
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.get("/api/status")
+    assert response.status_code == 200
+    saved = json.loads(config_path.read_text(encoding="utf-8"))
+    assert saved["targets"]["guangya"]["authorization"] == "Bearer refreshed-auth"
+    assert saved["targets"]["guangya"]["access_token"] == ""
+    assert saved["targets"]["guangya"]["refresh_token"] == "fresh-refresh"
+    assert saved["targets"]["guangya"]["device_id"] == "fresh-device"
+
+
 def test_openlist_list_dirs_accepts_grouped_fields(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(

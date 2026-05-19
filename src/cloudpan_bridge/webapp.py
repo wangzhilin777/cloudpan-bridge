@@ -301,6 +301,13 @@ def create_app(config_path: Path) -> FastAPI:
             save_config_payload({"grouped_config": grouped_patch})
         return changed
 
+    def retain_explicit_grouped_updates(updates: dict[tuple[str, ...], Any]) -> dict[tuple[str, ...], Any]:
+        return {
+            path: value
+            for path, value in updates.items()
+            if value is not None
+        }
+
     def resolve_payload_value(
         payload: dict[str, Any] | None,
         flat_key: str,
@@ -516,7 +523,7 @@ def create_app(config_path: Path) -> FastAPI:
             ("targets", "guangya", "refresh_token"): str(tokens.get("refresh_token", "")),
             ("targets", "guangya", "device_id"): str(tokens.get("device_id", "")),
         }
-        changed = save_grouped_config_updates({path: value for path, value in updates.items() if value})
+        changed = save_grouped_config_updates(retain_explicit_grouped_updates(updates))
         if changed:
             config = AppConfig.load(config_path)
             logger.info("光鸭 token/device_id 已自动写回配置")
@@ -539,7 +546,7 @@ def create_app(config_path: Path) -> FastAPI:
             ("targets", "guangya", "refresh_token"): refresh_token,
             ("targets", "guangya", "device_id"): device_id,
         }
-        changed = save_grouped_config_updates({path: value for path, value in updates.items() if value})
+        changed = save_grouped_config_updates(retain_explicit_grouped_updates(updates))
         if changed:
             config = AppConfig.load(config_path)
             logger.info("光鸭 Authorization/token/device_id 已自动写回配置")
