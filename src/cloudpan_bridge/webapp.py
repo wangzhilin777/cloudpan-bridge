@@ -226,7 +226,7 @@ def create_app(config_path: Path) -> FastAPI:
 
     def load_config_payload() -> dict[str, Any]:
         normalized = AppConfig.load(config_path)
-        payload = normalized.to_dict()
+        payload = normalized.to_flat_dict()
         if config_path.exists():
             raw_payload = json.loads(config_path.read_text(encoding="utf-8"))
             for key in ("openlist_password", "guangya_authorization", "guangya_access_token", "guangya_refresh_token", "guangya_device_id", "openlist_token"):

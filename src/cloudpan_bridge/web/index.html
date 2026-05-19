@@ -1828,6 +1828,7 @@
                 <div>${escapeHtml(item.driver || "-")}</div>
                 <div class="mono">profile=${item.hasProfile ? "yes" : "no"} | guide=${item.hasGuide ? "yes" : "no"} | capture=${item.hasCapture ? "yes" : "no"} | capability=${item.hasCapability ? "yes" : "no"}</div>
                 <div class="mono">${currentLang() === "en" ? "level" : currentLang() === "mix" ? "等级 / level" : "等级"}=${escapeHtml(capabilityLevelText(item.capabilityLevel || "unsupported"))} | score=${item.coverageScore ?? 0}/4 | P${item.priorityRank ?? "-"}</div>
+                <div class="mono">canonicalDriver=${escapeHtml(item.canonicalDriverKey || "generic")} | matchedGuide=${escapeHtml(item.matchedGuideKey || "-")}</div>
                 <div class="mono">profileKey=${escapeHtml(item.profileKey || "generic")}</div>
                 <div class="mono">guideDoc=${escapeHtml(item.guideDocUrl || "-")}</div>
                 <div class="mono">captureSpec=${escapeHtml(item.captureSpecKey || "-")} | alias=${escapeHtml(item.captureMatchedAlias || "-")}</div>

@@ -65,6 +65,30 @@ DRIVER_GUIDES: dict[str, dict[str, Any]] = {
             "root_folder_id": "0",
         },
     },
+    "189cloud": {
+        "doc_url": "https://doc.oplist.org/guide/drivers/189cloud",
+        "summary": {
+            "zh": "天翼云盘驱动通常以 Cookie 与 sessionKey 类字段为主。网页登录抓取可作为快速起步，但正式挂载前仍建议先验证目录读取、小范围下载和分页稳定性。",
+            "en": "189Cloud usually relies on Cookie and sessionKey-like fields. Web capture is a good bootstrap path, but you should still validate listing, small downloads, and pagination stability before large jobs.",
+        },
+        "steps": {
+            "zh": [
+                "先登录天翼云盘网页端，确认当前账号和目标目录都能正常打开。",
+                "如果页面抓取已拿到 Cookie 与 sessionKey 类字段，可先回填挂载表单并尝试小目录读取。",
+                "如果驱动字段里出现更多认证项，优先按当前 OpenList 驱动字段名回填，不要自行臆造参数。",
+                "大目录同步前，先在本项目里跑一次源目录分析，确认 OpenList 是否能稳定返回 MD5/分页列表。",
+            ],
+            "en": [
+                "Log in to the 189Cloud web app and make sure the account and target folder open correctly.",
+                "If web capture already collected Cookie and sessionKey-like fields, prefill the mount form and validate with a small directory first.",
+                "If the driver exposes extra auth fields, fill them according to the actual OpenList driver field names rather than inventing values.",
+                "Before syncing large trees, run a source analysis in this project and verify that OpenList returns stable MD5 metadata and paginated listing results.",
+            ],
+        },
+        "defaults": {
+            "root_folder_id": "-11",
+        },
+    },
     "quark": {
         "doc_url": "https://doc.oplist.org/guide/drivers/quark.html",
         "summary": {
@@ -590,9 +614,30 @@ def _serialize_driver_guide(guide: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _resolve_guide_key(driver: str) -> tuple[str, dict[str, Any] | None]:
+    normalized = _normalize_key(driver)
+    if not normalized:
+        return "", None
+    direct = DRIVER_GUIDES.get(normalized)
+    if direct is not None:
+        return normalized, direct
+
+    source_profile = get_source_profile_by_key_or_alias(driver)
+    profile_key = _normalize_key(source_profile.get("key") or "")
+    if profile_key:
+        profile_guide = DRIVER_GUIDES.get(profile_key)
+        if profile_guide is not None:
+            return profile_key, profile_guide
+    for alias in list(source_profile.get("driverAliases") or []):
+        alias_key = _normalize_key(alias)
+        alias_guide = DRIVER_GUIDES.get(alias_key)
+        if alias_guide is not None:
+            return alias_key, alias_guide
+    return "", None
+
+
 def get_driver_guide(driver: str) -> dict[str, Any] | None:
-    key = _normalize_key(driver)
-    guide = DRIVER_GUIDES.get(key)
+    _matched_key, guide = _resolve_guide_key(driver)
     if guide is None:
         return None
     return _serialize_driver_guide(guide)
@@ -737,6 +782,7 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
         has_profile = str(profile.get("key") or "") != "generic"
         guide = get_driver_guide(driver)
         has_guide = guide is not None
+        matched_guide_key, _matched_guide = _resolve_guide_key(driver)
         capture_match = resolve_capture_spec_for_driver(driver)
         has_capture = bool(capture_match.get("specKey")) and normalized in capture_supported_aliases
         capability = matrix.get(normalized)
@@ -776,9 +822,11 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
         row = {
             "driver": driver,
             "normalized": normalized,
+            "canonicalDriverKey": str(profile.get("key") or "generic"),
             "profileKey": str(profile.get("key") or "generic"),
             "hasProfile": has_profile,
             "hasGuide": has_guide,
+            "matchedGuideKey": matched_guide_key,
             "guideDocUrl": str((guide or {}).get("docUrl") or ""),
             "hasCapture": has_capture,
             "captureSpecKey": str(capture_match.get("specKey") or ""),
@@ -799,7 +847,9 @@ def build_driver_coverage_audit(drivers: list[str], target: str = "guangya") -> 
                 {
                     "driver": driver,
                     "normalized": normalized,
+                    "canonicalDriverKey": str(profile.get("key") or "generic"),
                     "profileKey": str(profile.get("key") or "generic"),
+                    "matchedGuideKey": matched_guide_key,
                     "capabilityLevel": capability_level or "unsupported",
                     "missingItems": missing_items,
                     "nextAction": next_action,

@@ -444,7 +444,7 @@ Guangya 是当前已完成最多的目标端，必须继续保留并增强。
 
 ## 13.5 当前进展快照
 
-截至 2026-05-17，以下主线已经有可运行落点：
+截至 2026-05-19，以下主线已经有可运行落点：
 
 - `Phase 1`
   - 新仓库、命名、主计划文档已经切到 `CloudPan Bridge`
@@ -458,14 +458,18 @@ Guangya 是当前已完成最多的目标端，必须继续保留并增强。
   - 页面已具备驱动覆盖审计、按缺口过滤、导出 JSON/Markdown、优先级 backlog
   - 覆盖审计已修正为按真实 capture spec 判断，不再把 source profile 误当作已具备抓取支持
   - 审计结果现在还能追踪 `guideDocUrl / captureSpecKey / captureMatchedAlias / captureLoginUrl`
+  - guide 查询已支持 canonical key / alias 归一，`123Open / BaiduNetdisk / 189Cloud` 这类别名不再误报缺 guide
 - `Phase 6`
   - 已有静态能力矩阵与基于目录分析结果的动态策略建议
+  - 覆盖审计已支持 `nextAction / missingItem / capabilityLevel / profileKey` 高级筛选，且 backlog/导出保持一致
 
 仍未完成的重点：
 
 - OpenList 全驱动 profile / guide / capture / capability 逐项补齐
+  - 当前重点驱动里仍剩 `123Open` 明确缺 `capture`
 - Guangya 之外的目标端适配器继续扩展
 - 更完整的 README 场景建议与最终验收清单收口
+- 配置结构虽然已支持新分组存储，但页面与接口层仍处于平面字段兼容过渡期
 
 ## 14. 验收标准
 

@@ -103,9 +103,107 @@ def test_config_has_scan_throttle_defaults(tmp_path) -> None:
     assert cfg.openlist_request_interval_ms == 300
     assert cfg.queue_interval_ms == 3000
     assert cfg.auto_download_threshold_mb == 10
-    assert cfg.to_dict()["openlist_page_size"] == 200
-    assert cfg.to_dict()["queue_interval_ms"] == 3000
-    assert cfg.to_dict()["provider_captures"] == {}
+    assert cfg.to_flat_dict()["openlist_page_size"] == 200
+    assert cfg.to_flat_dict()["queue_interval_ms"] == 3000
+    assert cfg.to_flat_dict()["provider_captures"] == {}
+
+
+def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "app": {
+    "bind_host": "127.0.0.1",
+    "bind_port": 9876
+  },
+  "openlist": {
+    "mode": "external",
+    "url": "http://127.0.0.1:5244",
+    "username": "admin",
+    "password": "demo",
+    "managed_runtime": {
+      "bin": "openlist.exe",
+      "data_dir": ".runtime/openlist",
+      "port": 5244
+    }
+  },
+  "targets": {
+    "guangya": {
+      "phone": "+86 13800138000",
+      "authorization": "Bearer abc",
+      "access_token": "tok",
+      "refresh_token": "refresh",
+      "device_id": "device"
+    }
+  },
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst",
+    "openlist_page_size": 120,
+    "openlist_request_interval_ms": 600,
+    "queue_interval_ms": 2500,
+    "auto_download_threshold_mb": 8,
+    "rate_limit_mode": "balanced"
+  },
+  "source_session": {
+    "provider_captures": {
+      "quark": {
+        "status": "captured",
+        "captured": {
+          "cookie_header": "k=v"
+        }
+      }
+    }
+  },
+  "ui": {
+    "panel_open_states": {
+      "basic_config": true
+    }
+  },
+  "state": {
+    "state_file": ".state/sync-state.json",
+    "export_file": ".work/source-export.jsonl",
+    "temp_dir": ".work/download-cache",
+    "log_file": ".state/sync.log"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    cfg = AppConfig.load(path)
+    assert cfg.source_path == "/src"
+    assert cfg.target_path == "/dst"
+    assert cfg.openlist_password == "demo"
+    assert cfg.guangya_refresh_token == "refresh"
+    assert cfg.provider_captures["quark"]["captured"]["cookie_header"] == "k=v"
+    nested = cfg.to_dict()
+    assert nested["sync"]["source_path"] == "/src"
+    assert nested["targets"]["guangya"]["device_id"] == "device"
+    assert nested["source_session"]["provider_captures"]["quark"]["captured"]["cookie_header"] == "k=v"
+    flat = cfg.to_flat_dict()
+    assert flat["bind_port"] == 9876
+    assert flat["openlist_password"] == "demo"
+
+
+def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "openlist_password": "legacy-pass",
+  "guangya_refresh_token": "legacy-refresh"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    cfg = AppConfig.load(path)
+    serialized = cfg.to_dict()
+    assert serialized["sync"]["source_path"] == "/src"
+    assert serialized["targets"]["guangya"]["refresh_token"] == "legacy-refresh"
+    assert "source_path" not in serialized
 
 
 def test_config_roundtrip_provider_captures(tmp_path) -> None:
@@ -136,7 +234,7 @@ def test_config_roundtrip_provider_captures(tmp_path) -> None:
             },
         }
     }
-    assert cfg.to_dict()["provider_captures"]["quark"]["captured"]["cookie_header"] == "k=v"
+    assert cfg.to_flat_dict()["provider_captures"]["quark"]["captured"]["cookie_header"] == "k=v"
 
 
 def test_auto_download_threshold_zero_disables_fallback(tmp_path) -> None:
@@ -350,6 +448,20 @@ def test_capture_alias_registry_resolves_real_spec_keys() -> None:
     missing = resolve_capture_spec_for_driver("UnknownDrive")
     assert missing["specKey"] == ""
     assert missing["matchedAlias"] == ""
+
+
+def test_driver_guide_supports_profile_and_alias_resolution() -> None:
+    guide_123 = provider_registry_module.get_driver_guide("123Pan")
+    assert guide_123 is not None
+    assert guide_123["docUrl"].endswith("/123_open")
+
+    guide_baidu = provider_registry_module.get_driver_guide("BaiduNetdisk")
+    assert guide_baidu is not None
+    assert guide_baidu["docUrl"].endswith("/baidu")
+
+    guide_189 = provider_registry_module.get_driver_guide("189Cloud")
+    assert guide_189 is not None
+    assert guide_189["docUrl"].endswith("/189cloud")
 
 
 def test_openlist_extract_hash_fields_supports_md5_and_gcid() -> None:
@@ -613,6 +725,8 @@ def test_provider_coverage_audit_endpoint_reports_registry_and_capture_coverage(
     assert backlog[0]["priorityRank"] == 1
     assert rows["aliyundriveopen"]["hasProfile"] is True
     assert rows["aliyundriveopen"]["hasGuide"] is True
+    assert rows["aliyundriveopen"]["canonicalDriverKey"] == "aliyundriveopen"
+    assert rows["aliyundriveopen"]["matchedGuideKey"] == "aliyundriveopen"
     assert rows["aliyundriveopen"]["hasCapture"] is True
     assert rows["aliyundriveopen"]["guideDocUrl"].endswith("/aliyundrive_open")
     assert rows["aliyundriveopen"]["captureSpecKey"] == "aliyundriveopen"
@@ -624,6 +738,8 @@ def test_provider_coverage_audit_endpoint_reports_registry_and_capture_coverage(
     assert rows["thunder"]["captureSpecKey"] == "thunder"
     assert rows["unknowndrive"]["hasProfile"] is False
     assert rows["unknowndrive"]["hasGuide"] is False
+    assert rows["unknowndrive"]["canonicalDriverKey"] == "generic"
+    assert rows["unknowndrive"]["matchedGuideKey"] == ""
     assert rows["unknowndrive"]["hasCapture"] is False
     assert rows["unknowndrive"]["captureSpecKey"] == ""
     assert rows["unknowndrive"]["missingItems"] == ["profile", "guide", "capture", "capability"]

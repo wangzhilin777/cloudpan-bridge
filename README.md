@@ -162,12 +162,18 @@
   - 覆盖筛选条件会自动记住，下次进入页面继续延续
   - 导出结果会跟随当前筛选视图，不再固定导出全量
   - 每条审计记录现在还会展示：
+    - `canonicalDriver`
+    - `matchedGuide`
     - `profileKey`
     - `guideDoc`
     - `captureSpec`
     - `capture alias`
     - `captureLogin`
-  - 这意味着你现在不只是知道“有没有 capture”，还能直接看出它命中了哪个内置抓取规格，以及后续应从哪个登录入口继续补流程
+  - 这意味着你现在不只是知道“有没有 capture”，还能直接看出：
+    - 当前驱动最终归一到了哪个 canonical driver key
+    - guide 是通过哪个 key/alias 命中的
+    - capture 命中了哪个内置抓取规格
+    - 后续应从哪个登录入口继续补流程
   - 方便后续按缺口继续补 OpenList 全驱动
 - 各源端的登录模式、哈希能力、下载链路、抓取策略、默认挂载值、风控备注
 
@@ -225,37 +231,64 @@
 
 - `.work/openlist-config.json`
 
+当前配置已升级为“内部按分组存储、页面继续兼容平面字段”的过渡结构。
+
+- 页面与现有接口仍继续使用平面字段读写，避免一次性重写前端
+- 磁盘上的配置文件默认保存为分组结构，便于后续继续扩展多目标端和 UI 状态
+- 旧版平面配置仍可直接读取
+
 示例：
 
 ```json
 {
-  "source_path": "/你的挂载目录",
-  "target_path": "/同步目标目录",
-  "state_file": ".state/sync-state.json",
-  "export_file": ".work/source-export.jsonl",
-  "temp_dir": ".work/download-cache",
-  "openlist_mode": "external",
-  "managed_openlist_bin": "",
-  "managed_openlist_data_dir": ".runtime/openlist",
-  "managed_openlist_port": 5244,
-  "openlist_url": "http://127.0.0.1:5244",
-  "openlist_token": "",
-  "openlist_username": "admin",
-  "openlist_password": "",
-  "guangya_phone": "+86 13800138000",
-  "guangya_authorization": "",
-  "guangya_access_token": "",
-  "guangya_refresh_token": "",
-  "guangya_device_id": "",
-  "delete_removed": false,
-  "openlist_page_size": 200,
-  "openlist_request_interval_ms": 300,
-  "queue_interval_ms": 3000,
-  "auto_download_threshold_mb": 10,
-  "rate_limit_mode": "safe",
-  "bind_host": "127.0.0.1",
-  "bind_port": 8765,
-  "log_file": ".state/sync.log"
+  "app": {
+    "name": "CloudPan Bridge",
+    "bind_host": "127.0.0.1",
+    "bind_port": 8765
+  },
+  "ui": {
+    "panel_open_states": {}
+  },
+  "openlist": {
+    "mode": "external",
+    "url": "http://127.0.0.1:5244",
+    "token": "",
+    "username": "admin",
+    "password": "",
+    "managed_runtime": {
+      "bin": "",
+      "data_dir": ".runtime/openlist",
+      "port": 5244
+    }
+  },
+  "source_session": {
+    "provider_captures": {}
+  },
+  "targets": {
+    "guangya": {
+      "phone": "+86 13800138000",
+      "authorization": "",
+      "access_token": "",
+      "refresh_token": "",
+      "device_id": ""
+    }
+  },
+  "sync": {
+    "source_path": "/你的挂载目录",
+    "target_path": "/同步目标目录",
+    "delete_removed": false,
+    "openlist_page_size": 200,
+    "openlist_request_interval_ms": 300,
+    "queue_interval_ms": 3000,
+    "auto_download_threshold_mb": 10,
+    "rate_limit_mode": "safe"
+  },
+  "state": {
+    "state_file": ".state/sync-state.json",
+    "export_file": ".work/source-export.jsonl",
+    "temp_dir": ".work/download-cache",
+    "log_file": ".state/sync.log"
+  }
 }
 ```
 
