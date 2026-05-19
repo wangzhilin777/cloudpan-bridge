@@ -381,7 +381,7 @@
           <button class="tab" data-tab="source" data-i18n="tab.source">源目录</button>
           <button class="tab" data-tab="sync" data-i18n="tab.sync">同步</button>
           <button class="tab" data-tab="pending" data-i18n="tab.pending">补传</button>
-          <button class="tab" data-tab="miaochuan" data-i18n="tab.miaochuan">秒传</button>
+          <button class="tab" id="tab-miaochuan-label" data-tab="miaochuan" data-i18n="tab.miaochuan">秒传</button>
           <button class="tab" data-tab="mounts" data-i18n="tab.mounts">挂载</button>
           <button class="tab" data-tab="config" data-i18n="tab.config">配置</button>
           <button class="tab" data-tab="about" data-i18n="tab.about">关于</button>
@@ -523,7 +523,7 @@
 
         <section class="tab-panel" data-panel="miaochuan">
           <div class="panel">
-            <h2 data-i18n="panel.miaochuan">秒传 JSON 直导</h2>
+            <h2 id="miaochuan-panel-title" data-i18n="panel.miaochuan">秒传 JSON 直导</h2>
             <div class="subtle" id="miaochuan-desc" data-i18n="desc.miaochuan">支持直接粘贴油猴或插件导出的 JSON。若你已自动抓取到光鸭 Authorization，会优先使用它。</div>
             <label data-i18n="label.miaochuan_payload">秒传 JSON</label>
             <textarea id="miaochuan_payload" placeholder='{"files":[{"path":"/demo.zip","size":"123","etag":"md5"}]}'></textarea>
@@ -1338,6 +1338,8 @@
     function renderTargetSpecificControls() {
       const target = activeTargetKey();
       const isGuangya = target === "guangya";
+      const miaochuanTabLabel = document.getElementById("tab-miaochuan-label");
+      const miaochuanPanelTitle = document.getElementById("miaochuan-panel-title");
       const captureCardTitle = document.getElementById("capture-card-title");
       const targetAuthPanelTitle = document.getElementById("target-auth-panel-title");
       const targetPathLabel = document.getElementById("target-path-label");
@@ -1345,7 +1347,26 @@
       const targetProfilesDesc = document.getElementById("target-profiles-desc");
       const driverMatrixDesc = document.getElementById("driver-matrix-desc");
       const miaochuanDesc = document.getElementById("miaochuan-desc");
+      const diagnoseMiaochuanButton = document.getElementById("diagnose-miaochuan");
       const runMiaochuanButton = document.getElementById("run-miaochuan");
+      if (miaochuanTabLabel) {
+        miaochuanTabLabel.textContent = isGuangya
+          ? t("tab.miaochuan")
+          : (currentLang() === "en"
+            ? "Flash Ref"
+            : currentLang() === "mix"
+              ? "秒传参考 / Flash Ref"
+              : "秒传参考");
+      }
+      if (miaochuanPanelTitle) {
+        miaochuanPanelTitle.textContent = isGuangya
+          ? t("panel.miaochuan")
+          : (currentLang() === "en"
+            ? "Flash Upload Reference"
+            : currentLang() === "mix"
+              ? "秒传参考与诊断 / Flash Upload Reference"
+              : "秒传参考与诊断");
+      }
       if (captureCardTitle) {
         captureCardTitle.textContent = isGuangya
           ? t("card.capture")
@@ -1409,7 +1430,23 @@
               ? "秒传 JSON 直导当前仅适用于 Guangya。切到其他目标端时，这里只保留参考/诊断意义，不应视为可直接写入。 / Flash-upload JSON direct import is Guangya-only for now."
               : "秒传 JSON 直导当前仅适用于 Guangya。切到其他目标端时，这里只保留参考/诊断意义，不应视为可直接写入。");
       }
+      if (diagnoseMiaochuanButton) {
+        diagnoseMiaochuanButton.textContent = isGuangya
+          ? t("btn.diagnose_miaochuan")
+          : (currentLang() === "en"
+            ? "Diagnose Flash JSON"
+            : currentLang() === "mix"
+              ? "诊断秒传 JSON / Diagnose Flash JSON"
+              : "诊断秒传 JSON");
+      }
       if (runMiaochuanButton) {
+        runMiaochuanButton.textContent = isGuangya
+          ? t("btn.run_miaochuan")
+          : (currentLang() === "en"
+            ? "Guangya Only"
+            : currentLang() === "mix"
+              ? "仅 Guangya 可导入 / Guangya Only"
+              : "仅 Guangya 可导入");
         runMiaochuanButton.disabled = !isGuangya;
         runMiaochuanButton.title = isGuangya
           ? ""
