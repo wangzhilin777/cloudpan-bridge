@@ -719,6 +719,24 @@ TARGET_PROFILES: dict[str, dict[str, Any]] = {
             "zh": "不依赖额外云盘接口，适合作为真实可写适配器样板，但不应宣传成跨盘秒传目标端。",
             "en": "It does not depend on extra cloud APIs and works well as a real writable adapter template, but it should never be presented as a cross-cloud fast-upload target.",
         },
+    },
+    "webdav": {
+        "key": "webdav",
+        "label": "WebDAV",
+        "label_zh": "WebDAV 目标端",
+        "auth_mode": "webdav url + username/password",
+        "token_refresh": "not required",
+        "auto_create_dir": True,
+        "fast_upload_hashes": [],
+        "fallback_modes": ["download_upload", "stream_upload"],
+        "description": {
+            "zh": "第四个正式可写目标端。用于把同步结果写入任意 WebDAV 服务，当前只按普通上传/覆盖处理，不承诺元数据秒传。",
+            "en": "Fourth built-in writable target. It writes sync results into any WebDAV service and currently uses normal upload/overwrite only, without any metadata-based fast-upload promise.",
+        },
+        "research_notes": {
+            "zh": "适合作为 NAS、私有网盘或第三方 WebDAV 存储的统一目标端；当前能力定位仍是保守上传链路，而不是真跨盘秒传。",
+            "en": "Useful as a unified target for NAS, private cloud, or third-party WebDAV storage. The current capability is still a conservative upload path rather than real cross-cloud fast upload.",
+        },
     }
 }
 
@@ -1977,7 +1995,7 @@ def build_driver_target_capability(
     target_profile = _serialize_target_profile(TARGET_PROFILES.get(target_key, TARGET_PROFILES["guangya"]))
     capability_to_targets = dict(source_profile.get("capabilityToTargets") or {})
     target_capability = dict(capability_to_targets.get(target_key) or {})
-    if not target_capability and target_key in {"openlist", "localfs"}:
+    if not target_capability and target_key in {"openlist", "localfs", "webdav"}:
         if target_key == "openlist":
             target_capability = {
                 "level": "download_upload_only",
@@ -1988,7 +2006,7 @@ def build_driver_target_capability(
                     "en": "Use OpenList as an aggregated writable target or relay target. For true metadata-based fast upload, prefer a target that supports direct import.",
                 },
             }
-        else:
+        elif target_key == "localfs":
             target_capability = {
                 "level": "download_upload_only",
                 "recommendedFlow": "当前组合可写入 LocalFS 本地目录目标端，但只按普通下载后写入/覆盖处理，不承诺秒传。",
@@ -1996,6 +2014,16 @@ def build_driver_target_capability(
                 "notes": {
                     "zh": "适合作为本地导出、联调或兜底目标端；如果你要真正跨盘秒传，仍应优先选择具备元数据导入能力的目标端。",
                     "en": "Use it as a local export, integration-test, or fallback target. For real cross-cloud fast upload, prefer a target with metadata-import support.",
+                },
+            }
+        else:
+            target_capability = {
+                "level": "download_upload_only",
+                "recommendedFlow": "当前组合可写入 WebDAV 目标端，但只按普通上传/覆盖处理，不承诺跨盘秒传。",
+                "recommendedFlowEn": "This combination can write into the WebDAV target, but it only uses normal upload/overwrite and does not promise any cross-cloud fast upload.",
+                "notes": {
+                    "zh": "适合作为 NAS、私有云或第三方 WebDAV 的统一目标端；如果你要真正秒传，仍应优先选择支持元数据导入的目标端。",
+                    "en": "Use it as a unified target for NAS, private cloud, or third-party WebDAV storage. For true fast upload, still prefer a target with metadata-import support.",
                 },
             }
         source_profile = dict(source_profile)

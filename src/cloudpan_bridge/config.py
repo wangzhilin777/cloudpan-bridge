@@ -57,6 +57,9 @@ class AppConfig:
     guangya_refresh_token: str = ""
     guangya_device_id: str = ""
     local_target_root: Path = Path(".exports/localfs")
+    webdav_target_url: str = ""
+    webdav_target_username: str = ""
+    webdav_target_password: str = ""
     delete_removed: bool = False
     target_delete_removed: bool = False
     openlist_page_size: int = 200
@@ -110,6 +113,9 @@ class AppConfig:
             guangya_refresh_token=str(_pick(payload.get("guangya_refresh_token"), guangya.get("refresh_token"), default="")),
             guangya_device_id=str(_pick(payload.get("guangya_device_id"), guangya.get("device_id"), default="")),
             local_target_root=Path(_pick(payload.get("local_target_root"), localfs.get("root"), default=".exports/localfs")),
+            webdav_target_url=str(_pick(payload.get("webdav_target_url"), targets.get("webdav", {}).get("url"), default="")),
+            webdav_target_username=str(_pick(payload.get("webdav_target_username"), targets.get("webdav", {}).get("username"), default="")),
+            webdav_target_password=str(_pick(payload.get("webdav_target_password"), targets.get("webdav", {}).get("password"), default="")),
             delete_removed=bool(_pick(payload.get("delete_removed"), sync.get("delete_removed"), default=False)),
             target_delete_removed=bool(_pick(payload.get("target_delete_removed"), sync.get("target_delete_removed"), default=False)),
             openlist_page_size=_int_or_default(_pick(payload.get("openlist_page_size"), sync.get("openlist_page_size"), default=200), 200, minimum=1),
@@ -156,6 +162,9 @@ class AppConfig:
             "guangya_refresh_token": self.guangya_refresh_token,
             "guangya_device_id": self.guangya_device_id,
             "local_target_root": str(self.local_target_root),
+            "webdav_target_url": self.webdav_target_url,
+            "webdav_target_username": self.webdav_target_username,
+            "webdav_target_password": self.webdav_target_password,
             "delete_removed": self.delete_removed,
             "target_delete_removed": self.target_delete_removed,
             "openlist_page_size": self.openlist_page_size,
@@ -212,6 +221,11 @@ class AppConfig:
                 },
                 "localfs": {
                     "root": str(self.local_target_root),
+                },
+                "webdav": {
+                    "url": self.webdav_target_url,
+                    "username": self.webdav_target_username,
+                    "password": self.webdav_target_password,
                 }
             },
             "sync": {
@@ -257,6 +271,9 @@ def write_example_config(path: Path) -> None:
         guangya_refresh_token="",
         guangya_device_id="",
         local_target_root=Path(".exports/localfs"),
+        webdav_target_url="",
+        webdav_target_username="",
+        webdav_target_password="",
         delete_removed=False,
         target_delete_removed=False,
         openlist_page_size=200,

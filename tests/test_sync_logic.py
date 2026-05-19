@@ -29,7 +29,7 @@ from cloudpan_bridge.syncer import (
     serialize_source_entry,
     summarize_source_entries,
 )
-from cloudpan_bridge.target_adapter import GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter
+from cloudpan_bridge.target_adapter import GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, WebDavTargetAdapter
 from cloudpan_bridge.webapp import (
     build_pending_selected_execution_groups,
     compute_rate_limit_cooldown_ms,
@@ -136,6 +136,11 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
       "access_token": "tok",
       "refresh_token": "refresh",
       "device_id": "device"
+    },
+    "webdav": {
+      "url": "https://dav.example.com/root",
+      "username": "dav-user",
+      "password": "dav-pass"
     }
   },
   "sync": {
@@ -187,6 +192,9 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert cfg.target_key == "guangya"
     assert cfg.guangya_refresh_token == "refresh"
     assert cfg.local_target_root == Path(".exports/localfs")
+    assert cfg.webdav_target_url == "https://dav.example.com/root"
+    assert cfg.webdav_target_username == "dav-user"
+    assert cfg.webdav_target_password == "dav-pass"
     assert cfg.target_delete_removed is False
     assert cfg.provider_captures["quark"]["captured"]["cookie_header"] == "k=v"
     assert cfg.ui_language == "mix"
@@ -195,6 +203,7 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     nested = cfg.to_dict()
     assert nested["sync"]["source_path"] == "/src"
     assert nested["targets"]["guangya"]["device_id"] == "device"
+    assert nested["targets"]["webdav"]["url"] == "https://dav.example.com/root"
     assert nested["source_session"]["provider_captures"]["quark"]["captured"]["cookie_header"] == "k=v"
     assert nested["ui"]["language"] == "mix"
     assert nested["ui"]["browser"]["mounted_source"] == "/mount"
@@ -213,7 +222,10 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
   "target_path": "/dst",
   "target_key": "guangya",
   "openlist_password": "legacy-pass",
-  "guangya_refresh_token": "legacy-refresh"
+  "guangya_refresh_token": "legacy-refresh",
+  "webdav_target_url": "https://dav.example.com/legacy",
+  "webdav_target_username": "legacy-dav",
+  "webdav_target_password": "legacy-pass"
 }
 """.strip(),
         encoding="utf-8",
@@ -224,6 +236,8 @@ def test_config_supports_flat_legacy_structure_and_writes_nested(tmp_path) -> No
     assert serialized["targets"]["active_target"] == "guangya"
     assert serialized["targets"]["guangya"]["refresh_token"] == "legacy-refresh"
     assert serialized["targets"]["localfs"]["root"] == str(Path(".exports/localfs"))
+    assert serialized["targets"]["webdav"]["url"] == "https://dav.example.com/legacy"
+    assert serialized["targets"]["webdav"]["username"] == "legacy-dav"
     assert serialized["sync"]["target_delete_removed"] is False
     assert "source_path" not in serialized
 
@@ -434,6 +448,37 @@ def test_sync_runner_builds_localfs_target_adapter(tmp_path) -> None:
     adapter.close()
 
 
+def test_sync_runner_builds_webdav_target_adapter(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst",
+                },
+                "targets": {
+                    "active_target": "webdav",
+                    "webdav": {
+                        "url": "https://dav.example.com/root",
+                        "username": "dav-user",
+                        "password": "dav-pass",
+                    },
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    adapter = runner._build_target_adapter(SyncState())
+    assert isinstance(adapter, WebDavTargetAdapter)
+    exported = adapter.export_state()
+    assert exported["url"] == "https://dav.example.com/root"
+    assert exported["username"] == "dav-user"
+    adapter.close()
+
+
 def test_localfs_target_adapter_can_remove_target_path(tmp_path) -> None:
     root = tmp_path / "exports"
     adapter = LocalFsTargetAdapter(root)
@@ -444,6 +489,50 @@ def test_localfs_target_adapter_can_remove_target_path(tmp_path) -> None:
     assert adapter.remove_target_path("/a/b.txt") is True
     assert not nested.exists()
     assert adapter.remove_target_path("/a/missing.txt") is False
+
+
+def test_webdav_target_adapter_uses_basic_webdav_calls(tmp_path) -> None:
+    local_file = tmp_path / "demo.txt"
+    local_file.write_text("hello", encoding="utf-8")
+
+    class FakeResponse:
+        def __init__(self, status_code: int, text: str = "") -> None:
+            self.status_code = status_code
+            self.text = text
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str, bytes | None]] = []
+
+        def request(self, method: str, url: str, auth=None, headers=None, content=None):  # type: ignore[no-untyped-def]
+            self.calls.append((method, url, content))
+            if method == "DELETE":
+                return FakeResponse(204)
+            if method == "PUT":
+                return FakeResponse(201)
+            return FakeResponse(201)
+
+        def close(self) -> None:
+            return None
+
+    fake_client = FakeClient()
+    adapter = WebDavTargetAdapter(
+        base_url="https://dav.example.com/root",
+        username="demo",
+        password="secret",
+        client=fake_client,  # type: ignore[arg-type]
+    )
+    adapter.ensure_auth()
+    parent_id = adapter.ensure_target_dir("/photos/2026")
+    assert parent_id == "/photos/2026"
+    result = adapter.upload_local_file(local_file, parent_id, "demo.txt")
+    assert result["path"] == "/photos/2026/demo.txt"
+    assert adapter.remove_target_path("/photos/2026/demo.txt") is True
+    methods = [item[0] for item in fake_client.calls]
+    assert methods[:2] == ["MKCOL", "MKCOL"]
+    assert "PUT" in methods
+    assert "DELETE" in methods
+    adapter.close()
 
 
 def test_delete_removed_does_not_touch_target_when_target_delete_removed_disabled(
@@ -672,7 +761,7 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     payload = response.json()
     assert payload["active_target"] == "guangya"
     assert payload["driver_matrix"]["thunder"]["targetProfile"]["key"] == "guangya"
-    assert payload["implemented_targets"] == ["guangya", "openlist", "localfs"]
+    assert payload["implemented_targets"] == ["guangya", "openlist", "localfs", "webdav"]
     assert payload["target_implementation_status"]["guangya"]["known_profile"] is True
     assert payload["target_implementation_status"]["guangya"]["implemented"] is True
     assert payload["target_implementation_status"]["guangya"]["selectable"] is True
@@ -732,6 +821,35 @@ def test_target_preflight_endpoint_reports_openlist_target(tmp_path: Path) -> No
     assert response.status_code == 200
     payload = response.json()
     assert payload["target_key"] == "openlist"
+    assert payload["known_profile"] is True
+    assert payload["implemented"] is True
+    assert payload["selectable"] is True
+
+
+def test_target_preflight_endpoint_reports_webdav_target(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "targets": {
+    "active_target": "webdav",
+    "webdav": {
+      "url": "https://dav.example.com/root",
+      "username": "dav-user",
+      "password": "dav-pass"
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/target/preflight?target=webdav")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["target_key"] == "webdav"
     assert payload["known_profile"] is True
     assert payload["implemented"] is True
     assert payload["selectable"] is True
@@ -1869,6 +1987,8 @@ def test_provider_registry_endpoint_returns_serialized_guides(tmp_path: Path) ->
     assert payload["target_profiles"]["guangya"]["autoCreateDir"] is True
     assert payload["target_profiles"]["localfs"]["authMode"] == "local filesystem path"
     assert payload["target_profiles"]["localfs"]["autoCreateDir"] is True
+    assert payload["target_profiles"]["webdav"]["authMode"] == "webdav url + username/password"
+    assert payload["target_profiles"]["webdav"]["autoCreateDir"] is True
     assert payload["driver_matrix"]["thunder"]["level"] == "fast_upload_partial"
 
 
@@ -1982,6 +2102,38 @@ def test_provider_capability_endpoint_returns_driver_to_guangya_matrix(tmp_path:
     assert payload["sourceProfile"]["key"] == "aliyundriveopen"
     assert payload["targetProfile"]["key"] == "guangya"
     assert payload["level"] == "download_upload_only"
+
+
+def test_provider_capability_endpoint_supports_webdav_target(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  },
+  "targets": {
+    "active_target": "webdav",
+    "webdav": {
+      "url": "https://dav.example.com/root",
+      "username": "dav-user",
+      "password": "dav-pass"
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/provider/capability", params={"driver": "Quark", "target": "webdav"})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["targetProfile"]["key"] == "webdav"
+    assert payload["level"] == "download_upload_only"
+    assert "WebDAV" in payload["recommendedFlow"]
 
 
 def test_provider_coverage_audit_endpoint_reports_registry_and_capture_coverage(tmp_path: Path) -> None:

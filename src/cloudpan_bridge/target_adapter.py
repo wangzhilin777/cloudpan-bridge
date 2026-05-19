@@ -5,6 +5,8 @@ import shutil
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
+import httpx
+
 from .guangya import GuangyaService
 from .openlist import OpenListClient
 from .models import DirectImportResult
@@ -226,8 +228,123 @@ class LocalFsTargetAdapter:
         return None
 
 
+class WebDavTargetAdapter:
+    def __init__(
+        self,
+        base_url: str,
+        username: str = "",
+        password: str = "",
+        *,
+        client: httpx.Client | None = None,
+    ) -> None:
+        self.base_url = str(base_url or "").rstrip("/")
+        self.username = username
+        self.password = password
+        self.client = client or httpx.Client(timeout=60.0, follow_redirects=True)
+
+    def ensure_auth(self) -> None:
+        if not self.base_url:
+            raise RuntimeError("WebDAV 目标端未配置 URL。")
+
+    def export_state(self) -> dict[str, str]:
+        return {
+            "url": self.base_url,
+            "username": self.username,
+        }
+
+    def close(self) -> None:
+        self.client.close()
+
+    def _normalize_path(self, path: str) -> str:
+        normalized = str(PurePosixPath("/" + str(path or "/").lstrip("/")))
+        return "/" if normalized == "." else normalized
+
+    def _build_url(self, path: str) -> str:
+        normalized = self._normalize_path(path)
+        return f"{self.base_url}{normalized}"
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        content: bytes | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        request_headers = dict(headers or {})
+        auth = None
+        if self.username:
+            auth = (self.username, self.password)
+        response = self.client.request(
+            method,
+            self._build_url(path),
+            auth=auth,
+            headers=request_headers,
+            content=content,
+        )
+        return response
+
+    def ensure_target_dir(self, path: str) -> str:
+        normalized = self._normalize_path(path)
+        if normalized == "/":
+            return normalized
+        current = PurePosixPath("/")
+        for part in PurePosixPath(normalized).parts[1:]:
+            current = current / part
+            response = self._request("MKCOL", str(current))
+            if response.status_code not in {200, 201, 204, 301, 302, 405}:
+                raise RuntimeError(f"WebDAV 创建目录失败: {current} -> {response.status_code} {response.text}")
+        return normalized
+
+    def delete_if_exists(self, parent_id: str, name: str) -> bool:
+        target_path = str(PurePosixPath(self._normalize_path(parent_id)) / name)
+        return self.remove_target_path(target_path)
+
+    def remove_target_path(self, path: str) -> bool:
+        normalized = self._normalize_path(path)
+        if normalized == "/":
+            return False
+        response = self._request("DELETE", normalized)
+        if response.status_code in {200, 202, 204}:
+            return True
+        if response.status_code == 404:
+            return False
+        raise RuntimeError(f"WebDAV 删除失败: {normalized} -> {response.status_code} {response.text}")
+
+    def try_fast_upload(
+        self,
+        file_name: str,
+        file_size: int,
+        parent_id: str,
+        md5_hex: str = "",
+        gcid: str = "",
+    ) -> DirectImportResult:
+        return DirectImportResult(
+            success=False,
+            reason="WebDAV 目标端当前只支持普通上传/覆盖，不支持元数据秒传。",
+        )
+
+    def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, Any]:
+        target_path = str(PurePosixPath(self._normalize_path(target_parent_id)) / target_name)
+        response = self._request(
+            "PUT",
+            target_path,
+            content=local_path.read_bytes(),
+            headers={"content-type": "application/octet-stream"},
+        )
+        if response.status_code not in {200, 201, 204}:
+            raise RuntimeError(f"WebDAV 上传失败: {target_path} -> {response.status_code} {response.text}")
+        return {
+            "path": target_path,
+            "size": local_path.stat().st_size,
+        }
+
+    def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
+        return None
+
+
 def supported_target_keys() -> list[str]:
-    return ["guangya", "openlist", "localfs"]
+    return ["guangya", "openlist", "localfs", "webdav"]
 
 
 def create_target_adapter(config: AppConfig, state: SyncState, target_key: str = "") -> TargetAdapter:
@@ -259,4 +376,10 @@ def create_target_adapter(config: AppConfig, state: SyncState, target_key: str =
         )
     if normalized == "localfs":
         return LocalFsTargetAdapter(config.local_target_root)
+    if normalized == "webdav":
+        return WebDavTargetAdapter(
+            base_url=config.webdav_target_url,
+            username=config.webdav_target_username,
+            password=config.webdav_target_password,
+        )
     raise NotImplementedError(f"目标端暂未实现: {normalized}")

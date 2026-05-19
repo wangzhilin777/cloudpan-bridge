@@ -720,6 +720,18 @@
                 <label data-i18n="label.local_target_root">本地目标根目录</label>
                 <input id="local_target_root" placeholder="E:\\CloudPanBridge\\Exports">
               </div>
+              <div class="col-span-2" data-target-only="webdav">
+                <label data-i18n="label.webdav_target_url">WebDAV 目标地址</label>
+                <input id="webdav_target_url" placeholder="https://dav.example.com/remote.php/dav/files/demo">
+              </div>
+              <div data-target-only="webdav">
+                <label data-i18n="label.webdav_target_username">WebDAV 用户名</label>
+                <input id="webdav_target_username">
+              </div>
+              <div data-target-only="webdav">
+                <label data-i18n="label.webdav_target_password">WebDAV 密码</label>
+                <input id="webdav_target_password" type="password">
+              </div>
             </div>
             <div class="notice" id="target-preflight-notice">等待目标端检查...</div>
             <div class="actions">
@@ -817,7 +829,7 @@
       "source_path", "target_path", "openlist_mode", "managed_openlist_bin", "managed_openlist_data_dir",
       "managed_openlist_port", "openlist_url", "openlist_token", "openlist_username", "openlist_password",
       "target_key", "guangya_phone", "guangya_authorization", "guangya_access_token", "guangya_refresh_token",
-      "guangya_device_id", "local_target_root", "delete_removed", "target_delete_removed", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
+      "guangya_device_id", "local_target_root", "webdav_target_url", "webdav_target_username", "webdav_target_password", "delete_removed", "target_delete_removed", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
       "auto_download_threshold_mb", "rate_limit_mode", "log_file", "temp_dir", "state_file"
     ];
     const CONFIG_GROUPED_PATHS = {
@@ -838,6 +850,9 @@
       guangya_refresh_token: ["targets", "guangya", "refresh_token"],
       guangya_device_id: ["targets", "guangya", "device_id"],
       local_target_root: ["targets", "localfs", "root"],
+      webdav_target_url: ["targets", "webdav", "url"],
+      webdav_target_username: ["targets", "webdav", "username"],
+      webdav_target_password: ["targets", "webdav", "password"],
       delete_removed: ["sync", "delete_removed"],
       target_delete_removed: ["sync", "target_delete_removed"],
       openlist_page_size: ["sync", "openlist_page_size"],
@@ -986,6 +1001,9 @@
         "label.guangya_refresh_token": "光鸭 Refresh Token",
         "label.guangya_authorization": "光鸭 Authorization",
         "label.local_target_root": "本地目标根目录",
+        "label.webdav_target_url": "WebDAV 目标地址",
+        "label.webdav_target_username": "WebDAV 用户名",
+        "label.webdav_target_password": "WebDAV 密码",
         "desc.source_browser": "页面进入时会优先按配置里的 source_path 恢复当前浏览目录；如果该目录读取失败，再回退到挂载根目录。",
         "desc.source_analyze": "开始真正同步前，先做一次源目录分析。这里会统计当前目录中有多少文件带 MD5、多少文件带 GCID、各 provider 占比，以及抽样展示前几条源文件元数据。",
         "desc.leaf_mode": "适合防风控慢跑。可以直接边扫边同步，也可以先把叶子目录加入队列后分批执行。",
@@ -1119,6 +1137,9 @@
         "label.guangya_refresh_token": "Guangya Refresh Token",
         "label.guangya_authorization": "Guangya Authorization",
         "label.local_target_root": "Local Target Root",
+        "label.webdav_target_url": "WebDAV Target URL",
+        "label.webdav_target_username": "WebDAV Username",
+        "label.webdav_target_password": "WebDAV Password",
         "desc.source_browser": "On load, the page restores the browser to source_path first. If that path fails, it falls back to the mount root.",
         "desc.source_analyze": "Before starting a real sync, run a source analysis first. It counts how many files have MD5, how many have GCID, shows provider distribution, and previews the first few source file metadata rows.",
         "desc.leaf_mode": "Best for throttled syncing. You can sync while scanning, or queue leaf directories first.",
