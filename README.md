@@ -794,6 +794,12 @@ cloudpan-bridge sync --config .work/openlist-config.json --no-download-upload
 
 ### Docker
 
+如果你只想最快跑起来，建议优先顺序是：
+
+1. 本机 Python 直接运行
+2. `docker compose up -d --build`
+3. 再按需接入远程 OpenList / 托管 OpenList
+
 构建镜像：
 
 ```powershell
@@ -863,6 +869,18 @@ docker compose restart cloudpan-bridge
 
 也就是说，Docker 版本当前更偏“服务端运行版”，而不是“桌面浏览器抓取版”。
 
+如果你希望直接拉现成镜像，也可以使用 GitHub Container Registry：
+
+```powershell
+docker pull ghcr.io/wangzhilin777/cloudpan-bridge:latest
+docker run --rm -p 8765:8765 ^
+  -v ${PWD}/.work:/app/.work ^
+  -v ${PWD}/.state:/app/.state ^
+  -v ${PWD}/.runtime:/app/.runtime ^
+  -v ${PWD}/.exports:/app/.exports ^
+  ghcr.io/wangzhilin777/cloudpan-bridge:latest
+```
+
 ### OpenList 模式说明
 
 当前页面里的 OpenList 模式已经按真实用途拆成：
@@ -897,7 +915,7 @@ docker info
 
 若这两条都通过，说明本机 Docker 环境至少已可用；当前项目会在 `managed_docker` 模式下复用本机 Docker 来创建和启动 OpenList 容器。
 
-### GitHub 自动打包
+### GitHub 自动打包与镜像发布
 
 仓库已补：
 
@@ -905,7 +923,7 @@ docker info
 - `docker-compose.yml`
 - `.github/workflows/build.yml`
 
-当前 GitHub Actions 行为：
+当前 GitHub Actions 触发条件：
 
 - push 到 `main`
 - push `v*` tag
@@ -918,14 +936,35 @@ docker info
 - `pytest -q`
 - 构建 Python 包
 - 上传 Python 包产物
+- 构建 Docker 镜像
+- 在非 PR 场景登录 GHCR
+- 推送 `ghcr.io/wangzhilin777/cloudpan-bridge`
 
-当前默认不再自动做这些动作：
+当前镜像发布策略：
 
-- 自动构建 Docker 镜像
-- 自动上传 Docker 镜像 tar 产物
-- 自动推送 `ghcr.io/<你的仓库路径>`
+- `pull_request`
+  - 只做构建校验，不推镜像
+- `push main`
+  - 推送 `latest`、`main`、`sha-*`
+- `push v* tag`
+  - 推送对应 tag、`sha-*`
 
-如果后面你要恢复正式 release 流程，可以再单独补回镜像发布 workflow，而不是默认在每次 push 时触发。
+如果你后面想切到 Docker Hub 或私有 Registry，只需要改 `.github/workflows/build.yml` 里的登录目标和 `images` 配置即可。
+
+### 当前能力边界
+
+这版项目的对外说法建议按下面理解：
+
+- OpenList 主要负责源端接入、挂载、目录浏览、部分登录态抓取和源文件指纹补齐
+- Guangya 仍然是当前元数据秒传能力最完整的正式目标端
+- 其它目标端已经支持统一任务配置、普通上传/覆盖、能力提示和诚实降级
+- “所有网盘之间都已实现真正跨盘秒传” 这件事当前不能宣传为已完成
+
+也就是说，当前最稳妥的使用方式依然是：
+
+1. 先用 OpenList 接入源网盘
+2. 优先走能直接命中的秒传/快传能力
+3. 命不中时再按配置回落到普通上传或下载补传
 
 ## 状态与续跑
 
