@@ -1182,15 +1182,29 @@ def test_source_enrichment_reads_nested_content_hash_from_provider_specific(tmp_
         provider_specific={
             "metadata": "{\"content_hash\":\"sha1:abcdef0123456789abcdef0123456789abcdef01\"}"
         },
-        raw_hash_info={
-            "metadata": {
-                "content_hash": "sha1:abcdef0123456789abcdef0123456789abcdef01",
-            }
-        },
     )
     enriched, report = enrich_entry(entry, AppConfig.load(path))
     assert enriched.sha1 == "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
     assert "sha1" in report["candidate_hashes"]
+
+
+def test_source_enrichment_reads_stringified_nested_hash_info_payloads(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/stringified-quark.bin",
+        md5="",
+        size=10,
+        provider="Quark",
+        provider_specific={
+            "metadata": "{\"hash_info\":{\"sha1\":\"abcdef0123456789abcdef0123456789abcdef01\",\"slice_md5\":\"abcdef0123456789abcdef0123456789\"}}"
+        },
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.sha1 == "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+    assert enriched.slice_md5 == "ABCDEF0123456789ABCDEF0123456789"
+    assert "sha1" in report["candidate_hashes"]
+    assert "slice_md5" in report["candidate_hashes"]
 
 
 def test_source_enrichment_runtime_reports_bridge_status_for_aliyundriveopen(tmp_path: Path) -> None:

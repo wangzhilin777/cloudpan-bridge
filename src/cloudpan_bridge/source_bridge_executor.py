@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Callable
 
@@ -44,10 +45,28 @@ def _collect_nested_payloads(value: Any, *, depth: int = 0) -> list[dict[str, An
             elif isinstance(item, list) and key_lower in NESTED_HASH_CONTAINER_KEYS:
                 for child in item:
                     payloads.extend(_collect_nested_payloads(child, depth=depth + 1))
+            elif isinstance(item, str) and (key_lower in NESTED_HASH_CONTAINER_KEYS or depth == 0):
+                payloads.extend(_collect_nested_payloads(_try_parse_json(item), depth=depth + 1))
     elif isinstance(value, list):
         for item in value:
             payloads.extend(_collect_nested_payloads(item, depth=depth + 1))
+    elif isinstance(value, str):
+        parsed = _try_parse_json(value)
+        if parsed is not None and parsed is not value:
+            payloads.extend(_collect_nested_payloads(parsed, depth=depth + 1))
     return payloads
+
+
+def _try_parse_json(value: Any) -> Any:
+    text = str(value or "").strip()
+    if len(text) < 2:
+        return value
+    if not ((text.startswith("{") and text.endswith("}")) or (text.startswith("[") and text.endswith("]"))):
+        return value
+    try:
+        return json.loads(text)
+    except Exception:
+        return value
 
 
 def _dedupe_payloads(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
