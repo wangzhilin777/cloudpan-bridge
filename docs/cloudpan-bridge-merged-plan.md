@@ -58,6 +58,14 @@
 - [x] 前端源端摘要与能力面板显示后端 `sourceMappingContext`，前后端对当前 effective driver 的认知保持一致
 - [x] 将 mapping 结果进一步写回更多矩阵展示与实际同步执行链路
 
+### 里程碑 7：Target Provider 统一预检能力（起步）
+
+- [x] `target_adapter.py` 正式补齐 `preflight_capability()` 能力声明入口，目标端不再只有“能否创建 adapter”
+- [x] `/api/target/preflight` 接入真实 adapter 预检结果，返回 `configured / missing_fields / fast_upload_hashes / fallback_modes / write_mode`
+- [x] Guangya / OpenList / WebDAV / S3 / Seafile / SMB / FTP / SFTP / Azure Blob 的目标端能力说明统一下沉到 adapter 层
+- [x] 前端目标端预检面板显示真实运行前能力与缺失配置，而不是只显示 implemented/selectable
+- [x] 相关回归通过：`python -m compileall src tests`、`node --check src/cloudpan_bridge/web/assets/app.js`、`pytest -q tests/test_sync_logic.py -x`
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

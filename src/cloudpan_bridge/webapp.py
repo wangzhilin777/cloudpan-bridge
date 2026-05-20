@@ -39,7 +39,7 @@ from .provider_registry import (
     render_driver_coverage_audit_markdown,
     render_driver_coverage_scaffold_markdown,
 )
-from .target_adapter import supported_target_keys
+from .target_adapter import build_target_preflight_capability, supported_target_keys
 from .syncer import (
     SyncRunner,
     build_source_miaochuan_payload,
@@ -270,8 +270,14 @@ def create_app(config_path: Path) -> FastAPI:
         known_profile = normalized in target_profiles
         implemented = normalized in implemented_targets
         selectable = known_profile and implemented
+        state = load_state(config.state_file)
+        adapter_capability = build_target_preflight_capability(config, state, normalized)
         if selectable:
-            message = "当前目标端已实现，可继续执行同步任务。"
+            if adapter_capability.get("configured"):
+                message = "当前目标端已实现且已补齐基础配置，可继续执行同步任务。"
+            else:
+                missing_text = ", ".join(list(adapter_capability.get("missing_fields") or [])) or "配置项"
+                message = f"当前目标端已实现，但仍缺少配置：{missing_text}"
         elif known_profile:
             message = f"目标端 {normalized} 目前只有档案定义，还没有实现可写入适配器。"
         else:
@@ -281,6 +287,9 @@ def create_app(config_path: Path) -> FastAPI:
             "known_profile": known_profile,
             "implemented": implemented,
             "selectable": selectable,
+            "configured": bool(adapter_capability.get("configured")) if implemented else False,
+            "missing_fields": list(adapter_capability.get("missing_fields") or []),
+            "adapter_capability": adapter_capability,
             "message": message,
         }
 

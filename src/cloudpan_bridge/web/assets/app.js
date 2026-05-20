@@ -413,8 +413,14 @@
         const payload = await call(`/api/target/preflight?target=${encodeURIComponent(activeTargetKey())}`);
         const implemented = payload?.implemented ? "true" : "false";
         const selectable = payload?.selectable ? "true" : "false";
+        const configured = payload?.configured ? "true" : "false";
+        const capability = payload?.adapter_capability || {};
+        const missingFields = Array.isArray(payload?.missing_fields) ? payload.missing_fields : [];
         root.innerHTML = `
-          <div class="mono">target=${escapeHtml(payload?.target_key || "-")} | implemented=${implemented} | selectable=${selectable}</div>
+          <div class="mono">target=${escapeHtml(payload?.target_key || "-")} | implemented=${implemented} | selectable=${selectable} | configured=${configured}</div>
+          <div class="mono">fast_upload=${capability?.supports_fast_upload ? "true" : "false"} | hashes=${escapeHtml((capability?.fast_upload_hashes || []).join(", ") || "-")} | fallback=${escapeHtml((capability?.fallback_modes || []).join(", ") || "-")}</div>
+          <div class="mono">write_mode=${escapeHtml(capability?.write_mode || "-")} | auto_create_dir=${capability?.auto_create_dir ? "true" : "false"} | supports_delete=${capability?.supports_delete ? "true" : "false"}</div>
+          <div class="mono">missing=${escapeHtml(missingFields.join(", ") || "-")}</div>
           <div>${escapeHtml(payload?.message || "")}</div>
         `;
       } catch (error) {

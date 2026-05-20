@@ -1840,6 +1840,10 @@ def test_target_preflight_endpoint_reports_supported_target(tmp_path: Path) -> N
     assert payload["known_profile"] is True
     assert payload["implemented"] is True
     assert payload["selectable"] is True
+    assert payload["configured"] is False
+    assert payload["adapter_capability"]["supports_fast_upload"] is True
+    assert payload["adapter_capability"]["fast_upload_hashes"] == ["md5", "gcid"]
+    assert "access_token_or_refresh_token" in payload["missing_fields"]
 
 
 def test_target_preflight_endpoint_reports_openlist_target(tmp_path: Path) -> None:
@@ -1869,6 +1873,9 @@ def test_target_preflight_endpoint_reports_openlist_target(tmp_path: Path) -> No
     assert payload["known_profile"] is True
     assert payload["implemented"] is True
     assert payload["selectable"] is True
+    assert payload["configured"] is True
+    assert payload["adapter_capability"]["supports_fast_upload"] is False
+    assert payload["adapter_capability"]["write_mode"] == "upload_overwrite"
 
 
 def test_target_preflight_endpoint_reports_webdav_target(tmp_path: Path) -> None:
@@ -1898,6 +1905,8 @@ def test_target_preflight_endpoint_reports_webdav_target(tmp_path: Path) -> None
     assert payload["known_profile"] is True
     assert payload["implemented"] is True
     assert payload["selectable"] is True
+    assert payload["configured"] is True
+    assert payload["adapter_capability"]["fallback_modes"] == ["download_upload", "stream_upload"]
 
 
 def test_target_preflight_endpoint_reports_ftp_target(tmp_path: Path) -> None:
@@ -1927,6 +1936,8 @@ def test_target_preflight_endpoint_reports_ftp_target(tmp_path: Path) -> None:
     assert payload["known_profile"] is True
     assert payload["implemented"] is True
     assert payload["selectable"] is True
+    assert payload["configured"] is True
+    assert payload["adapter_capability"]["write_mode"] == "stream_upload"
 
 
 def test_target_preflight_endpoint_rejects_unknown_target(tmp_path: Path) -> None:
@@ -1951,6 +1962,8 @@ def test_target_preflight_endpoint_rejects_unknown_target(tmp_path: Path) -> Non
     assert payload["known_profile"] is False
     assert payload["implemented"] is False
     assert payload["selectable"] is False
+    assert payload["configured"] is False
+    assert payload["adapter_capability"]["write_mode"] == "unavailable"
 
     sync_response = client.post("/api/sync/start", json={"mode": "dry_run"})
     assert sync_response.status_code == 400

@@ -14,11 +14,13 @@ from .openlist import OpenListClient
 from .models import DirectImportResult
 from .config import AppConfig
 from .models import SyncState
+from .provider_registry_data import TARGET_PROFILES
 
 
 class TargetAdapter(Protocol):
     def ensure_auth(self) -> None: ...
     def export_state(self) -> dict[str, str]: ...
+    def preflight_capability(self) -> dict[str, Any]: ...
     def close(self) -> None: ...
     def ensure_target_dir(self, path: str) -> str: ...
     def remove_target_path(self, path: str) -> bool: ...
@@ -26,6 +28,35 @@ class TargetAdapter(Protocol):
     def try_fast_upload(self, file_name: str, file_size: int, parent_id: str, md5_hex: str = "", gcid: str = "") -> DirectImportResult: ...
     def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, Any]: ...
     def verify_local_md5(self, local_path: Path, md5_hex: str) -> None: ...
+
+
+def _build_target_capability(
+    target_key: str,
+    *,
+    configured: bool,
+    missing_fields: list[str] | None = None,
+    message: str = "",
+    write_mode: str = "upload_overwrite",
+    auth_state_fields: list[str] | None = None,
+) -> dict[str, Any]:
+    profile = dict(TARGET_PROFILES.get(target_key, {}) or {})
+    fast_upload_hashes = list(profile.get("fast_upload_hashes") or [])
+    fallback_modes = list(profile.get("fallback_modes") or [])
+    supports_fast_upload = bool(fast_upload_hashes)
+    return {
+        "target_key": target_key,
+        "configured": configured,
+        "missing_fields": list(missing_fields or []),
+        "supports_fast_upload": supports_fast_upload,
+        "fast_upload_hashes": fast_upload_hashes,
+        "fallback_modes": fallback_modes,
+        "supports_delete": True,
+        "auto_create_dir": bool(profile.get("auto_create_dir", True)),
+        "auth_mode": str(profile.get("auth_mode") or ""),
+        "write_mode": write_mode,
+        "auth_state_fields": list(auth_state_fields or []),
+        "message": message,
+    }
 
 
 class GuangyaTargetAdapter:
@@ -48,6 +79,18 @@ class GuangyaTargetAdapter:
 
     def export_state(self) -> dict[str, str]:
         return self.service.export_tokens()
+
+    def preflight_capability(self) -> dict[str, Any]:
+        configured = bool(self.service.client.token or self.service.client.refresh_token_value)
+        missing_fields = [] if configured else ["access_token_or_refresh_token"]
+        return _build_target_capability(
+            "guangya",
+            configured=configured,
+            missing_fields=missing_fields,
+            message="Guangya 目标端支持元数据秒传，未命中时可降级补传。" if configured else "请先提供 Guangya 登录态后再执行同步。",
+            write_mode="metadata_import",
+            auth_state_fields=["access_token", "refresh_token", "device_id"],
+        )
 
     def close(self) -> None:
         self.service.close()
@@ -116,6 +159,22 @@ class OpenListTargetAdapter:
     def export_state(self) -> dict[str, str]:
         return {"token": self.client.token}
 
+    def preflight_capability(self) -> dict[str, Any]:
+        configured = bool(self.client.base_url and (self.client.token or self.client.username))
+        missing_fields: list[str] = []
+        if not self.client.base_url:
+            missing_fields.append("openlist_url")
+        if not (self.client.token or self.client.username):
+            missing_fields.append("openlist_token_or_username")
+        return _build_target_capability(
+            "openlist",
+            configured=configured,
+            missing_fields=missing_fields,
+            message="OpenList 目标端当前只支持普通上传/覆盖，不支持跨盘元数据秒传。" if configured else "请先补齐 OpenList 目标端连接信息。",
+            write_mode="upload_overwrite",
+            auth_state_fields=["token"],
+        )
+
     def close(self) -> None:
         self.client.close()
 
@@ -161,6 +220,17 @@ class LocalFsTargetAdapter:
 
     def export_state(self) -> dict[str, str]:
         return {"root": str(self.root_dir)}
+
+    def preflight_capability(self) -> dict[str, Any]:
+        configured = bool(str(self.root_dir))
+        return _build_target_capability(
+            "localfs",
+            configured=configured,
+            missing_fields=[] if configured else ["local_target_root"],
+            message="本地文件系统目标端使用复制覆盖写入，不支持元数据秒传。" if configured else "请先配置本地目标目录。",
+            write_mode="local_copy",
+            auth_state_fields=["root"],
+        )
 
     def close(self) -> None:
         return None
@@ -253,6 +323,17 @@ class WebDavTargetAdapter:
             "url": self.base_url,
             "username": self.username,
         }
+
+    def preflight_capability(self) -> dict[str, Any]:
+        configured = bool(self.base_url)
+        return _build_target_capability(
+            "webdav",
+            configured=configured,
+            missing_fields=[] if configured else ["webdav_target_url"],
+            message="WebDAV 目标端支持普通上传/覆盖与自动建目录，不支持元数据秒传。" if configured else "请先配置 WebDAV URL。",
+            write_mode="stream_upload",
+            auth_state_fields=["url", "username"],
+        )
 
     def close(self) -> None:
         self.client.close()
@@ -399,6 +480,22 @@ class S3TargetAdapter:
             "region": self.region,
         }
 
+    def preflight_capability(self) -> dict[str, Any]:
+        missing_fields: list[str] = []
+        if not self.endpoint:
+            missing_fields.append("s3_target_endpoint")
+        if not self.bucket:
+            missing_fields.append("s3_target_bucket")
+        configured = not missing_fields
+        return _build_target_capability(
+            "s3",
+            configured=configured,
+            missing_fields=missing_fields,
+            message="S3 目标端支持普通上传/覆盖，不支持元数据秒传。" if configured else "请先补齐 S3 endpoint 与 bucket。",
+            write_mode="stream_upload",
+            auth_state_fields=["endpoint", "bucket", "prefix", "region"],
+        )
+
     def close(self) -> None:
         client = self.client
         if client is not None and hasattr(client, "close"):
@@ -520,6 +617,22 @@ class SeafileTargetAdapter:
             "repo_name": self.repo_name,
             "username": self.username,
         }
+
+    def preflight_capability(self) -> dict[str, Any]:
+        configured = bool(self.base_url and (self.token or self.username))
+        missing_fields: list[str] = []
+        if not self.base_url:
+            missing_fields.append("seafile_target_url")
+        if not (self.token or self.username):
+            missing_fields.append("seafile_target_token_or_username")
+        return _build_target_capability(
+            "seafile",
+            configured=configured,
+            missing_fields=missing_fields,
+            message="Seafile 目标端支持普通上传/覆盖与自动建目录，不支持元数据秒传。" if configured else "请先补齐 Seafile 连接信息。",
+            write_mode="stream_upload",
+            auth_state_fields=["url", "token", "repo_id", "repo_name", "username"],
+        )
 
     def close(self) -> None:
         try:
@@ -726,6 +839,22 @@ class SmbTargetAdapter:
             "username": self.username,
         }
 
+    def preflight_capability(self) -> dict[str, Any]:
+        configured = bool(self.host and self.share)
+        missing_fields: list[str] = []
+        if not self.host:
+            missing_fields.append("smb_target_url")
+        if not self.share:
+            missing_fields.append("smb_share")
+        return _build_target_capability(
+            "smb",
+            configured=configured,
+            missing_fields=missing_fields,
+            message="SMB 目标端支持普通上传/覆盖，不支持元数据秒传。" if configured else "请先补齐 SMB URL 与共享名。",
+            write_mode="stream_upload",
+            auth_state_fields=["url", "username"],
+        )
+
     def close(self) -> None:
         return None
 
@@ -857,6 +986,22 @@ class AzureBlobTargetAdapter:
             "account_name": self.account_name,
         }
 
+    def preflight_capability(self) -> dict[str, Any]:
+        missing_fields: list[str] = []
+        if not self.account_url:
+            missing_fields.append("azureblob_target_account_url")
+        if not self.container:
+            missing_fields.append("azureblob_target_container")
+        configured = not missing_fields
+        return _build_target_capability(
+            "azureblob",
+            configured=configured,
+            missing_fields=missing_fields,
+            message="Azure Blob 目标端支持普通上传/覆盖，不支持元数据秒传。" if configured else "请先补齐 Azure Blob account_url 与 container。",
+            write_mode="stream_upload",
+            auth_state_fields=["account_url", "container", "prefix", "account_name"],
+        )
+
     def close(self) -> None:
         self.container_client = None
         self.service_client = None
@@ -960,6 +1105,17 @@ class FtpTargetAdapter:
             "url": self.base_url,
             "username": self.username,
         }
+
+    def preflight_capability(self) -> dict[str, Any]:
+        configured = bool(self.host)
+        return _build_target_capability(
+            "ftp",
+            configured=configured,
+            missing_fields=[] if configured else ["ftp_target_url"],
+            message="FTP 目标端支持普通上传/覆盖，不支持元数据秒传。" if configured else "请先配置 FTP URL。",
+            write_mode="stream_upload",
+            auth_state_fields=["url", "username"],
+        )
 
     def close(self) -> None:
         if self.ftp is None:
@@ -1095,6 +1251,17 @@ class SftpTargetAdapter:
             "username": self.username,
         }
 
+    def preflight_capability(self) -> dict[str, Any]:
+        configured = bool(self.host)
+        return _build_target_capability(
+            "sftp",
+            configured=configured,
+            missing_fields=[] if configured else ["sftp_target_url"],
+            message="SFTP 目标端支持普通上传/覆盖，不支持元数据秒传。" if configured else "请先配置 SFTP URL。",
+            write_mode="stream_upload",
+            auth_state_fields=["url", "username"],
+        )
+
     def close(self) -> None:
         if self.sftp is not None:
             try:
@@ -1186,6 +1353,31 @@ class SftpTargetAdapter:
 
 def supported_target_keys() -> list[str]:
     return ["guangya", "openlist", "localfs", "webdav", "s3", "seafile", "azureblob", "ftp", "sftp", "smb"]
+
+
+def build_target_preflight_capability(config: AppConfig, state: SyncState, target_key: str = "") -> dict[str, Any]:
+    normalized = str(target_key or config.target_key or "guangya").strip().lower() or "guangya"
+    if normalized not in supported_target_keys():
+        profile = dict(TARGET_PROFILES.get(normalized, {}) or {})
+        return {
+            "target_key": normalized,
+            "configured": False,
+            "missing_fields": [],
+            "supports_fast_upload": bool(profile.get("fast_upload_hashes")),
+            "fast_upload_hashes": list(profile.get("fast_upload_hashes") or []),
+            "fallback_modes": list(profile.get("fallback_modes") or []),
+            "supports_delete": False,
+            "auto_create_dir": bool(profile.get("auto_create_dir", False)),
+            "auth_mode": str(profile.get("auth_mode") or ""),
+            "write_mode": "unavailable",
+            "auth_state_fields": [],
+            "message": f"目标端 {normalized} 当前还没有可执行适配器。",
+        }
+    adapter = create_target_adapter(config, state, normalized)
+    try:
+        return adapter.preflight_capability()
+    finally:
+        adapter.close()
 
 
 def create_target_adapter(config: AppConfig, state: SyncState, target_key: str = "") -> TargetAdapter:
