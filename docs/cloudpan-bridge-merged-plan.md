@@ -30,11 +30,12 @@
 ### 里程碑 3：前端入口拆分与主流程重排（进行中）
 
 - [x] `index.html` 拆为入口壳 + `assets/app.css` + `assets/app.js`
+- [x] 再将 `app.js` 内的大型静态字典拆为 `assets/app.data.js`
 - [x] 补齐 `/assets/*` 静态资源路由，入口页与拆分资源可独立请求
 - [x] 当前标签页顺序重排为“总览 / 连接 / 源端 / 目标端 / 任务执行 / 补传 / 快传能力 / 能力与关于”
 - [x] `source_path / target_key / target_path` 收拢到“任务执行”主区域
 - [ ] Source / Target / Task 的文案、状态摘要和能力面板继续细化
-- [x] 本地验证通过：`/`、`/assets/app.css`、`/assets/app.js` 请求 200，`pytest -q` 通过
+- [x] 本地验证通过：`/`、`/assets/app.css`、`/assets/app.js`、`/assets/app.data.js` 请求 200，`node --check` 通过，`pytest -q` 通过
 
 ### 里程碑 4：超大 Python 文件拆分（进行中）
 
