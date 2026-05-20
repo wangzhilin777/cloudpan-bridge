@@ -791,6 +791,8 @@ def test_build_source_runtime_status_exposes_provider_runtime_shape(tmp_path: Pa
     assert runtime["auth_state"]["username"] == "admin"
     assert runtime["auth_state"]["has_token"] is True
     assert runtime["direct_provider_candidate"] is True
+    assert runtime["source_enrichment"]["provider_key"] == "quark"
+    assert runtime["source_enrichment"]["capture_ready"] is False
 
 
 def test_source_provider_resolution_prefers_direct_candidate_but_falls_back_honestly(tmp_path: Path) -> None:
@@ -832,6 +834,8 @@ def test_source_provider_resolution_prefers_direct_candidate_but_falls_back_hone
     assert resolution["requested_provider_preference"] == "direct_preferred"
     assert resolution["direct_provider_candidate"] is True
     assert resolution["direct_provider_ready"] is True
+    assert resolution["source_enrichment"]["provider_key"] == "quark"
+    assert resolution["source_enrichment"]["capture_ready"] is True
     assert resolution["selected_source_mode"] == "direct_provider_bridge_pending"
     assert resolution["selected_provider_key"] == "quark"
     assert "回退 OpenList" in resolution["fallback_reason"]

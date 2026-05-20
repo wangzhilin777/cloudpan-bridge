@@ -1,5 +1,16 @@
 # CloudPan Bridge 主流网盘互传与秒传优先总计划（首批主流版）
 
+## 当前进度
+
+- [x] 建立 `source_enrich.py` 与 `transfer_planner.py` 的主骨架
+- [x] 把补指纹运行态、传输预览接入 `/api/source/analyze`、`/api/source/miaochuan_preview`、能力矩阵摘要
+- [x] 为首批主流源端建立差异化补指纹规则表，避免把所有 provider 的 `etag` 都误判成 `md5`
+- [x] 把补指纹运行态与目标能力摘要接入 `/api/status` 和任务摘要区
+- [x] 拆出前端工作流摘要脚本 `app.workflow.js`，降低 `app.js` 耦合
+- [ ] 深化首批主流源端的直连补指纹桥接实现
+- [ ] 继续拆分前端与过大的 Python/JS 文件，尽量压到单文件 100 KB 以内
+- [ ] 完成更多主流 provider 的互传能力验证与 UI 诚实提示收口
+
 ## 摘要
 
 这版计划只聚焦首批主流网盘，范围固定为：
