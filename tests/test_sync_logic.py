@@ -843,7 +843,7 @@ def test_source_provider_resolution_prefers_direct_candidate_but_falls_back_hone
     assert resolution["source_enrichment"]["capture_ready"] is True
     assert resolution["bridge_preparation"]["transport_hint"] == "cookie_snapshot"
     assert resolution["bridge_preparation"]["selected_field_names"] == ["cookie_header"]
-    assert resolution["selected_source_mode"] == "direct_provider_bridge_pending"
+    assert resolution["selected_source_mode"] == "direct_provider_bridge_ready"
     assert resolution["selected_provider_key"] == "quark"
     assert "回退 OpenList" in resolution["fallback_reason"]
 
@@ -883,7 +883,7 @@ def test_create_source_provider_runtime_context_includes_resolution(tmp_path: Pa
     )
     provider = create_source_provider(AppConfig.load(path))
     runtime = provider.get_runtime_context()
-    assert runtime["selected_source_mode"] == "direct_provider_bridge_pending"
+    assert runtime["selected_source_mode"] == "direct_provider_bridge_ready"
     assert runtime["selected_provider_key"] == "quark"
     assert runtime["execution_provider_class"] == "OpenListSourceProvider"
     assert "回退 OpenList" in runtime["fallback_reason"]

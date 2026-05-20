@@ -88,6 +88,7 @@ def build_source_provider_resolution(
     )
     bridge_runtime = dict(source_enrichment.get("bridge_runtime") or {})
     bridge_preparation = dict(bridge_runtime.get("preparation") or {})
+    bridge_status = str(bridge_runtime.get("status") or "")
     selected_source_mode = "openlist_mount"
     selected_provider_key = "openlist"
     fallback_reason = ""
@@ -96,19 +97,27 @@ def build_source_provider_resolution(
         selection_reason = "已显式指定只使用 OpenList 挂载源。"
     elif preference == "direct_preferred":
         if direct_provider_ready:
-            selected_source_mode = "direct_provider_bridge_pending"
+            selected_source_mode = "direct_provider_bridge_ready" if bridge_status == "bridge_ready" else "direct_provider_bridge_pending"
             selected_provider_key = provider_key or "openlist"
-            fallback_reason = "当前已识别到直连 provider 候选与可用补指纹运行态，但真实直连 source provider 仍待后续实现，暂回退 OpenList 执行。"
-            selection_reason = "已优先尝试直连 source provider 路径，但当前版本仍会保守回退到 OpenList。"
+            if bridge_status == "bridge_ready":
+                fallback_reason = "当前已识别到直连 provider 候选，且会话桥接补指纹已 ready；当前版本仍未接入真实 source provider 传输链路，暂回退 OpenList 执行。"
+                selection_reason = "已优先命中可用的会话桥接补指纹路径，但当前版本仍会保守回退到 OpenList。"
+            else:
+                fallback_reason = "当前已识别到直连 provider 候选与可用补指纹运行态，但真实直连 source provider 仍待后续实现，暂回退 OpenList 执行。"
+                selection_reason = "已优先尝试直连 source provider 路径，但当前版本仍会保守回退到 OpenList。"
         elif direct_candidate:
             fallback_reason = "当前已识别到直连 provider 候选，但补指纹运行态尚未 ready，暂回退 OpenList 执行。"
             selection_reason = "已配置为优先直连 source provider，但当前尚未满足直连执行条件。"
     elif preference == "auto":
         if direct_provider_ready:
-            selected_source_mode = "openlist_with_direct_candidate"
+            selected_source_mode = "openlist_with_bridge_ready_candidate" if bridge_status == "bridge_ready" else "openlist_with_direct_candidate"
             selected_provider_key = provider_key or "openlist"
-            fallback_reason = "当前 source provider 具备直连候选与可用补指纹运行态，但尚未接入真实直连实现，先保守走 OpenList。"
-            selection_reason = "自动模式已检测到可用直连候选，后续可继续提升到真实直连执行。"
+            if bridge_status == "bridge_ready":
+                fallback_reason = "当前 source provider 的会话桥接补指纹已 ready，但尚未接入真实直连传输实现，先保守走 OpenList。"
+                selection_reason = "自动模式已检测到可用会话桥接补指纹候选，后续可继续提升到真实直连执行。"
+            else:
+                fallback_reason = "当前 source provider 具备直连候选与可用补指纹运行态，但尚未接入真实直连实现，先保守走 OpenList。"
+                selection_reason = "自动模式已检测到可用直连候选，后续可继续提升到真实直连执行。"
     return {
         "requested_provider_preference": preference,
         "selected_source_mode": selected_source_mode,
