@@ -90,6 +90,14 @@
 - [x] 前端源分析摘要面板已显示目录级秒传等级、分桶与中英文解释
 - [x] 相关回归通过：`python -m compileall src tests`、`node --check src/cloudpan_bridge/web/assets/app.js`、`pytest -q tests/test_sync_logic.py -x`
 
+### 里程碑 11：执行期补指纹第一层闭环（起步）
+
+- [x] `OpenListClient` / `OpenListSourceProvider` 已补齐单文件指纹读取入口，支持按文件路径回查当前目录下的真实元数据
+- [x] `SyncRunner` 在执行元数据秒传前，若首轮扫描缺少 `MD5/GCID`，会先调用 `get_file_fingerprints()` 尝试补指纹
+- [x] 补指纹成功后会直接复用刷新后的 `SourceEntry` 继续秒传，并将增强后的指纹写回同步状态
+- [x] 补指纹后仍缺少秒传指纹时，会明确记录日志并以“未命中秒传库存”进入待补传，而不是继续沿用“新增文件/源文件已修改”这类计划原因
+- [x] 相关回归通过：`python -m compileall src tests`、`pytest -q tests/test_sync_logic.py -k "enriches_missing_fast_upload_fingerprint_before_direct_sync or enrichment_still_lacks_fast_upload_fingerprint"`、`pytest -q tests/test_sync_logic.py -x`
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

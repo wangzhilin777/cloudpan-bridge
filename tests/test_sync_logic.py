@@ -28,6 +28,7 @@ from cloudpan_bridge.syncer import (
     SyncRunner,
     build_plan,
     build_source_miaochuan_payload,
+    load_state,
     relative_target_path,
     render_tree,
     serialize_source_entry,
@@ -712,6 +713,216 @@ def test_sync_runner_uses_source_provider_factory(tmp_path: Path, monkeypatch: p
     runner.source.close()
     item = build_plan([SourceEntry(path="/src/a.txt", md5="ABC", size=5 * 1024 * 1024, last_op_time="1")], SyncState())[0][0]
     assert runner._should_auto_download(item) is True
+
+
+def test_sync_runner_enriches_missing_fast_upload_fingerprint_before_direct_sync(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "config.json"
+    state_path = tmp_path / "state.json"
+    export_path = tmp_path / "export.jsonl"
+    temp_dir = tmp_path / "tmp"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst",
+                    "auto_download_threshold_mb": 0,
+                },
+                "state": {
+                    "state_file": str(state_path),
+                    "export_file": str(export_path),
+                    "temp_dir": str(temp_dir),
+                },
+                "targets": {
+                    "active_target": "guangya"
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    captured: dict[str, object] = {"fingerprint_paths": []}
+
+    class FakeSourceProvider:
+        def ensure_auth(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+        def list_roots(self) -> list[str]:
+            return ["/"]
+
+        def list_dir(self, path: str) -> dict[str, object]:
+            return {"path": path, "directories": []}
+
+        def walk_tree(self, source_root: str) -> list[SourceEntry]:
+            return [SourceEntry(path="/src/a.bin", md5="", size=123, last_op_time="1", provider="quark", sha256="A" * 64)]
+
+        def walk_leaf_dirs(self, root_path: str):
+            if False:
+                yield root_path
+            return
+
+        def get_file_fingerprints(self, path: str) -> list[SourceEntry]:
+            cast_list = captured["fingerprint_paths"]
+            assert isinstance(cast_list, list)
+            cast_list.append(path)
+            return [SourceEntry(path="/src/a.bin", md5="ABCDEF0123456789ABCDEF0123456789", size=123, last_op_time="1", provider="quark")]
+
+        def download_stream(self, source_path: str, temp_dir: Path) -> Path:
+            raise AssertionError("download_stream should not be called when enrichment unlocks direct sync")
+
+        def get_auth_state(self) -> dict[str, str]:
+            return {"token": "demo"}
+
+        def get_provider_key(self) -> str:
+            return "openlist"
+
+    class FakeTarget:
+        def ensure_auth(self) -> None:
+            return None
+
+        def export_state(self) -> dict[str, str]:
+            return {}
+
+        def close(self) -> None:
+            return None
+
+        def ensure_target_dir(self, path: str) -> str:
+            return "parent-id"
+
+        def delete_if_exists(self, parent_id: str, name: str) -> bool:
+            return False
+
+        def remove_target_path(self, path: str) -> bool:
+            return False
+
+        def try_fast_upload(self, file_name: str, file_size: int, parent_id: str, md5_hex: str = "", gcid: str = "") -> DirectImportResult:
+            captured["md5_hex"] = md5_hex
+            captured["gcid"] = gcid
+            return DirectImportResult(True, "mocked-import", used_hash="md5")
+
+        def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, object]:
+            raise AssertionError("upload_local_file should not be called when direct sync succeeds")
+
+        def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
+            return None
+
+    monkeypatch.setattr("cloudpan_bridge.syncer.create_source_provider", lambda config, on_progress=None: FakeSourceProvider())
+    monkeypatch.setattr("cloudpan_bridge.syncer.create_target_adapter", lambda config, state, target_key="": FakeTarget())
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    summary = runner.run_direct_phase()
+    assert summary.direct_success == 1
+    assert summary.downloaded_success == 0
+    assert summary.failed == 0
+    assert summary.pending_downloads == []
+    assert captured["fingerprint_paths"] == ["/src/a.bin"]
+    assert captured["md5_hex"] == "ABCDEF0123456789ABCDEF0123456789"
+    state = load_state(state_path)
+    assert state.files["/src/a.bin"].md5 == "ABCDEF0123456789ABCDEF0123456789"
+
+
+def test_sync_runner_marks_pending_when_enrichment_still_lacks_fast_upload_fingerprint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "config.json"
+    state_path = tmp_path / "state.json"
+    export_path = tmp_path / "export.jsonl"
+    temp_dir = tmp_path / "tmp"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst",
+                    "auto_download_threshold_mb": 0,
+                },
+                "state": {
+                    "state_file": str(state_path),
+                    "export_file": str(export_path),
+                    "temp_dir": str(temp_dir),
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    class FakeSourceProvider:
+        def ensure_auth(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+        def list_roots(self) -> list[str]:
+            return ["/"]
+
+        def list_dir(self, path: str) -> dict[str, object]:
+            return {"path": path, "directories": []}
+
+        def walk_tree(self, source_root: str) -> list[SourceEntry]:
+            return [SourceEntry(path="/src/a.bin", md5="", size=123, last_op_time="1", provider="thunder", pickcode="pc-1")]
+
+        def walk_leaf_dirs(self, root_path: str):
+            if False:
+                yield root_path
+            return
+
+        def get_file_fingerprints(self, path: str) -> list[SourceEntry]:
+            return [SourceEntry(path="/src/a.bin", md5="", size=123, last_op_time="1", provider="thunder", pickcode="pc-1")]
+
+        def download_stream(self, source_path: str, temp_dir: Path) -> Path:
+            raise AssertionError("download_stream should not be called when threshold is disabled")
+
+        def get_auth_state(self) -> dict[str, str]:
+            return {"token": "demo"}
+
+        def get_provider_key(self) -> str:
+            return "openlist"
+
+    class FakeTarget:
+        def ensure_auth(self) -> None:
+            return None
+
+        def export_state(self) -> dict[str, str]:
+            return {}
+
+        def close(self) -> None:
+            return None
+
+        def ensure_target_dir(self, path: str) -> str:
+            return "parent-id"
+
+        def delete_if_exists(self, parent_id: str, name: str) -> bool:
+            return False
+
+        def remove_target_path(self, path: str) -> bool:
+            return False
+
+        def try_fast_upload(self, file_name: str, file_size: int, parent_id: str, md5_hex: str = "", gcid: str = "") -> DirectImportResult:
+            raise AssertionError("try_fast_upload should not be called without enriched fast-upload fingerprints")
+
+        def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, object]:
+            raise AssertionError("upload_local_file should not be called when threshold is disabled")
+
+        def verify_local_md5(self, local_path: Path, md5_hex: str) -> None:
+            return None
+
+    monkeypatch.setattr("cloudpan_bridge.syncer.create_source_provider", lambda config, on_progress=None: FakeSourceProvider())
+    monkeypatch.setattr("cloudpan_bridge.syncer.create_target_adapter", lambda config, state, target_key="": FakeTarget())
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    summary = runner.run_direct_phase()
+    assert summary.direct_success == 0
+    assert summary.pending_downloads == ["/src/a.bin"]
+    state = load_state(state_path)
+    assert state.pending_files["/src/a.bin"].pickcode == "pc-1"
+    assert state.pending_files["/src/a.bin"].reason == "未命中秒传库存"
 
 
 def test_auto_download_threshold_accepts_small_file_without_md5(tmp_path) -> None:

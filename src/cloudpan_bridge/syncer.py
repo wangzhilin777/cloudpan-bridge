@@ -256,6 +256,56 @@ class SyncRunner:
             return self.source.download_file(source_path, self.config.temp_dir)  # type: ignore[call-arg]
         raise RuntimeError("当前源端 provider 缺少 download_stream/download_file 接口。")
 
+    def _get_source_fingerprints(self, source_path: str) -> list[SourceEntry]:
+        if hasattr(self.source, "get_file_fingerprints"):
+            return list(self.source.get_file_fingerprints(source_path) or [])  # type: ignore[call-arg]
+        return []
+
+    @staticmethod
+    def _merge_source_entry(base: SourceEntry, refreshed: SourceEntry) -> SourceEntry:
+        def pick(current: str, incoming: str) -> str:
+            return incoming or current
+
+        return SourceEntry(
+            path=base.path,
+            md5=pick(base.md5, refreshed.md5),
+            size=refreshed.size or base.size,
+            last_op_time=pick(base.last_op_time, refreshed.last_op_time),
+            source_id=pick(base.source_id, refreshed.source_id),
+            provider=pick(base.provider, refreshed.provider),
+            hash_type=pick(base.hash_type, refreshed.hash_type),
+            gcid=pick(base.gcid, refreshed.gcid),
+            etag=pick(base.etag, refreshed.etag),
+            sha1=pick(base.sha1, refreshed.sha1),
+            sha256=pick(base.sha256, refreshed.sha256),
+            crc64=pick(base.crc64, refreshed.crc64),
+            pre_hash=pick(base.pre_hash, refreshed.pre_hash),
+            slice_md5=pick(base.slice_md5, refreshed.slice_md5),
+            pickcode=pick(base.pickcode, refreshed.pickcode),
+            content_hash=pick(base.content_hash, refreshed.content_hash),
+            extra_hashes={**dict(base.extra_hashes or {}), **dict(refreshed.extra_hashes or {})},
+            provider_specific={**dict(base.provider_specific or {}), **dict(refreshed.provider_specific or {})},
+            raw_hash_info={**dict(base.raw_hash_info or {}), **dict(refreshed.raw_hash_info or {})},
+        )
+
+    def _enrich_source_entry_for_fast_upload(self, entry: SourceEntry) -> SourceEntry:
+        if entry.has_fast_upload_fingerprint:
+            return entry
+        candidates = self._get_source_fingerprints(entry.path)
+        matched = next((item for item in candidates if item.path == entry.path), None)
+        if matched is None:
+            self.log(f"[补指纹未命中] {entry.path}: 源端没有返回匹配的单文件指纹。")
+            return entry
+        merged = self._merge_source_entry(entry, matched)
+        if merged.has_fast_upload_fingerprint and not entry.has_fast_upload_fingerprint:
+            self.log(
+                f"[补指纹成功] {entry.path}: "
+                f"MD5={'Y' if bool(merged.md5) else 'N'} GCID={'Y' if bool(merged.gcid) else 'N'}"
+            )
+            return merged
+        self.log(f"[补指纹后仍缺少秒传指纹] {entry.path}: 仍缺少 MD5/GCID。")
+        return merged
+
     def run(self, allow_download_upload: bool | None = None, dry_run: bool = False) -> SyncSummary:
         self.config.ensure_parent_dirs()
         state = load_state(self.config.state_file)
@@ -420,7 +470,7 @@ class SyncRunner:
                         self.log(f"[失败] {item.source.path}: {exc}")
                 else:
                     pending.append(item.source.path)
-                    self._record_pending(item, state)
+                    self._record_pending(item, state, reason="未命中秒传库存")
             summary.pending_downloads = pending
             self._prune_pending_for_source(self.config.source_path, keep_paths=set(pending), state=state)
             self._update_queue_item(
@@ -507,6 +557,7 @@ class SyncRunner:
         return relative_target_path(source_root_override or self.source_root_for_target, source_path, self.config.target_path)
 
     def _try_direct_metadata_sync(self, item: SyncPlanItem, target: TargetAdapter, state: SyncState) -> bool:
+        item.source = self._enrich_source_entry_for_fast_upload(item.source)
         if not item.source.has_fast_upload_fingerprint:
             self.log(f"[无秒传指纹] {item.source.path}: 缺少 MD5/GCID，改走降级路径。")
             return False

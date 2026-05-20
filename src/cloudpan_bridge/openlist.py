@@ -136,6 +136,15 @@ class OpenListClient:
         self._walk(source_root, entries)
         return entries
 
+    def get_file_fingerprints(self, source_path: str) -> list[SourceEntry]:
+        self.ensure_login()
+        normalized = self._normalize_dir(source_path)
+        parent_path = self._parent(normalized) or "/"
+        entries = self.list_entries(parent_path)
+        target_name = Path(normalized).name
+        matched = [item for item in entries if str(item.get("name") or "").strip() == target_name and not bool(item.get("is_dir"))]
+        return [self._build_source_entry(parent_path, item) for item in matched]
+
     def list_directories(self, path: str) -> dict[str, Any]:
         self.ensure_login()
         normalized = self._normalize_dir(path)
@@ -223,30 +232,7 @@ class OpenListClient:
                 if item.get("is_dir"):
                     self._walk(child_path, entries)
                     continue
-                hash_fields = self._extract_hash_fields(item)
-                entries.append(
-                    SourceEntry(
-                        path=child_path,
-                        md5=hash_fields["md5"],
-                        size=int(item.get("size") or 0),
-                        last_op_time=str(item.get("modified") or item.get("created") or ""),
-                        source_id=self._extract_source_id(item),
-                        provider=self._extract_provider(item),
-                        hash_type=hash_fields["hash_type"],
-                        gcid=hash_fields["gcid"],
-                        etag=hash_fields["etag"],
-                        sha1=hash_fields["sha1"],
-                        sha256=hash_fields["sha256"],
-                        crc64=hash_fields["crc64"],
-                        pre_hash=hash_fields["pre_hash"],
-                        slice_md5=hash_fields["slice_md5"],
-                        pickcode=hash_fields["pickcode"],
-                        content_hash=hash_fields["content_hash"],
-                        extra_hashes=dict(hash_fields["extra_hashes"] or {}),
-                        provider_specific=dict(hash_fields["provider_specific"] or {}),
-                        raw_hash_info=dict(hash_fields["raw_hash_info"] or {}),
-                    )
-                )
+                entries.append(self._build_source_entry(path, item))
             has_more = data.get("has_more")
             if has_more is None:
                 has_more = page * per_page < total
@@ -422,6 +408,31 @@ class OpenListClient:
         if int(payload.get("code", 500)) != 200:
             raise RuntimeError(payload.get("message") or payload.get("msg") or f"OpenList 上传失败: {normalized_parent}/{normalized_name}")
         return payload
+
+    def _build_source_entry(self, parent_path: str, item: dict[str, Any]) -> SourceEntry:
+        child_path = self._join(parent_path, str(item.get("name", "")))
+        hash_fields = self._extract_hash_fields(item)
+        return SourceEntry(
+            path=child_path,
+            md5=hash_fields["md5"],
+            size=int(item.get("size") or 0),
+            last_op_time=str(item.get("modified") or item.get("created") or ""),
+            source_id=self._extract_source_id(item),
+            provider=self._extract_provider(item),
+            hash_type=hash_fields["hash_type"],
+            gcid=hash_fields["gcid"],
+            etag=hash_fields["etag"],
+            sha1=hash_fields["sha1"],
+            sha256=hash_fields["sha256"],
+            crc64=hash_fields["crc64"],
+            pre_hash=hash_fields["pre_hash"],
+            slice_md5=hash_fields["slice_md5"],
+            pickcode=hash_fields["pickcode"],
+            content_hash=hash_fields["content_hash"],
+            extra_hashes=dict(hash_fields["extra_hashes"] or {}),
+            provider_specific=dict(hash_fields["provider_specific"] or {}),
+            raw_hash_info=dict(hash_fields["raw_hash_info"] or {}),
+        )
 
     def _mkdir_if_needed(self, path: str) -> None:
         payload = self._request_json(

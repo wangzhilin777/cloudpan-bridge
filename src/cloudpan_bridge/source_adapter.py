@@ -69,7 +69,7 @@ class OpenListSourceProvider:
 
     def get_file_fingerprints(self, path: str) -> list[SourceEntry]:
         self.ensure_auth()
-        return self.client.export_tree(path)
+        return self.client.get_file_fingerprints(path)
 
     def download_stream(self, source_path: str, temp_dir: Path) -> Path:
         self.ensure_auth()
