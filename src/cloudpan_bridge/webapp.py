@@ -155,6 +155,8 @@ def create_app(config_path: Path) -> FastAPI:
         "last_error": "",
         "pending_downloads": [],
         "directory_browser": None,
+        "current_task": {},
+        "current_source_context": {},
         "persistent_pending": [],
         "persistent_pending_groups": [],
         "source_queue": [],
@@ -425,13 +427,40 @@ def create_app(config_path: Path) -> FastAPI:
         raw["analysis_summary"] = analysis_summary if isinstance(analysis_summary, dict) else {}
         return raw
 
+    def resolve_mapped_mount_path(
+        source_path: str,
+        mapping: dict[str, Any] | None = None,
+        fallback_mount_path: str = "",
+    ) -> str:
+        normalized_source_path = normalize_posix_path(source_path) if str(source_path or "").strip() else ""
+        normalized_fallback = normalize_posix_path(fallback_mount_path) if str(fallback_mount_path or "").strip() else ""
+        if not normalized_source_path:
+            return normalized_fallback
+        candidates = [
+            normalize_posix_path(str(path))
+            for path in dict(mapping or {}).keys()
+            if str(path).strip()
+        ]
+        best_match = ""
+        for candidate in candidates:
+            if normalized_source_path == candidate or normalized_source_path.startswith(candidate.rstrip("/") + "/"):
+                if len(candidate) > len(best_match):
+                    best_match = candidate
+        if best_match:
+            return best_match
+        if normalized_fallback and (
+            normalized_source_path == normalized_fallback
+            or normalized_source_path.startswith(normalized_fallback.rstrip("/") + "/")
+        ):
+            return normalized_fallback
+        return normalized_fallback
+
     def resolve_source_mapping_context(payload: dict[str, Any] | None, runtime_config: AppConfig) -> dict[str, str]:
         raw = dict(payload or {})
-        mount_path = str(
-            resolve_payload_value(raw, "mount_path", ("ui", "browser", "mounted_source"), default="")
-        ).strip()
-        normalized_mount_path = normalize_posix_path(mount_path) if mount_path else ""
         mapping = dict(runtime_config.mount_provider_mapping or {})
+        source_path = str(resolve_payload_value(raw, "source_path", ("sync", "source_path"), default="")).strip()
+        mount_path = str(resolve_payload_value(raw, "mount_path", ("ui", "browser", "mounted_source"), default="")).strip()
+        normalized_mount_path = resolve_mapped_mount_path(source_path, mapping, mount_path)
         configured_override = str(mapping.get(normalized_mount_path) or "").strip() if normalized_mount_path else ""
         requested_driver = str(resolve_payload_value(raw, "driver", default="")).strip()
         effective_driver = configured_override or requested_driver
@@ -440,6 +469,36 @@ def create_app(config_path: Path) -> FastAPI:
             "requested_driver": requested_driver,
             "source_profile_override": configured_override,
             "effective_driver": effective_driver,
+        }
+
+    def build_current_task_snapshot(
+        mode: str,
+        runtime_config: AppConfig,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        raw = dict(payload or {})
+        source_path = normalize_posix_path(str(raw.get("source_path") or runtime_config.source_path or "/"))
+        source_root_for_target = normalize_posix_path(
+            str(raw.get("source_root_for_target") or source_path or runtime_config.source_path or "/")
+        )
+        target_key = str(raw.get("target_key") or runtime_config.target_key or "guangya").strip().lower() or "guangya"
+        target_path = normalize_posix_path(str(raw.get("target_path") or runtime_config.target_path or "/"))
+        mapping_context = resolve_source_mapping_context(
+            {
+                "source_path": source_path,
+                "mount_path": raw.get("mount_path") or payload_nested_get(load_grouped_config_payload(), ("ui", "browser", "mounted_source"), ""),
+                "driver": str(raw.get("driver") or ""),
+            },
+            runtime_config,
+        )
+        return {
+            "mode": mode,
+            "source_path": source_path,
+            "source_root_for_target": source_root_for_target,
+            "target_key": target_key,
+            "target_path": target_path,
+            "selected_paths_count": len(list(raw.get("selected_paths") or [])),
+            "source_mapping_context": mapping_context,
         }
 
     def normalize_provider_capture_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
@@ -733,6 +792,10 @@ def create_app(config_path: Path) -> FastAPI:
         guangya_authorization = str(payload.get("guangya_authorization") or "").strip()
         miaochuan_payload = str(payload.get("miaochuan_payload") or "")
         try:
+            runtime_task = build_current_task_snapshot(mode, config, payload)
+            with sync_lock:
+                sync_state["current_task"] = runtime_task
+                sync_state["current_source_context"] = dict(runtime_task.get("source_mapping_context") or {})
             if mode in {"dry_run", "direct"} and active_source.strip() == "/":
                 raise RuntimeError("当前 source_path 还是 OpenList 根目录 / 。请先进入具体挂载目录，再使用“使用当前目录作为源目录”，或把最底层目录批量入队。")
             logger.info(f"开始同步任务: {mode}")
@@ -804,6 +867,7 @@ def create_app(config_path: Path) -> FastAPI:
         finally:
             with sync_lock:
                 sync_state["running"] = False
+                sync_state["current_task"] = {}
 
     def run_queue_job() -> None:
         nonlocal config
@@ -818,12 +882,22 @@ def create_app(config_path: Path) -> FastAPI:
                 return
             for index, next_item in enumerate(enabled, start=1):
                 current_source = next_item.source_path
+                task_snapshot = build_current_task_snapshot(
+                    "direct",
+                    config,
+                    {
+                        "source_path": current_source,
+                        "source_root_for_target": next_item.source_root_for_target or current_source,
+                    },
+                )
                 with sync_lock:
                     sync_state["queue_runner"] = {
                         "running": True,
                         "current_source": current_source,
                         "remaining": total - index + 1,
+                        "source_mapping_context": dict(task_snapshot.get("source_mapping_context") or {}),
                     }
+                    sync_state["current_source_context"] = dict(task_snapshot.get("source_mapping_context") or {})
                 logger.info(f"开始执行队列目录 [{index}/{total}]: {current_source}")
                 ok = run_sync_job(
                     "direct",
@@ -849,6 +923,7 @@ def create_app(config_path: Path) -> FastAPI:
             with sync_lock:
                 sync_state["queue_runner"] = {"running": False, "current_source": "", "remaining": 0}
                 sync_state["running"] = False
+                sync_state["current_source_context"] = {}
 
     def run_leaf_stream_job(root_path: str) -> None:
         run_leaf_stream_job_with_mode(root_path, "direct")
@@ -868,13 +943,23 @@ def create_app(config_path: Path) -> FastAPI:
             count = 0
             for leaf_path in client.iter_leaf_directories(root_path):
                 count += 1
+                task_snapshot = build_current_task_snapshot(
+                    mode,
+                    config,
+                    {
+                        "source_path": leaf_path,
+                        "source_root_for_target": root_path,
+                    },
+                )
                 with sync_lock:
                     sync_state["queue_runner"] = {
                         "running": True,
                         "current_source": leaf_path,
                         "remaining": -1,
+                        "source_mapping_context": dict(task_snapshot.get("source_mapping_context") or {}),
                     }
                     sync_state["running"] = True
+                    sync_state["current_source_context"] = dict(task_snapshot.get("source_mapping_context") or {})
                 logger.info(f"发现最底层目录并立即执行 [{count}]: {leaf_path}")
                 ok = run_sync_job(
                     mode,
@@ -901,6 +986,7 @@ def create_app(config_path: Path) -> FastAPI:
             with sync_lock:
                 sync_state["queue_runner"] = {"running": False, "current_source": "", "remaining": 0}
                 sync_state["running"] = False
+                sync_state["current_source_context"] = {}
 
     def run_pending_selected_stream_job(selected_paths: list[str]) -> None:
         nonlocal config
@@ -913,13 +999,23 @@ def create_app(config_path: Path) -> FastAPI:
                 return
             logger.info(f"已按最底层优先拆分出 {total} 个待补传目录批次。")
             for index, (directory, paths) in enumerate(items, start=1):
+                task_snapshot = build_current_task_snapshot(
+                    "download_selected",
+                    AppConfig.load(config_path),
+                    {
+                        "source_path": directory,
+                        "selected_paths": paths,
+                    },
+                )
                 with sync_lock:
                     sync_state["queue_runner"] = {
                         "running": True,
                         "current_source": directory,
                         "remaining": total - index + 1,
+                        "source_mapping_context": dict(task_snapshot.get("source_mapping_context") or {}),
                     }
                     sync_state["running"] = True
+                    sync_state["current_source_context"] = dict(task_snapshot.get("source_mapping_context") or {})
                 logger.info(f"开始按勾选目录顺序补传 [{index}/{total}]: {directory}")
                 ok = run_sync_job(
                     "download_selected",
@@ -944,6 +1040,7 @@ def create_app(config_path: Path) -> FastAPI:
             with sync_lock:
                 sync_state["queue_runner"] = {"running": False, "current_source": "", "remaining": 0}
                 sync_state["running"] = False
+                sync_state["current_source_context"] = {}
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
@@ -1432,6 +1529,7 @@ def create_app(config_path: Path) -> FastAPI:
         source_context = resolve_source_mapping_context(
             {
                 "mount_path": payload_nested_get(grouped, ("ui", "browser", "mounted_source"), ""),
+                "source_path": str(config.source_path or "/"),
                 "driver": "",
             },
             config,

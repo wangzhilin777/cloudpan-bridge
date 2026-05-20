@@ -56,7 +56,7 @@
 - [x] `provider/registry` 与 `provider/capability_assess` 返回 `sourceMappingContext`，明确当前挂载源的 override/effective driver
 - [x] `load_grouped_config_payload()` 兼容显式 `grouped_config` 读入，避免映射上下文在只读场景下丢失
 - [x] 前端源端摘要与能力面板显示后端 `sourceMappingContext`，前后端对当前 effective driver 的认知保持一致
-- [ ] 将 mapping 结果进一步写回更多矩阵展示与实际同步执行链路
+- [x] 将 mapping 结果进一步写回更多矩阵展示与实际同步执行链路
 
 ## 摘要
 

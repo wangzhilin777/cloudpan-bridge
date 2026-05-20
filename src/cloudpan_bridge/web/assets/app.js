@@ -1477,9 +1477,13 @@
       const running = sync?.running ? (currentLang() === "en" ? "running" : currentLang() === "mix" ? "运行中 / running" : "运行中") : (currentLang() === "en" ? "idle" : currentLang() === "mix" ? "空闲 / idle" : "空闲");
       const summary = sync?.last_summary || {};
       const queue = sync?.queue_runner || {};
+      const task = sync?.current_task || {};
+      const mapping = sync?.current_source_context || queue?.source_mapping_context || {};
       document.getElementById("sync-summary").innerHTML = `
         <div class="badge">${escapeHtml(running)}</div>
         <div class="mono">${currentLang() === "en" ? "Last error" : currentLang() === "mix" ? "最近错误 / Last error" : "最近错误"}: ${escapeHtml(sync?.last_error || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Current task" : currentLang() === "mix" ? "当前任务 / Current task" : "当前任务"}: ${escapeHtml(task.mode || "-")} | ${escapeHtml(task.source_path || "-")} -> ${escapeHtml(task.target_key || "-")}:${escapeHtml(task.target_path || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Source mapping" : currentLang() === "mix" ? "源映射 / Source mapping" : "源映射"}: mount=${escapeHtml(mapping.mount_path || "-")} | requested=${escapeHtml(mapping.requested_driver || "-")} | override=${escapeHtml(mapping.source_profile_override || "-")} | effective=${escapeHtml(mapping.effective_driver || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Current queue source" : currentLang() === "mix" ? "当前队列目录 / Current queue source" : "当前队列目录"}: ${escapeHtml(queue.current_source || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Remaining" : currentLang() === "mix" ? "待处理剩余 / Remaining" : "待处理剩余"}: ${queue.remaining ?? "-"}</div>
         <div class="mono">${currentLang() === "en" ? "Last summary" : currentLang() === "mix" ? "最近结果 / Last summary" : "最近结果"}: total=${summary.total ?? 0}, direct=${summary.direct_success ?? 0}, downloaded=${summary.downloaded_success ?? 0}, failed=${summary.failed ?? 0}</div>
@@ -1992,9 +1996,11 @@
     function renderOverviewRouteSummary(syncState = {}, runtimeState = {}) {
       const root = document.getElementById("overview-route-summary");
       if (!root) return;
-      const sourcePath = String(document.getElementById("source_path")?.value || configCache?.source_path || currentDirectoryPath || "/").trim() || "/";
-      const targetKey = String(document.getElementById("target_key")?.value || configCache?.target_key || "guangya").trim() || "guangya";
-      const targetPath = String(document.getElementById("target_path")?.value || configCache?.target_path || "/").trim() || "/";
+      const currentTask = syncState?.current_task || {};
+      const currentSourceContext = syncState?.current_source_context || {};
+      const sourcePath = String(currentTask.source_path || document.getElementById("source_path")?.value || configCache?.source_path || currentDirectoryPath || "/").trim() || "/";
+      const targetKey = String(currentTask.target_key || document.getElementById("target_key")?.value || configCache?.target_key || "guangya").trim() || "guangya";
+      const targetPath = String(currentTask.target_path || document.getElementById("target_path")?.value || configCache?.target_path || "/").trim() || "/";
       const mode = normalizeOpenListMode(document.getElementById("openlist_mode")?.value || configCache?.openlist_mode || "external_local");
       const queueSize = Array.isArray(syncState?.source_queue) ? syncState.source_queue.length : 0;
       const pendingSize = Array.isArray(syncState?.persistent_pending) ? syncState.persistent_pending.length : 0;
@@ -2004,6 +2010,7 @@
         <div class="mono">OpenList URL: ${escapeHtml(activeUrl)}</div>
         <div class="mono">Source: ${escapeHtml(sourcePath)}</div>
         <div class="mono">Target: ${escapeHtml(targetKey)} -> ${escapeHtml(targetPath)}</div>
+        <div class="mono">Source Mapping: mount=${escapeHtml(currentSourceContext.mount_path || "-")} | effective=${escapeHtml(currentSourceContext.effective_driver || "-")}</div>
         <div class="mono">Queue: ${queueSize} | Pending: ${pendingSize}</div>
       `;
     }
@@ -2014,6 +2021,7 @@
       const context = currentDriverContext();
       const backendContext = providerRegistryPayload?.current_source_context || {};
       const assessedContext = capabilityAssessmentCache?.sourceMappingContext || {};
+      const runtimeContext = window.__cpbStatusCache?.sync?.current_source_context || {};
       const sourcePath = String(document.getElementById("source_path")?.value || configCache?.source_path || "/").trim() || "/";
       const browsingPath = String(currentDirectoryPath || "/").trim() || "/";
       const selectedMount = String(document.getElementById("mounted_source_select")?.value || "").trim();
@@ -2022,6 +2030,7 @@
         <div class="mono">driver=${escapeHtml(context.driver || "-")} | mount=${escapeHtml(selectedMount || "-")} | rate=${escapeHtml(rateMode)}</div>
         <div class="mono">mounted_driver=${escapeHtml(context.mountedDriver || "-")} | override=${escapeHtml(context.overrideProfile || "-")}</div>
         <div class="mono">backend_effective=${escapeHtml(assessedContext.effective_driver || backendContext.effective_driver || "-")} | backend_override=${escapeHtml(assessedContext.source_profile_override || backendContext.source_profile_override || "-")}</div>
+        <div class="mono">runtime_mount=${escapeHtml(runtimeContext.mount_path || "-")} | runtime_effective=${escapeHtml(runtimeContext.effective_driver || "-")}</div>
         <div class="mono">source_path=${escapeHtml(sourcePath)} | browsing=${escapeHtml(browsingPath)}</div>
       `;
     }
@@ -2056,6 +2065,7 @@
 
     async function refreshStatus() {
       const data = await call("/api/status");
+      window.__cpbStatusCache = data || {};
       renderSync(data.sync || {});
       renderRuntime(data.openlist_runtime || {});
       renderCapture(data.guangya_capture || {}, data.active_target_state || null);

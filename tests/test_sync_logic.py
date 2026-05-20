@@ -1708,6 +1708,116 @@ def test_provider_capability_assess_uses_mount_override_context(tmp_path: Path) 
     assert payload["sourceMappingContext"]["effective_driver"] == "quark"
 
 
+def test_provider_registry_resolves_source_mapping_by_longest_prefix(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/alist/quark/photos/2026",
+  "target_path": "/dst",
+  "source_session": {
+    "mount_provider_mapping": {
+      "/alist": "generic",
+      "/alist/quark": "quark"
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/provider/registry")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["current_source_context"]["mount_path"] == "/alist/quark"
+    assert payload["current_source_context"]["source_path"] == "/alist/quark/photos/2026"
+    assert payload["current_source_context"]["effective_driver"] == "quark"
+
+
+def test_start_sync_writes_source_mapping_context_into_runtime_status(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/alist/quark/photos/2026",
+    "target_path": "/archive"
+  },
+  "source_session": {
+    "mount_provider_mapping": {
+      "/alist/quark": "quark"
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge import webapp as webapp_module
+
+    class FakeSummary:
+        pending_downloads: list[str] = []
+
+        def to_dict(self) -> dict[str, object]:
+            return {
+                "source_path": "/alist/quark/photos/2026",
+                "total": 0,
+                "direct_success": 0,
+                "downloaded_success": 0,
+                "skipped": 0,
+                "failed": 0,
+                "pending_downloads": [],
+            }
+
+    class FakeSyncRunner:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @staticmethod
+        def _update_queue_item(*_args: object, **_kwargs: object) -> None:
+            return None
+
+        def run(self, *_args: object, **_kwargs: object) -> FakeSummary:
+            return FakeSummary()
+
+        def run_direct_phase(self) -> FakeSummary:
+            return FakeSummary()
+
+        def run_selected_downloads(self, _selected_paths: list[str]) -> FakeSummary:
+            return FakeSummary()
+
+    class ImmediateThread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):  # type: ignore[no-untyped-def]
+            self._target = target
+            self._args = args
+            self._kwargs = kwargs or {}
+
+        def start(self) -> None:
+            self._target(*self._args, **self._kwargs)
+
+    monkeypatch.setattr(webapp_module, "SyncRunner", FakeSyncRunner)
+    monkeypatch.setattr(webapp_module, "Thread", ImmediateThread)
+
+    client = TestClient(webapp_module.create_app(config_path))
+    response = client.post(
+        "/api/sync/start",
+        json={
+            "mode": "dry_run",
+            "source_path": "/alist/quark/photos/2026",
+        },
+    )
+    assert response.status_code == 200
+    status_response = client.get("/api/status")
+    assert status_response.status_code == 200
+    payload = status_response.json()
+    assert payload["sync"]["current_task"] == {}
+    assert payload["sync"]["current_source_context"]["mount_path"] == "/alist/quark"
+    assert payload["sync"]["current_source_context"]["source_profile_override"] == "quark"
+    assert payload["sync"]["current_source_context"]["effective_driver"] == "quark"
+    assert payload["sync"]["last_summary"]["source_path"] == "/alist/quark/photos/2026"
+
+
 def test_target_preflight_endpoint_reports_supported_target(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
