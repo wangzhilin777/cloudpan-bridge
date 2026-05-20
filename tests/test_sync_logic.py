@@ -974,6 +974,18 @@ def test_target_adapter_delete_helper_prefers_new_delete_if_enabled_method() -> 
     assert seen == ["new:parent-1:demo.bin"]
 
 
+def test_target_adapter_compat_mixin_exposes_unified_methods_on_real_adapter(tmp_path: Path) -> None:
+    root_dir = tmp_path / "target-root"
+    adapter = LocalFsTargetAdapter(root_dir)
+    adapter.ensure_auth()
+    target_parent = adapter.ensure_target_dir("/demo")
+    local_file = tmp_path / "demo.txt"
+    local_file.write_text("hello", encoding="utf-8")
+    uploaded = adapter.upload_stream(local_file, target_parent, "demo.txt")
+    assert uploaded["path"].endswith("demo.txt")
+    assert adapter.delete_if_enabled(target_parent, "demo.txt") is True
+
+
 def test_sync_runner_builds_guangya_target_adapter(tmp_path) -> None:
     path = tmp_path / "config.json"
     path.write_text(

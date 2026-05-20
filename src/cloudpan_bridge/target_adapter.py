@@ -44,6 +44,14 @@ def target_upload_stream(target: TargetAdapter, local_path: Path, target_parent_
     return target.upload_local_file(local_path, target_parent_id, target_name)  # type: ignore[call-arg]
 
 
+class TargetAdapterCompatMixin:
+    def delete_if_enabled(self, parent_id: str, name: str) -> bool:
+        return self.delete_if_exists(parent_id, name)  # type: ignore[attr-defined]
+
+    def upload_stream(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, Any]:
+        return self.upload_local_file(local_path, target_parent_id, target_name)  # type: ignore[attr-defined]
+
+
 def _build_target_capability(
     target_key: str,
     *,
@@ -73,7 +81,7 @@ def _build_target_capability(
     }
 
 
-class GuangyaTargetAdapter:
+class GuangyaTargetAdapter(TargetAdapterCompatMixin):
     def __init__(
         self,
         access_token: str = "",
@@ -148,7 +156,7 @@ class GuangyaTargetAdapter:
         self.service.verify_local_md5(local_path, md5_hex)
 
 
-class OpenListTargetAdapter:
+class OpenListTargetAdapter(TargetAdapterCompatMixin):
     def __init__(
         self,
         base_url: str,
@@ -225,7 +233,7 @@ class OpenListTargetAdapter:
         return None
 
 
-class LocalFsTargetAdapter:
+class LocalFsTargetAdapter(TargetAdapterCompatMixin):
     def __init__(self, root_dir: Path) -> None:
         self.root_dir = Path(root_dir).expanduser()
 
@@ -314,7 +322,7 @@ class LocalFsTargetAdapter:
         return None
 
 
-class WebDavTargetAdapter:
+class WebDavTargetAdapter(TargetAdapterCompatMixin):
     def __init__(
         self,
         base_url: str,
@@ -440,7 +448,7 @@ class WebDavTargetAdapter:
         return None
 
 
-class S3TargetAdapter:
+class S3TargetAdapter(TargetAdapterCompatMixin):
     def __init__(
         self,
         endpoint: str,
@@ -583,7 +591,7 @@ class S3TargetAdapter:
         return None
 
 
-class SeafileTargetAdapter:
+class SeafileTargetAdapter(TargetAdapterCompatMixin):
     def __init__(
         self,
         base_url: str,
@@ -802,7 +810,7 @@ class SeafileTargetAdapter:
         return None
 
 
-class SmbTargetAdapter:
+class SmbTargetAdapter(TargetAdapterCompatMixin):
     def __init__(
         self,
         base_url: str,
@@ -952,7 +960,7 @@ class SmbTargetAdapter:
         return None
 
 
-class AzureBlobTargetAdapter:
+class AzureBlobTargetAdapter(TargetAdapterCompatMixin):
     def __init__(
         self,
         account_url: str,
@@ -1085,7 +1093,7 @@ class AzureBlobTargetAdapter:
         return None
 
 
-class FtpTargetAdapter:
+class FtpTargetAdapter(TargetAdapterCompatMixin):
     def __init__(
         self,
         base_url: str,
@@ -1220,7 +1228,7 @@ class FtpTargetAdapter:
         return None
 
 
-class SftpTargetAdapter:
+class SftpTargetAdapter(TargetAdapterCompatMixin):
     def __init__(
         self,
         base_url: str,
