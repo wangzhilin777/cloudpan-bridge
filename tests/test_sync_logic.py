@@ -22,6 +22,7 @@ from cloudpan_bridge.provider_capture import (
     derive_capture_requirements_from_fields,
     resolve_capture_spec_for_driver,
 )
+from cloudpan_bridge.source_adapter import OpenListSourceProvider, create_source_provider
 from cloudpan_bridge.syncer import (
     SyncRunner,
     build_plan,
@@ -608,6 +609,106 @@ def test_auto_download_threshold_accepts_small_file(tmp_path) -> None:
         encoding="utf-8",
     )
     runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+
+
+def test_openlist_source_provider_reports_provider_key_and_auth_state() -> None:
+    provider = OpenListSourceProvider(
+        base_url="http://127.0.0.1:5244",
+        token="demo-token",
+        username="admin",
+        password="demo-pass",
+    )
+    try:
+        assert provider.get_provider_key() == "openlist"
+        assert provider.get_auth_state()["base_url"] == "http://127.0.0.1:5244"
+        assert provider.get_auth_state()["token"] == "demo-token"
+        assert provider.get_auth_state()["username"] == "admin"
+    finally:
+        provider.close()
+
+
+def test_create_source_provider_returns_openlist_provider(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "openlist": {
+    "url": "http://127.0.0.1:5244",
+    "token": "token-1",
+    "username": "admin",
+    "password": "demo"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    provider = create_source_provider(AppConfig.load(path))
+    try:
+        assert provider.get_provider_key() == "openlist"
+        assert provider.get_auth_state()["token"] == "token-1"
+    finally:
+        provider.close()
+
+
+def test_sync_runner_uses_source_provider_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "sync": {
+    "source_path": "/src",
+    "target_path": "/dst"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    captured: dict[str, object] = {}
+
+    class FakeSourceProvider:
+        def ensure_auth(self) -> None:
+            captured["ensure_auth"] = True
+
+        def close(self) -> None:
+            captured["closed"] = True
+
+        def list_roots(self) -> list[str]:
+            return ["/"]
+
+        def list_dir(self, path: str) -> dict[str, object]:
+            return {"path": path, "directories": []}
+
+        def walk_tree(self, source_root: str) -> list[SourceEntry]:
+            captured["walk_tree"] = source_root
+            return []
+
+        def walk_leaf_dirs(self, root_path: str):
+            if False:
+                yield root_path
+            return
+
+        def get_file_fingerprints(self, path: str) -> list[SourceEntry]:
+            return []
+
+        def download_stream(self, source_path: str, temp_dir: Path) -> Path:
+            raise AssertionError("download_stream should not be called in analyze test")
+
+        def get_auth_state(self) -> dict[str, str]:
+            return {"token": "demo"}
+
+        def get_provider_key(self) -> str:
+            return "openlist"
+
+    monkeypatch.setattr("cloudpan_bridge.syncer.create_source_provider", lambda config, on_progress=None: FakeSourceProvider())
+    runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
+    entries, plan, removed = runner.analyze()
+    assert entries == []
+    assert plan == []
+    assert removed == []
+    assert captured["ensure_auth"] is True
+    assert captured["walk_tree"] == "/src"
+    assert captured.get("closed") is not True
+    runner.source.close()
     item = build_plan([SourceEntry(path="/src/a.txt", md5="ABC", size=5 * 1024 * 1024, last_op_time="1")], SyncState())[0][0]
     assert runner._should_auto_download(item) is True
 

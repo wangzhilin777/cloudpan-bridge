@@ -8,7 +8,7 @@ from typing import Callable
 
 from .config import AppConfig
 from .models import PendingFileState, QueueItemState, SourceEntry, SyncFileState, SyncPlanItem, SyncState, normalize_posix_path
-from .openlist import OpenListClient
+from .source_adapter import SourceProvider, create_source_provider
 from .target_adapter import TargetAdapter, create_target_adapter
 
 LogFn = Callable[[str], None]
@@ -192,19 +192,34 @@ class SyncRunner:
     def __init__(self, config: AppConfig, log: LogFn | None = None, source_root_for_target: str | None = None):
         self.config = config
         self.source_root_for_target = normalize_posix_path(source_root_for_target or config.source_path)
-        self.source = OpenListClient(
-            base_url=config.openlist_url,
-            token=config.openlist_token,
-            username=config.openlist_username,
-            password=config.openlist_password,
-            on_progress=log,
-            page_size=config.openlist_page_size,
-            request_interval_ms=config.openlist_request_interval_ms,
-        )
+        self.source: SourceProvider = create_source_provider(config, on_progress=log)
         self.log = log or print
 
     def _build_target_adapter(self, state: SyncState) -> TargetAdapter:
         return create_target_adapter(self.config, state, self.config.target_key)
+
+    def _ensure_source_auth(self) -> None:
+        if hasattr(self.source, "ensure_auth"):
+            self.source.ensure_auth()  # type: ignore[call-arg]
+            return
+        if hasattr(self.source, "ensure_login"):
+            self.source.ensure_login()  # type: ignore[call-arg]
+            return
+        raise RuntimeError("当前源端 provider 缺少 ensure_auth/ensure_login 接口。")
+
+    def _walk_source_tree(self, source_root: str) -> list[SourceEntry]:
+        if hasattr(self.source, "walk_tree"):
+            return self.source.walk_tree(source_root)  # type: ignore[call-arg]
+        if hasattr(self.source, "export_tree"):
+            return self.source.export_tree(source_root)  # type: ignore[call-arg]
+        raise RuntimeError("当前源端 provider 缺少 walk_tree/export_tree 接口。")
+
+    def _download_source_file(self, source_path: str) -> Path:
+        if hasattr(self.source, "download_stream"):
+            return self.source.download_stream(source_path, self.config.temp_dir)  # type: ignore[call-arg]
+        if hasattr(self.source, "download_file"):
+            return self.source.download_file(source_path, self.config.temp_dir)  # type: ignore[call-arg]
+        raise RuntimeError("当前源端 provider 缺少 download_stream/download_file 接口。")
 
     def run(self, allow_download_upload: bool | None = None, dry_run: bool = False) -> SyncSummary:
         self.config.ensure_parent_dirs()
@@ -212,8 +227,8 @@ class SyncRunner:
         target: TargetAdapter | None = None
 
         try:
-            self.source.ensure_login()
-            entries = self.source.export_tree(self.config.source_path)
+            self._ensure_source_auth()
+            entries = self._walk_source_tree(self.config.source_path)
             self.config.export_file.write_text(
                 "\n".join(
                     json.dumps(
@@ -315,9 +330,9 @@ class SyncRunner:
     def analyze(self) -> tuple[list[SourceEntry], list[SyncPlanItem], list[str]]:
         self.config.ensure_parent_dirs()
         state = load_state(self.config.state_file)
-        self.source.ensure_login()
+        self._ensure_source_auth()
         self.log(f"开始扫描源目录树: {self.config.source_path}")
-        entries = self.source.export_tree(self.config.source_path)
+        entries = self._walk_source_tree(self.config.source_path)
         self.log(f"源目录扫描完成，累计文件数: {len(entries)}")
         plan, removed_paths = build_plan(entries, state)
         self.config.export_file.write_text(
@@ -398,7 +413,7 @@ class SyncRunner:
             target = self._build_target_adapter(state)
             target.ensure_auth()
             state.set_target_state(self.config.target_key, target.export_state())
-            self.source.ensure_login()
+            self._ensure_source_auth()
 
             summary = SyncSummary(source_path=self.config.source_path, total=len(selected_paths), pending_downloads=[])
             for path in selected_paths:
@@ -481,7 +496,7 @@ class SyncRunner:
         target_parent_id = target.ensure_target_dir(target_parent)
         target.delete_if_exists(target_parent_id, item.source.name)
 
-        local_path = self.source.download_file(item.source.path, self.config.temp_dir)
+        local_path = self._download_source_file(item.source.path)
         if item.source.md5:
             target.verify_local_md5(local_path, item.source.md5)
         else:

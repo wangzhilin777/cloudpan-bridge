@@ -66,6 +66,14 @@
 - [x] 前端目标端预检面板显示真实运行前能力与缺失配置，而不是只显示 implemented/selectable
 - [x] 相关回归通过：`python -m compileall src tests`、`node --check src/cloudpan_bridge/web/assets/app.js`、`pytest -q tests/test_sync_logic.py -x`
 
+### 里程碑 8：Source Provider 执行主链抽象（起步）
+
+- [x] 新增 `source_adapter.py`，定义 `SourceProvider` 协议与 `OpenListSourceProvider` 首个实现
+- [x] `SyncRunner` 不再直接构造 `OpenListClient`，而是通过 `create_source_provider()` 获取源端 provider
+- [x] 执行主链已切换为 `ensure_auth / walk_tree / download_stream` 抽象入口，并保留对旧 `ensure_login / export_tree / download_file` 的兼容回退
+- [x] 新增 Source Provider 基础测试，验证 provider key / auth state / factory / SyncRunner 注入链路
+- [x] 相关回归通过：`python -m compileall src tests`、`pytest -q tests/test_sync_logic.py -x`
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。
