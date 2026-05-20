@@ -3963,10 +3963,14 @@ def test_status_restores_provider_captures_from_config(tmp_path: Path) -> None:
     assert body["provider_captures"]["quark"]["captured"]["cookie_header"] == "sid=1; token=2"
     assert body["source_runtime"]["provider_class"] == "OpenListSourceProvider"
     assert body["source_runtime"]["requested_provider_preference"] == "auto"
+    assert body["sourceEnrichment"]["provider_key"] == "generic_openlist_driver"
+    assert body["sourceEnrichment"]["supported"] is False
     assert body["active_target"] == "guangya"
     assert body["active_target_state"]["has_state"] is True
     assert body["active_target_state"]["field_count"] == 3
     assert "access_token" in body["active_target_state"]["fields"]
+    assert body["target_preflight"]["target_key"] == "guangya"
+    assert body["target_preflight"]["adapter_capability"]["supports_fast_upload"] is True
 
 
 def test_provider_driver_blueprint_endpoint_returns_dynamic_capture_spec(tmp_path: Path) -> None:

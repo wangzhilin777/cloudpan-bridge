@@ -2297,12 +2297,14 @@
       const selectedMount = String(document.getElementById("mounted_source_select")?.value || "").trim();
       const rateMode = String(document.getElementById("rate_limit_mode")?.value || configCache?.rate_limit_mode || "safe").trim() || "safe";
       const sourceRuntime = window.__cpbStatusCache?.source_runtime || {};
+      const sourceEnrichment = window.__cpbStatusCache?.sourceEnrichment || {};
       root.innerHTML = `
         <div class="mono">driver=${escapeHtml(context.driver || "-")} | mount=${escapeHtml(selectedMount || "-")} | rate=${escapeHtml(rateMode)}</div>
         <div class="mono">mounted_driver=${escapeHtml(context.mountedDriver || "-")} | override=${escapeHtml(context.overrideProfile || "-")}</div>
         <div class="mono">backend_effective=${escapeHtml(assessedContext.effective_driver || backendContext.effective_driver || "-")} | backend_override=${escapeHtml(assessedContext.source_profile_override || backendContext.source_profile_override || "-")}</div>
         <div class="mono">runtime_mount=${escapeHtml(runtimeContext.mount_path || "-")} | runtime_effective=${escapeHtml(runtimeContext.effective_driver || "-")}</div>
         <div class="mono">route_pref=${escapeHtml(sourceRuntime.requested_provider_preference || "-")} | route_selected=${escapeHtml(sourceRuntime.selected_source_mode || "-")} | route_provider=${escapeHtml(sourceRuntime.selected_provider_key || "-")}</div>
+        <div class="mono">enrich_supported=${escapeHtml(String(!!sourceEnrichment.supported))} | capture_ready=${escapeHtml(String(!!sourceEnrichment.capture_ready))} | bridge=${escapeHtml(sourceEnrichment.bridge_status || "-")} | preferred=${escapeHtml((sourceEnrichment.preferred_hashes || []).join(", ") || "-")}</div>
         <div class="mono">source_path=${escapeHtml(sourcePath)} | browsing=${escapeHtml(browsingPath)}</div>
         ${sourceRuntime.selection_reason ? `<div>${escapeHtml(sourceRuntime.selection_reason)}</div>` : ""}
         ${sourceRuntime.fallback_reason ? `<div>${escapeHtml(sourceRuntime.fallback_reason)}</div>` : ""}
@@ -2325,10 +2327,17 @@
         ? translateDriverText(capabilityAssessmentCache.rationale.zh || "", capabilityAssessmentCache.rationale.en || "")
         : "";
       const sourceRuntime = window.__cpbStatusCache?.source_runtime || {};
+      const statusTargetPreflight = window.__cpbStatusCache?.target_preflight || {};
+      const statusTargetCapability = statusTargetPreflight?.adapter_capability || {};
+      const transferPreviewText = sourceAnalyzeCache?.transferPlanPreview
+        ? Object.entries(sourceAnalyzeCache.transferPlanPreview.mode_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ")
+        : "-";
       root.innerHTML = `
         <div class="mono">source=${escapeHtml(sourcePath)} -> target=${escapeHtml(targetKey)}:${escapeHtml(targetPath)}</div>
         <div class="mono">recommended=${escapeHtml(recommendedMode)} | level=${escapeHtml(assessedLevel)} | auto_small_mb=${escapeHtml(autoThreshold)}</div>
         <div class="mono">source_route_pref=${escapeHtml(sourcePreference)} | selected=${escapeHtml(sourceRuntime.selected_source_mode || "-")} | provider=${escapeHtml(sourceRuntime.selected_provider_key || "-")}</div>
+        <div class="mono">target_fast_upload=${escapeHtml(String(!!statusTargetCapability.supports_fast_upload))} | hashes=${escapeHtml((statusTargetCapability.fast_upload_hashes || []).join(", ") || "-")} | fallback=${escapeHtml((statusTargetCapability.fallback_modes || []).join(", ") || "-")}</div>
+        <div class="mono">transfer_preview=${escapeHtml(transferPreviewText)}</div>
         <div class="mono">delete_state=${deleteRemoved ? "on" : "off"} | delete_target=${deleteRealTarget ? "on" : "off"}</div>
         ${sourceRuntime.selection_reason ? `<div>${escapeHtml(sourceRuntime.selection_reason)}</div>` : ""}
         ${sourceRuntime.fallback_reason ? `<div>${escapeHtml(sourceRuntime.fallback_reason)}</div>` : ""}

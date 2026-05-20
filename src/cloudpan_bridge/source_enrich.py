@@ -16,6 +16,7 @@ def supports_enrichment(provider_key: str) -> bool:
 def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dict[str, Any]:
     normalized = str(provider_key or "").strip().lower()
     rule = build_provider_rule(normalized)
+    supported = normalized in MAINSTREAM_SOURCE_PROVIDERS
     capture_snapshot = dict((config.provider_captures or {}).get(normalized) or {})
     captured = dict(capture_snapshot.get("captured") or {})
     capture_fields = list(rule.get("capture_fields") or [])
@@ -24,7 +25,7 @@ def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dic
     capture_ready = bool(present_capture_fields) if capture_required else True
     return {
         "provider_key": normalized,
-        "supported": bool(rule),
+        "supported": supported,
         "preferred_hashes": list(rule.get("preferred_hashes") or []),
         "capture_required": capture_required,
         "capture_ready": capture_ready,
@@ -32,9 +33,9 @@ def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dic
         "capture_fields_present": present_capture_fields,
         "capture_status": str(capture_snapshot.get("status") or ("captured" if present_capture_fields else "idle")),
         "hash_aliases": dict(rule.get("hash_aliases") or {}),
-        "strategy_level": str(rule.get("strategy_level") or ("provider_normalization" if rule else "openlist_only")),
-        "bridge_status": str(rule.get("bridge_status") or ("capture_guided_normalization" if rule else "not_supported")),
-        "runtime_mode": "openlist_first_provider_snapshot_enrichment" if rule else "openlist_only",
+        "strategy_level": str(rule.get("strategy_level") or ("provider_normalization" if supported else "openlist_only")),
+        "bridge_status": str(rule.get("bridge_status") or ("capture_guided_normalization" if supported else "not_supported")),
+        "runtime_mode": "openlist_first_provider_snapshot_enrichment" if supported else "openlist_only",
     }
 
 

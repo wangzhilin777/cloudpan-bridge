@@ -1134,9 +1134,12 @@ def create_app(config_path: Path) -> FastAPI:
             mount_path=payload_nested_get(grouped, ("ui", "browser", "mounted_source"), ""),
             requested_driver="",
         )
+        source_enrichment = build_source_enrichment_runtime(config, str(source_runtime.get("provider_key") or ""))
+        target_preflight = build_target_preflight(active_target)
         return {
             "sync": state,
             "source_runtime": source_runtime,
+            "sourceEnrichment": source_enrichment,
             "active_target": active_target,
             "active_target_state": {
                 "target_key": active_target,
@@ -1144,6 +1147,7 @@ def create_app(config_path: Path) -> FastAPI:
                 "fields": sorted(active_target_state.keys()),
                 "has_state": bool(active_target_state),
             },
+            "target_preflight": target_preflight,
             "target_states": target_states,
             "guangya_capture": snapshots.get("guangya", provider_capture.snapshot("guangya")),
             "provider_captures": snapshots,
