@@ -1350,6 +1350,52 @@ def test_source_runtime_status_exposes_bridge_preparation_summary(tmp_path: Path
     assert summary["selected_field_names"] == ["refresh_token"]
     assert summary["throttle_defaults"]["page_size"] == 120
     assert summary["fallback_policy"]["download_selected_only"] is True
+    assert summary["capture_cache_available"] is False
+    assert summary["capture_cache_entry_count"] == 0
+
+
+def test_source_enrichment_runtime_exposes_capture_cache_summary(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "onedrive": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                                "file_hashes_by_path": {
+                                    "/src/a.docx": {
+                                        "sha1": "a" * 40,
+                                        "content_hash": "sha1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                    }
+                                },
+                                "entries": [
+                                    {
+                                        "path": "/src/b.docx",
+                                        "md5": "b" * 32,
+                                    }
+                                ],
+                            }
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "onedrive")
+    summary = runtime["bridge_preparation_summary"]
+    assert summary["capture_cache_available"] is True
+    assert summary["capture_cache_entry_count"] == 2
+    assert summary["capture_cache_path_entry_count"] == 1
+    assert summary["capture_cache_collection_entry_count"] == 1
+    assert summary["capture_cache_lookup_modes"] == ["path", "collection_scan"]
+    assert summary["capture_cache_hash_fields"] == ["content_hash", "md5", "sha1"]
+    assert runtime["bridge_maturity_summary"]["level"] == "api_capture_ready_with_cache"
+    assert runtime["bridge_maturity_summary"]["honesty"] == "api_prepared_with_capture_cache"
 
 
 def test_bridge_runtime_reports_missing_keys_for_baidu_capture() -> None:
@@ -6163,6 +6209,63 @@ def test_provider_capability_assess_prefers_enrichment_mode_when_directory_needs
     assert payload["sourceTargetRoute"]["bridge_recoverable_fast_hashes"] == ["md5", "gcid"]
     assert payload["sourceTargetRoute"]["preferred_execution_mode"] == "record_pending_only"
     assert any(item["key"] == "provider_refresh_supported" for item in payload["strategy"]["suggestedActions"])
+
+
+def test_provider_capability_assess_prefers_capture_cache_route_when_available(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "onedrive": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                                "file_hashes_by_path": {
+                                    "/src/demo.docx": {
+                                        "md5": "a" * 32,
+                                        "sha1": "b" * 40,
+                                    }
+                                },
+                            },
+                        }
+                    }
+                },
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst"
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/capability_assess",
+        json={
+            "driver": "OneDrive",
+            "analysis_summary": {
+                "total": 2,
+                "fast_upload_ready": 0,
+                "md5_ready": 0,
+                "gcid_ready": 0,
+                "missing_fast_upload": 2,
+                "sha1_ready": 2,
+            },
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sourceEnrichment"]["bridge_maturity_summary"]["level"] == "api_capture_ready_with_cache"
+    assert payload["sourceTargetRoute"]["decision_bucket"] == "api_capture_cache_candidate"
+    assert payload["sourceTargetRoute"]["next_focus"] == "consume_capture_cache_first"
+    assert payload["sourceTargetRoute"]["route_honesty"] == "capture_cache_available_before_live_api"
+    assert payload["sourceTargetRoute"]["preferred_execution_mode"] == "fast_upload"
+    assert payload["sourceTargetRoute"]["capture_cache_fast_hashes"] == ["md5"]
 
 
 def test_provider_capability_assess_without_analysis_requires_probe_first(tmp_path: Path) -> None:

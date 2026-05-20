@@ -193,10 +193,13 @@ def build_source_target_route_summary(
     target_fallback_modes = _normalize_hash_list(capability.get("fallback_modes") or capability.get("fallbackModes"))
     bridge_preparation = dict(source_enrichment.get("bridge_preparation_summary") or {})
     bridge_status = str(source_enrichment.get("bridge_status") or "")
+    capture_cache_available = bool(bridge_preparation.get("capture_cache_available"))
+    capture_cache_hash_fields = _normalize_hash_list(bridge_preparation.get("capture_cache_hash_fields"))
     preferred_hashes = _normalize_hash_list(source_enrichment.get("preferred_hashes") or bridge_preparation.get("preferred_hashes"))
     expected_hashes = _normalize_hash_list(bridge_preparation.get("fingerprint_expectation"))
     native_fast_candidate_hashes = [key for key in target_fast_hashes if key in preferred_hashes]
     bridge_recoverable_fast_hashes = [key for key in target_fast_hashes if key in expected_hashes]
+    capture_cache_fast_hashes = [key for key in target_fast_hashes if key in capture_cache_hash_fields]
     resolution = dict(resolution or {})
     direct_candidate = bool(resolution.get("direct_provider_candidate")) or bool(source_enrichment.get("supported"))
     direct_ready = bool(resolution.get("direct_provider_ready")) or bridge_status in {"bridge_ready", "bridge_ready_but_normalization_only"}
@@ -223,6 +226,15 @@ def build_source_target_route_summary(
         summary = (
             "当前源端会话桥接已 ready，且理论上能补到目标端所需的快传哈希；"
             f"优先关注 {', '.join(bridge_recoverable_fast_hashes)} 的命中率。"
+        )
+    elif api_pending and capture_cache_available and bridge_recoverable_fast_hashes:
+        decision_bucket = "api_capture_cache_candidate"
+        next_focus = "consume_capture_cache_first"
+        route_honesty = "capture_cache_available_before_live_api"
+        preferred_execution_mode = "fast_upload"
+        summary = (
+            "当前源端已进入 API bridge 准备态，且抓取快照里已经有可消费的文件级哈希缓存；"
+            f"建议先分析目录并优先消费缓存，重点关注 {', '.join(capture_cache_fast_hashes or bridge_recoverable_fast_hashes)}。"
         )
     elif api_pending and bridge_recoverable_fast_hashes:
         decision_bucket = "api_bridge_fast_candidate"
@@ -267,6 +279,8 @@ def build_source_target_route_summary(
         "expected_hashes": expected_hashes,
         "native_fast_candidate_hashes": native_fast_candidate_hashes,
         "bridge_recoverable_fast_hashes": bridge_recoverable_fast_hashes,
+        "capture_cache_fast_hashes": capture_cache_fast_hashes,
+        "capture_cache_available": capture_cache_available,
         "decision_bucket": decision_bucket,
         "next_focus": next_focus,
         "route_honesty": route_honesty,

@@ -105,6 +105,7 @@
   function bridgeMaturityText(ctx, key) {
     const mapping = {
       session_snapshot_ready: ["会话快照已就绪", "Session snapshot ready"],
+      api_capture_ready_with_cache: ["API 准备态已就绪且已有缓存", "API preparation is ready and cache is available"],
       api_capture_ready_pending_provider_enrich: ["API 准备态已就绪", "API preparation ready"],
       api_capture_cache_ready: ["抓取缓存补指纹已生效", "Capture-cache enrichment is active"],
       capture_missing: ["仍缺关键登录态", "Missing required capture fields"],
@@ -118,6 +119,7 @@
   function bridgeHonestyText(ctx, key) {
     const mapping = {
       capture_ready_normalization_only: ["已具备归并能力，但仍只到补指纹层", "Normalization is ready, but still limited to enrichment only"],
+      api_prepared_with_capture_cache: ["API 准备态已满足，且已有抓取缓存可先消费", "API preparation is satisfied and a capture cache is already available"],
       api_prepared_not_executed: ["API 准备态已满足，但真实 provider enrich 未执行", "API preparation is satisfied, but real provider enrich is not executed"],
       capture_cache_snapshot_only: ["已消费抓取缓存，但仍不是在线直连 enrich", "The capture cache is consumed, but this is still not live direct enrichment"],
       waiting_capture: ["仍在等待关键登录态", "Still waiting for required capture fields"],
@@ -134,6 +136,7 @@
       target_upload_only: ["目标端只能普通上传", "The target only supports normal upload"],
       session_bridge_fast_candidate: ["会话桥接已具备快传候选", "Session bridge is ready for fast-upload candidates"],
       api_bridge_fast_candidate: ["API 桥接理论可补齐快传", "API bridge can theoretically recover fast-upload hashes"],
+      api_capture_cache_candidate: ["抓取缓存已可先试快传", "The capture cache can be tried before live API enrichment"],
       capture_gap_before_fast: ["先补登录态再谈快传", "Capture fields must be collected before fast upload is realistic"],
       native_hash_candidate: ["OpenList 元数据已接近可快传", "OpenList metadata is already close to fast-upload readiness"],
       provider_candidate_but_fallback_first: ["有 provider 候选，但当前更适合补传", "A provider candidate exists, but fallback is still safer for now"],
@@ -148,6 +151,7 @@
       target_fallback_upload: ["按目标端普通上传能力规划执行", "Plan execution around the target's normal upload path"],
       validate_fast_hash_hit_rate: ["先验证快传哈希命中率", "Validate the fast-hash hit rate first"],
       provider_api_enrich: ["优先补齐 provider API enrich", "Prioritize provider API enrichment"],
+      consume_capture_cache_first: ["先消费抓取缓存再决定是否调 API", "Consume the capture cache before deciding whether live API enrichment is needed"],
       collect_provider_capture: ["先补关键登录态字段", "Collect the required capture fields first"],
       inspect_openlist_hash_coverage: ["先确认 OpenList 是否已暴露关键哈希", "Check whether OpenList already exposes the key hashes"],
       pending_tree_or_stream_upload: ["优先待补传树或普通上传", "Prefer the pending tree or normal upload first"],
@@ -162,6 +166,7 @@
       target_has_no_metadata_fast_upload: ["目标端本身没有元数据秒传", "The target itself has no metadata fast-upload path"],
       session_bridge_ready_but_transport_not_direct: ["会话桥接已 ready，但真实直连传输还没落地", "The session bridge is ready, but true direct transport is not implemented yet"],
       provider_api_not_implemented_yet: ["理论 API enrich 可行，但真实实现尚未接通", "Theoretical API enrichment exists, but the real implementation is not connected yet"],
+      capture_cache_available_before_live_api: ["已有抓取缓存可先消费，但仍不等于在线直连 enrich", "A capture cache is available first, but it is still not the same as live direct enrichment"],
       capture_missing_before_fast_upload: ["补齐关键登录态前，不应把它当作快传可用", "Do not treat this as fast-upload ready before the required capture fields exist"],
       openlist_metadata_may_already_be_enough: ["可能只靠 OpenList 元数据就够了", "OpenList metadata may already be sufficient"],
       provider_overlap_weak: ["源端与目标端快传哈希重叠较弱", "The overlap between source and target fast hashes is weak"],

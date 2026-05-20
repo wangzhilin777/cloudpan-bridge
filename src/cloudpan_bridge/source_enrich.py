@@ -10,6 +10,11 @@ from .source_enrich_rules import MAINSTREAM_SOURCE_PROVIDERS, build_provider_rul
 
 LogFn = Callable[[str], None]
 
+CAPTURE_CACHE_PATH_KEYS = ("file_hashes_by_path", "fingerprints_by_path", "hash_cache_by_path", "entry_hashes_by_path")
+CAPTURE_CACHE_ID_KEYS = ("file_hashes_by_id", "fingerprints_by_id", "hash_cache_by_id", "entry_hashes_by_id")
+CAPTURE_CACHE_COLLECTION_KEYS = ("file_hashes", "fingerprints", "hash_cache", "entries", "items")
+CAPTURE_CACHE_HASH_KEYS = ("md5", "gcid", "sha1", "sha256", "crc64", "pre_hash", "slice_md5", "content_hash", "pickcode")
+
 
 def _build_bridge_preparation_summary(bridge_runtime: dict[str, Any]) -> dict[str, Any]:
     preparation = dict(bridge_runtime.get("preparation") or {})
@@ -28,6 +33,69 @@ def _build_bridge_preparation_summary(bridge_runtime: dict[str, Any]) -> dict[st
     }
 
 
+def _extract_capture_cache_summary(captured: dict[str, Any]) -> dict[str, Any]:
+    path_count = 0
+    id_count = 0
+    collection_count = 0
+    hash_fields: set[str] = set()
+
+    def collect_hash_fields(payload: Any) -> None:
+        if not isinstance(payload, dict):
+            return
+        for key, value in payload.items():
+            normalized = str(key or "").strip().lower()
+            if normalized in CAPTURE_CACHE_HASH_KEYS and str(value or "").strip():
+                hash_fields.add(normalized)
+
+    for key in CAPTURE_CACHE_PATH_KEYS:
+        mapping = captured.get(key)
+        if isinstance(mapping, dict):
+            for item in mapping.values():
+                if isinstance(item, dict):
+                    path_count += 1
+                    collect_hash_fields(item)
+
+    for key in CAPTURE_CACHE_ID_KEYS:
+        mapping = captured.get(key)
+        if isinstance(mapping, dict):
+            for item in mapping.values():
+                if isinstance(item, dict):
+                    id_count += 1
+                    collect_hash_fields(item)
+
+    for key in CAPTURE_CACHE_COLLECTION_KEYS:
+        collection = captured.get(key)
+        if isinstance(collection, list):
+            for item in collection:
+                if isinstance(item, dict):
+                    collection_count += 1
+                    collect_hash_fields(item)
+        elif isinstance(collection, dict):
+            nested_entries = collection.get("items") or collection.get("entries") or collection.get("files")
+            if isinstance(nested_entries, list):
+                for item in nested_entries:
+                    if isinstance(item, dict):
+                        collection_count += 1
+                        collect_hash_fields(item)
+
+    lookup_modes: list[str] = []
+    if path_count:
+        lookup_modes.append("path")
+    if id_count:
+        lookup_modes.append("source_id")
+    if collection_count:
+        lookup_modes.append("collection_scan")
+    return {
+        "available": bool(path_count or id_count or collection_count),
+        "entry_count": int(path_count + id_count + collection_count),
+        "path_entry_count": int(path_count),
+        "id_entry_count": int(id_count),
+        "collection_entry_count": int(collection_count),
+        "lookup_modes": lookup_modes,
+        "hash_fields": sorted(hash_fields),
+    }
+
+
 def _build_bridge_maturity_summary(bridge_runtime: dict[str, Any], bridge_preparation_summary: dict[str, Any]) -> dict[str, Any]:
     status = str(bridge_runtime.get("status") or "").strip()
     mode = str(bridge_runtime.get("mode") or "").strip()
@@ -40,6 +108,13 @@ def _build_bridge_maturity_summary(bridge_runtime: dict[str, Any], bridge_prepar
             "summary": "已具备会话快照归并能力，可提升当前目录的指纹覆盖率，但真实直连传输仍未落地。",
         }
     if status == "bridge_ready_but_api_pending" and ready:
+        if bridge_preparation_summary.get("capture_cache_available"):
+            cache_hashes = ", ".join(list(bridge_preparation_summary.get("capture_cache_hash_fields") or [])) or "-"
+            return {
+                "level": "api_capture_ready_with_cache",
+                "honesty": "api_prepared_with_capture_cache",
+                "summary": f"登录态已满足 API bridge 准备条件，且当前抓取快照里已有可消费的文件级哈希缓存（{cache_hashes}），建议先分析目录并优先消费缓存。",
+            }
         return {
             "level": "api_capture_ready_pending_provider_enrich",
             "honesty": "api_prepared_not_executed",
@@ -80,6 +155,14 @@ def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dic
     bridge_runtime = build_bridge_runtime(normalized, captured)
     capture_ready = bool(bridge_runtime.get("ready")) if capture_required else True
     bridge_preparation_summary = _build_bridge_preparation_summary(bridge_runtime)
+    capture_cache_summary = _extract_capture_cache_summary(captured)
+    bridge_preparation_summary["capture_cache_available"] = bool(capture_cache_summary.get("available"))
+    bridge_preparation_summary["capture_cache_entry_count"] = int(capture_cache_summary.get("entry_count") or 0)
+    bridge_preparation_summary["capture_cache_path_entry_count"] = int(capture_cache_summary.get("path_entry_count") or 0)
+    bridge_preparation_summary["capture_cache_id_entry_count"] = int(capture_cache_summary.get("id_entry_count") or 0)
+    bridge_preparation_summary["capture_cache_collection_entry_count"] = int(capture_cache_summary.get("collection_entry_count") or 0)
+    bridge_preparation_summary["capture_cache_lookup_modes"] = list(capture_cache_summary.get("lookup_modes") or [])
+    bridge_preparation_summary["capture_cache_hash_fields"] = list(capture_cache_summary.get("hash_fields") or [])
     bridge_maturity_summary = _build_bridge_maturity_summary(bridge_runtime, bridge_preparation_summary)
     return {
         "provider_key": normalized,
@@ -97,6 +180,7 @@ def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dic
         "bridge_status": str(bridge_runtime.get("status") or (rule.get("bridge_status") or ("capture_guided_normalization" if supported else "not_supported"))),
         "bridge_runtime": bridge_runtime,
         "bridge_preparation_summary": bridge_preparation_summary,
+        "capture_cache_summary": capture_cache_summary,
         "bridge_maturity_summary": bridge_maturity_summary,
         "runtime_mode": "openlist_first_provider_snapshot_enrichment" if supported else "openlist_only",
     }

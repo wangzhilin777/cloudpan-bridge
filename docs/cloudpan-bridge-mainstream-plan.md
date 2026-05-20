@@ -59,6 +59,14 @@
   - 新增 `app.sourceops.js`
   - 将目录浏览、挂载列表、队列、秒传诊断、驱动字段渲染从 `app.js` 剥离
 - 当前 `app.js` 已从约 `97.4 KB` 继续压到约 `88.8 KB`，回到统一体积分级阈值的黄色区下半段
+- 运行态现在会先暴露 API 型 provider 的抓取缓存摘要：
+  - 是否已有文件级哈希缓存
+  - 缓存条目数
+  - 按 `path / source_id / collection_scan` 哪种方式可命中
+  - 缓存里大概有哪些哈希类型
+- `source_target_route` 也新增了这条诚实分支：
+  - `api_capture_cache_candidate`
+  - 表示“当前应先消费抓取缓存，再决定是否真的要走在线 provider API enrich”
 
 ## 摘要
 
