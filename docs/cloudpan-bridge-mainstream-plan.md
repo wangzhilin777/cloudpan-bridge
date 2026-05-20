@@ -112,6 +112,9 @@
 - collection 条目里的 identity 字段也继续向真实开放平台返回体靠拢：
   - 现在 `id / name / path` 不只支持顶层字段，也支持藏在子对象里再递归读取
   - 例如 `file.id / file.name / parentReference.path` 这类 OneDrive 风格结构，当前也能用于命中对应 `SourceEntry`
+- 路径标准化也继续补了一层开放平台风格兼容：
+  - 现在支持 `parentReference.path = "/drive/root:/src/docs"` 这类 Graph 风格父路径
+  - 这样即使 path 不是纯净的 POSIX 目录串，只要能还原到真实目录层级，也可以继续参与条目匹配
 - 统一体积分级阈值这轮也已落到实处：
   - 当前生产源码里最大的 Python / JS 文件是 `webapp.py`，约 `94.2 KB`
   - 前端主入口 `app.js` 约 `88.8 KB`

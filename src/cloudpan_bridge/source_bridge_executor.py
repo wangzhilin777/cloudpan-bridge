@@ -172,6 +172,17 @@ def _normalize_entry_path(value: Any) -> str:
     text = str(value or "").strip().replace("\\", "/")
     if not text:
         return ""
+    normalized_lower = text.lower()
+    graph_prefixes = (
+        "/drive/root:",
+        "drive/root:",
+        "/root:",
+        "root:",
+    )
+    for prefix in graph_prefixes:
+        if normalized_lower.startswith(prefix):
+            text = text[len(prefix):] or "/"
+            break
     if not text.startswith("/"):
         text = f"/{text}"
     while "//" in text:
