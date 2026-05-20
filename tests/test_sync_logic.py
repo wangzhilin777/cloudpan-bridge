@@ -969,6 +969,38 @@ def test_source_enrichment_allows_baidu_etag_as_md5(tmp_path: Path) -> None:
     assert report["fast_upload_ready_after_bridge"] is True
 
 
+def test_source_enrichment_derives_sha1_from_tagged_content_hash(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/onedrive-tagged.bin",
+        md5="",
+        size=10,
+        provider="OneDrive",
+        raw_hash_info={"content_hash": "sha1:abcdef0123456789abcdef0123456789abcdef01"},
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.sha1 == "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+    assert report["candidate_hashes"] == ["sha1", "content_hash"]
+    assert report["changed"] is True
+
+
+def test_source_enrichment_derives_md5_from_tagged_content_hash(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/provider-tagged.bin",
+        md5="",
+        size=10,
+        provider="123Pan",
+        raw_hash_info={"content_hash": "md5=abcdef0123456789abcdef0123456789"},
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.md5 == "ABCDEF0123456789ABCDEF0123456789"
+    assert report["fast_upload_ready_after_bridge"] is True
+    assert report["changed"] is True
+
+
 def test_source_enrichment_runtime_reports_bridge_status_for_aliyundriveopen(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text(

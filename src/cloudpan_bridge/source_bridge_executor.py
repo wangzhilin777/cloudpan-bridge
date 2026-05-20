@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Callable
 
 from .models import SourceEntry, normalize_fingerprint_value
 
 
 BridgeExecuteFn = Callable[[SourceEntry, dict[str, Any]], tuple[SourceEntry, dict[str, Any]]]
+
+HEX_LENGTHS: dict[str, int] = {
+    "md5": 32,
+    "sha1": 40,
+    "sha256": 64,
+}
 
 
 def _collect_raw_sources(entry: SourceEntry) -> list[dict[str, Any]]:
@@ -37,6 +44,50 @@ def _pick_hash_value(entry: SourceEntry, logical_key: str, aliases_map: dict[str
                 continue
             uppercase = logical_key not in {"pickcode"}
             return normalize_fingerprint_value(value, uppercase=uppercase)
+        derived = _derive_hash_value(payload, logical_key)
+        if derived:
+            return derived
+    return ""
+
+
+def _derive_hash_value(payload: dict[str, Any], logical_key: str) -> str:
+    length = HEX_LENGTHS.get(logical_key)
+    if not length:
+        return ""
+    candidate_fields = [
+        payload.get("content_hash"),
+        payload.get("contenthash"),
+        payload.get("etag"),
+        payload.get("hash"),
+        payload.get("digest"),
+    ]
+    for raw in candidate_fields:
+        derived = _extract_tagged_hash(raw, logical_key, length)
+        if derived:
+            return derived
+    return ""
+
+
+def _extract_tagged_hash(value: Any, logical_key: str, length: int) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    direct_pattern = rf"(?i)\b([a-f0-9]{{{length}}})\b"
+    if logical_key != "md5":
+        tagged_pattern = rf"(?i)\b{re.escape(logical_key)}\b[^a-f0-9]*([a-f0-9]{{{length}}})\b"
+        tagged_match = re.search(tagged_pattern, text)
+        if tagged_match:
+            return normalize_fingerprint_value(tagged_match.group(1))
+    else:
+        md5_tagged_pattern = rf"(?i)\b(md5|content[-_ ]?md5|file[-_ ]?md5)\b[^a-f0-9]*([a-f0-9]{{{length}}})\b"
+        tagged_match = re.search(md5_tagged_pattern, text)
+        if tagged_match:
+            return normalize_fingerprint_value(tagged_match.group(2))
+    if logical_key != "md5":
+        return ""
+    direct_match = re.fullmatch(direct_pattern, text)
+    if direct_match:
+        return normalize_fingerprint_value(direct_match.group(1))
     return ""
 
 

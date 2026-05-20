@@ -106,6 +106,8 @@
     };
     const { I18N, HELP_TEXT, DRIVER_FIELD_I18N, DRIVER_HELP_PATTERNS, DRIVER_OPTIONS_I18N, PROVIDER_DRIVER_HINTS } = window.CloudPanBridgeData || {};
     const workflowView = window.CloudPanBridgeWorkflow || {};
+    const driverCaptureView = window.CloudPanBridgeDriverCapture || {};
+    const pendingView = window.CloudPanBridgePendingUi || {};
     let configCache = {};
     let providerRegistryPayload = null;
     let driverGuideRegistry = {};
@@ -120,8 +122,12 @@
     let latestPendingItems = [];
     let pendingSelection = new Set();
     let pendingSelectionTouched = false;
+    let pendingExpanded = new Set(["/"]);
+    let pendingDirectoryFiles = new Map();
     let currentDirectoryPath = "/";
     let currentParentPath = null;
+    let currentDriverGuide = null;
+    let currentProviderGuide = null;
 
     function workflowContext() {
       return {
@@ -148,6 +154,73 @@
         applyWorkflowGates,
       };
     }
+
+    function driverCaptureContext() {
+      return {
+        currentLang,
+        normalizeDriverKey,
+        escapeHtml,
+        guideTextPair,
+        t,
+        call,
+        setNotice,
+        renderCapabilitySummary,
+        RATE_PRESETS,
+        PROVIDER_DRIVER_HINTS,
+        getProviderDefinitions: () => providerDefinitions,
+        getProviderSnapshots: () => providerSnapshots,
+        getDriverCaptureBlueprint: () => driverCaptureBlueprint,
+        getDriverGuideRegistry: () => driverGuideRegistry,
+        getStorageRecords: () => storageRecords,
+        getCurrentDriverGuide: () => currentDriverGuide,
+        setCurrentDriverGuide: (value) => {
+          currentDriverGuide = value;
+        },
+        getCurrentProviderGuide: () => currentProviderGuide,
+        setCurrentProviderGuide: (value) => {
+          currentProviderGuide = value;
+        },
+      };
+    }
+
+    function pendingUiContext() {
+      return {
+        currentLang,
+        escapeHtml,
+        formatBytes,
+        setLatestPendingItems: (items) => {
+          latestPendingItems = items;
+        },
+        getPendingState: () => ({
+          selection: new Set(pendingSelection),
+          selectionTouched: pendingSelectionTouched,
+          expanded: new Set(pendingExpanded),
+          directoryFiles: new Map(pendingDirectoryFiles),
+        }),
+        setPendingState: (state) => {
+          pendingSelection = new Set(state.selection || []);
+          pendingSelectionTouched = !!state.selectionTouched;
+          pendingExpanded = new Set(state.expanded || ["/"]);
+          pendingDirectoryFiles = new Map(state.directoryFiles || []);
+        },
+      };
+    }
+
+    const getDriverGuide = (driver) => driverCaptureView.getDriverGuide(driverCaptureContext(), driver);
+    const getGuideForProviderDefinition = (definition) => driverCaptureView.getGuideForProviderDefinition(driverCaptureContext(), definition);
+    const guideDocCandidates = (guide) => driverCaptureView.guideDocCandidates(driverCaptureContext(), guide);
+    const renderGuideIntoDialog = (guide, titleText) => driverCaptureView.renderGuideIntoDialog(driverCaptureContext(), guide, titleText);
+    const renderDriverGuide = (driver) => driverCaptureView.renderDriverGuide(driverCaptureContext(), driver);
+    const applyDriverGuideDefaults = () => driverCaptureView.applyDriverGuideDefaults(driverCaptureContext());
+    const toggleDriverGuideDialog = (visible) => driverCaptureView.toggleDriverGuideDialog(driverCaptureContext(), visible);
+    const chooseRatePreset = (driver, mode) => driverCaptureView.chooseRatePreset(driverCaptureContext(), driver, mode);
+    const inferProviderFromDriver = (driver) => driverCaptureView.inferProviderFromDriver(driverCaptureContext(), driver);
+    const renderProviderOptions = (definitions) => driverCaptureView.renderProviderOptions(driverCaptureContext(), definitions);
+    const renderProviderCapturePanel = () => driverCaptureView.renderProviderCapturePanel(driverCaptureContext());
+    const applyProviderSelectionFromDriver = (driver) => driverCaptureView.applyProviderSelectionFromDriver(driverCaptureContext(), driver);
+    const applyCapturedProviderFields = () => driverCaptureView.applyCapturedProviderFields(driverCaptureContext());
+    const applyRatePresetForMount = (mountPath) => driverCaptureView.applyRatePresetForMount(driverCaptureContext(), mountPath);
+    const renderPendingTree = (items) => pendingView.renderPendingTree(pendingUiContext(), items);
     let authState = { enabled: false, authenticated: true, username: "" };
     let appBootstrapped = false;
     let autoRefreshTimer = null;
@@ -1153,352 +1226,6 @@
       }
     }
 
-    function getDriverGuide(driver) {
-      const normalized = normalizeDriverKey(driver);
-      if (driverCaptureBlueprint?.driver && normalizeDriverKey(driverCaptureBlueprint.driver) === normalized && driverCaptureBlueprint.guide) {
-        return driverCaptureBlueprint.guide;
-      }
-      return driverGuideRegistry[normalized] || null;
-    }
-
-    function getGuideForProviderDefinition(definition) {
-      if (definition?.guide) return definition.guide;
-      const sourceProfile = definition?.source_profile || {};
-      const aliases = Array.isArray(sourceProfile.driverAliases) ? sourceProfile.driverAliases : [];
-      const recommendedDrivers = Array.isArray(definition?.recommended_drivers) ? definition.recommended_drivers : [];
-      const candidates = [...recommendedDrivers, ...aliases, sourceProfile.key || "", definition?.key || ""];
-      for (const item of candidates) {
-        const guide = getDriverGuide(item);
-        if (guide) return guide;
-      }
-      return null;
-    }
-
-    function guideDocCandidates(guide) {
-      const list = Array.isArray(guide?.docUrlCandidates) ? guide.docUrlCandidates : [];
-      const merged = [];
-      if (guide?.docUrl) merged.push(guide.docUrl);
-      merged.push(...list);
-      return [...new Set(merged.map((item) => String(item || "").trim()).filter(Boolean))];
-    }
-
-    function renderGuideIntoDialog(guide, titleText) {
-      currentDriverGuide = guide;
-      const summary = document.getElementById("driver-guide-summary");
-      const stepsRoot = document.getElementById("driver-guide-steps");
-      const title = document.getElementById("driver-guide-title");
-      const openDocButton = document.getElementById("open-driver-doc");
-      const candidatesRoot = document.getElementById("driver-guide-doc-candidates");
-      if (!guide) {
-        const empty = currentLang() === "en"
-          ? "This provider currently has no built-in special guide. You can still use the captured fields and the official docs manually."
-          : currentLang() === "mix"
-            ? "当前 provider 暂无内置专属流程说明，可先用抓取结果与动态字段，再手动参考官方文档。 / No built-in special guide yet."
-            : "当前 provider 暂无内置专属流程说明，可先用抓取结果与动态字段，再手动参考官方文档。";
-        if (summary) summary.textContent = empty;
-        if (stepsRoot) stepsRoot.innerHTML = "";
-        if (candidatesRoot) candidatesRoot.textContent = currentLang() === "en"
-          ? "No official doc candidates yet."
-          : currentLang() === "mix"
-            ? "当前没有官方文档候选链路。 / No official doc candidates yet."
-            : "当前没有官方文档候选链路。";
-        if (title) title.textContent = titleText || (currentLang() === "en" ? "Provider Access Guide" : currentLang() === "mix" ? "网盘接入流程 / Provider Access Guide" : "网盘接入流程");
-        if (openDocButton) openDocButton.disabled = true;
-        return;
-      }
-      const summaryText = guideTextPair(guide.summary);
-      if (summary) summary.textContent = summaryText;
-      if (title) title.textContent = titleText || (currentLang() === "en" ? "Provider Access Guide" : currentLang() === "mix" ? "网盘接入流程 / Provider Access Guide" : "网盘接入流程");
-      const zhSteps = Array.isArray(guide.steps?.zh) ? guide.steps.zh : [];
-      const enSteps = Array.isArray(guide.steps?.en) ? guide.steps.en : [];
-      const steps = currentLang() === "en" ? enSteps : currentLang() === "mix" ? zhSteps.map((item, index) => `${item}\n\n${enSteps[index] || ""}`) : zhSteps;
-      if (stepsRoot) {
-        stepsRoot.innerHTML = steps.map((item, index) => `
-          <div class="guide-step">
-            <strong>${index + 1}.</strong> ${escapeHtml(item)}
-          </div>
-        `).join("");
-      }
-      const candidates = guideDocCandidates(guide);
-      if (candidatesRoot) {
-        candidatesRoot.innerHTML = candidates.length
-          ? `
-            <div style="margin-bottom:8px;">${currentLang() === "en" ? "Official doc candidates" : currentLang() === "mix" ? "官方文档候选 / Official doc candidates" : "官方文档候选"}</div>
-            ${candidates.map((item, index) => `<div class="mono"><a href="${escapeHtml(item)}" target="_blank" rel="noopener noreferrer">${escapeHtml(index === 0 ? item : `${index + 1}. ${item}`)}</a></div>`).join("")}
-          `
-          : (currentLang() === "en"
-            ? "No official doc candidates yet."
-            : currentLang() === "mix"
-              ? "当前没有官方文档候选链路。 / No official doc candidates yet."
-              : "当前没有官方文档候选链路。");
-      }
-      if (openDocButton) openDocButton.disabled = !candidates.length;
-    }
-
-    function renderDriverGuide(driver) {
-      const guide = getDriverGuide(driver);
-      currentDriverGuide = guide;
-      const inline = document.getElementById("driver-guide-inline");
-      if (!guide) {
-        const empty = currentLang() === "en"
-          ? "This driver currently has no built-in special guide. You can still use the dynamic fields below or check the OpenList docs manually."
-          : currentLang() === "mix"
-            ? "当前驱动暂时没有内置专属流程说明，可先用下方动态字段，也可以手动查 OpenList 文档。 / No built-in special guide yet."
-            : "当前驱动暂时没有内置专属流程说明，可先用下方动态字段，也可以手动查 OpenList 文档。";
-        if (inline) inline.textContent = empty;
-        renderGuideIntoDialog(null, currentLang() === "en" ? "Driver Access Guide" : currentLang() === "mix" ? "驱动接入流程 / Driver Access Guide" : "驱动接入流程");
-        return;
-      }
-      const summaryText = guideTextPair(guide.summary);
-      if (inline) {
-        inline.innerHTML = `
-          <div>${escapeHtml(summaryText)}</div>
-          <div class="mono">${currentLang() === "en" ? "Official doc" : currentLang() === "mix" ? "官方文档 / Official doc" : "官方文档"}: ${escapeHtml(guide.docUrl || "")}</div>
-        `;
-      }
-      renderGuideIntoDialog(guide, `${driver} ${currentLang() === "en" ? "Guide" : currentLang() === "mix" ? "接入流程 / Guide" : "接入流程"}`);
-    }
-
-    function applyDriverGuideDefaults() {
-      if (!currentDriverGuide?.defaults) {
-        setNotice("driver-notice", currentLang() === "en"
-          ? "No built-in recommended defaults for this driver."
-          : currentLang() === "mix"
-            ? "当前驱动没有内置推荐默认值。 / No built-in recommended defaults."
-            : "当前驱动没有内置推荐默认值。");
-        return;
-      }
-      let changed = 0;
-      const inputs = [...document.querySelectorAll("[data-driver-field]")];
-      for (const [fieldName, value] of Object.entries(currentDriverGuide.defaults)) {
-        const input = inputs.find((item) => normalizeDriverKey(item.getAttribute("data-driver-field") || "") === normalizeDriverKey(fieldName));
-        if (input) {
-          input.value = String(value);
-          changed += 1;
-        }
-      }
-      setNotice("driver-notice", currentLang() === "en"
-        ? `Applied ${changed} recommended default values.`
-        : currentLang() === "mix"
-          ? `已套用 ${changed} 个推荐默认值。 / Applied ${changed} recommended defaults.`
-          : `已套用 ${changed} 个推荐默认值。`);
-    }
-
-    function toggleDriverGuideDialog(visible) {
-      const dialog = document.getElementById("driver-guide-dialog");
-      if (!dialog) return;
-      dialog.classList.toggle("hidden", !visible);
-    }
-
-    function chooseRatePreset(driver, mode) {
-      const normalizedDriver = String(driver || "").toLowerCase();
-      if (mode === "custom") return null;
-      for (const [key, preset] of Object.entries(RATE_PRESETS)) {
-        if (key === "default" || key === "safe" || key === "balanced" || key === "fast") continue;
-        if (normalizedDriver.includes(key)) return preset;
-      }
-      return RATE_PRESETS[mode] || RATE_PRESETS.default;
-    }
-
-    function inferProviderFromDriver(driver) {
-      const text = String(driver || "").toLowerCase();
-      const fromDefinitions = (providerDefinitions || []).find((item) => {
-        const list = Array.isArray(item?.recommended_drivers) ? item.recommended_drivers : [];
-        return list.some((name) => String(name || "").toLowerCase() === text);
-      });
-      if (fromDefinitions?.key) return fromDefinitions.key;
-      if (!text) return "189cloud";
-      if (text.includes("quark")) return "quark";
-      if (text.includes("123")) return "123pan";
-      if (text.includes("baidu")) return "baidu";
-      if (text.includes("thunder") || text.includes("xunlei")) return "thunder";
-      if (text.includes("189")) return "189cloud";
-      if (text.includes("aliyun") || text.includes("alipan")) return "aliyundriveopen";
-      if (text.includes("onedrive")) return "onedrive";
-      if (text.includes("pikpak")) return "pikpak";
-      if (text.includes("139")) return "139yun";
-      if (text.includes("guangya")) return "guangya";
-      if (driverCaptureBlueprint?.key) return driverCaptureBlueprint.key;
-      return "189cloud";
-    }
-
-    function maskValue(value) {
-      const text = String(value || "");
-      if (!text) return "";
-      if (text.length <= 12) return `${text.slice(0, 2)}***${text.slice(-2)}`;
-      return `${text.slice(0, 6)}***${text.slice(-4)}`;
-    }
-
-    function fieldStatus(value) {
-      if (value) return currentLang() === "en" ? "captured" : currentLang() === "mix" ? "已抓取 / captured" : "已抓取";
-      return currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未抓取 / missing" : "未抓取";
-    }
-
-    function normalizeProviderFieldValue(fieldName, captured, provider) {
-      const key = String(fieldName || "").toLowerCase();
-      const data = captured || {};
-      if (key.includes("cookie")) return data.cookie_header || "";
-      if (key.includes("bdstoken")) return data.bdstoken || "";
-      if (key.includes("refresh")) return data.refresh_token || "";
-      if (key.includes("access") || key.endsWith("token")) return data.access_token || data.token || "";
-      if (key.includes("auth")) return data.authorization || "";
-      if (key.includes("device") || key === "did") return data.device_id || data.did || "";
-      if (key === "dt") return data.dt || "";
-      if (key.includes("captcha")) return data.captcha_token || "";
-      if (key.includes("client")) return data.client_id || "";
-      if (key.includes("session")) return data.session_key || "";
-      if (provider === "quark" && key.includes("cookie")) return data.cookie_header || "";
-      return "";
-    }
-
-    function renderProviderOptions(definitions) {
-      const select = document.getElementById("provider-select");
-      if (!select) return;
-      const items = [...(Array.isArray(definitions) ? definitions : [])];
-      if (driverCaptureBlueprint?.key && !items.some((item) => item.key === driverCaptureBlueprint.key)) {
-        items.push(driverCaptureBlueprint);
-      }
-      if (!items.length) {
-        select.innerHTML = `<option value="">${currentLang() === "en" ? "No providers" : currentLang() === "mix" ? "暂无 provider / No providers" : "暂无 provider"}</option>`;
-        return;
-      }
-      const current = select.value || inferProviderFromDriver(document.getElementById("driver-select")?.value || "");
-      select.innerHTML = items.map((item) => {
-        const selected = item.key === current ? "selected" : "";
-        return `<option value="${escapeHtml(item.key)}" ${selected}>${escapeHtml(item.label)}</option>`;
-      }).join("");
-    }
-
-    function renderProviderCapturePanel() {
-      const select = document.getElementById("provider-select");
-      if (!select) return;
-      const items = [...providerDefinitions];
-      if (driverCaptureBlueprint?.key && !items.some((item) => item.key === driverCaptureBlueprint.key)) {
-        items.push(driverCaptureBlueprint);
-      }
-      const provider = select.value || items[0]?.key || "189cloud";
-      const definition = items.find((item) => item.key === provider);
-      currentProviderGuide = getGuideForProviderDefinition(definition);
-      const snapshot = providerSnapshots?.[provider] || {};
-      const captured = snapshot.captured || {};
-      const captureMode = String(definition?.capture_mode || "browser");
-      const requiredKeys = Array.isArray(definition?.required_keys) ? definition.required_keys : [];
-      const recommended = Array.isArray(definition?.recommended_drivers) && definition.recommended_drivers.length
-        ? definition.recommended_drivers
-        : (PROVIDER_DRIVER_HINTS[provider] || []);
-      const profile = definition?.source_profile || {};
-      const loginModeText = currentLang() === "en"
-        ? (profile.loginMode || "")
-        : currentLang() === "mix"
-          ? `${profile.loginMode || ""} / ${profile.loginMode || ""}`.trim()
-          : (profile.loginMode || "");
-      const hashText = Array.isArray(profile.hashFieldsSupported) ? profile.hashFieldsSupported.join(", ") : "";
-      const docLinks = Array.isArray(profile.docLinks) ? profile.docLinks : [];
-      const rateText = profile.recommendedRateProfile || "";
-      const lines = requiredKeys.length
-        ? requiredKeys.map((key) => `<div class="mono">${escapeHtml(key)}: ${fieldStatus(captured[key])}${captured[key] ? ` | ${escapeHtml(maskValue(captured[key]))}` : ""}</div>`).join("")
-        : `<div class="mono">${currentLang() === "en" ? "No required fields declared." : currentLang() === "mix" ? "未声明必需字段 / No required fields declared." : "未声明必需字段。"}</div>`;
-      document.getElementById("provider-driver-hint").innerHTML = `
-        <div>${escapeHtml(definition?.description || "")}</div>
-        <div class="mono">${currentLang() === "en" ? "Login URL" : currentLang() === "mix" ? "登录地址 / Login URL" : "登录地址"}: ${escapeHtml(definition?.login_url || "-")}</div>
-        <div class="mono">${currentLang() === "en" ? "Recommended drivers" : currentLang() === "mix" ? "建议驱动 / Recommended drivers" : "建议驱动"}: ${escapeHtml(recommended.join(", ") || "-")}</div>
-        <div class="mono">${currentLang() === "en" ? "Login mode" : currentLang() === "mix" ? "登录模式 / Login mode" : "登录模式"}: ${escapeHtml(loginModeText || "-")}</div>
-        <div class="mono">${currentLang() === "en" ? "Recommended rate" : currentLang() === "mix" ? "推荐频率 / Recommended rate" : "推荐频率"}: ${escapeHtml(rateText || "-")}</div>
-        <div class="mono">${currentLang() === "en" ? "Hash fields" : currentLang() === "mix" ? "哈希字段 / Hash fields" : "哈希字段"}: ${escapeHtml(hashText || "-")}</div>
-        <div class="mono">${currentLang() === "en" ? "Docs" : currentLang() === "mix" ? "文档 / Docs" : "文档"}: ${docLinks.length ? docLinks.map((link) => `<a href="${escapeHtml(link)}" target="_blank" rel="noreferrer">${escapeHtml(link)}</a>`).join("<br>") : "-"}</div>
-        <div class="mono">${currentLang() === "en" ? "Built-in guide" : currentLang() === "mix" ? "内置流程说明 / Built-in guide" : "内置流程说明"}: ${currentProviderGuide ? (currentLang() === "en" ? "available" : currentLang() === "mix" ? "可查看 / available" : "可查看") : (currentLang() === "en" ? "not available" : currentLang() === "mix" ? "暂无 / not available" : "暂无")}</div>
-      `;
-      const loginUrlInput = document.getElementById("provider-login-url");
-      if (loginUrlInput) {
-        loginUrlInput.value = definition?.login_url || "";
-      }
-      const startButton = document.getElementById("start-provider-capture");
-      if (startButton) {
-        startButton.textContent = captureMode === "manual"
-          ? (currentLang() === "en"
-            ? "Open guide / manual credentials"
-            : currentLang() === "mix"
-              ? "查看说明并手动填写 / Open guide"
-              : "查看说明并手动填写")
-          : t("btn.start_provider_capture");
-      }
-      document.getElementById("provider-capture-summary").innerHTML = `
-        <div class="badge">${escapeHtml(snapshot.status || "idle")}</div>
-        <div class="mono">${escapeHtml(snapshot.message || "")}</div>
-        <div class="mono">${currentLang() === "en" ? "Capture mode" : currentLang() === "mix" ? "接入模式 / Capture mode" : "接入模式"}: ${escapeHtml(captureMode === "manual" ? (currentLang() === "en" ? "manual credentials" : currentLang() === "mix" ? "手动凭证 / manual credentials" : "手动凭证") : (currentLang() === "en" ? "browser capture" : currentLang() === "mix" ? "网页登录抓取 / browser capture" : "网页登录抓取"))}</div>
-        ${lines}
-        ${captured.cookie_header ? `<div class="mono">cookie_header: ${escapeHtml(maskValue(captured.cookie_header))}</div>` : ""}
-      `;
-    }
-
-    function applyProviderSelectionFromDriver(driver) {
-      const select = document.getElementById("provider-select");
-      if (!select) return;
-      const provider = inferProviderFromDriver(driver);
-      if ([...select.options].some((item) => item.value === provider)) {
-        select.value = provider;
-        renderProviderCapturePanel();
-      }
-      renderCapabilitySummary();
-    }
-
-    async function applyCapturedProviderFields() {
-      const provider = document.getElementById("provider-select")?.value || "";
-      const driver = document.getElementById("driver-select")?.value || "";
-      const data = await call("/api/provider/capture/prefill", {
-        method: "POST",
-        body: JSON.stringify({ provider, driver }),
-      });
-      const values = data?.values || {};
-      let changed = 0;
-      document.querySelectorAll("[data-driver-field]").forEach((el) => {
-        const fieldName = el.getAttribute("data-driver-field") || "";
-        const nextValue = values[fieldName] || "";
-        if (nextValue && !el.value) {
-          el.value = nextValue;
-          changed += 1;
-        }
-      });
-      const missingRequired = Array.isArray(data?.missing_required) ? data.missing_required : [];
-      const missingText = missingRequired.length
-        ? (currentLang() === "en"
-          ? ` Missing required fields: ${missingRequired.join(", ")}`
-          : currentLang() === "mix"
-            ? ` 缺少必填字段 / Missing required fields: ${missingRequired.join(", ")}`
-            : ` 缺少必填字段: ${missingRequired.join(", ")}`)
-        : "";
-      setNotice(
-        "driver-notice",
-        changed
-          ? (currentLang() === "en"
-            ? `Applied ${changed} captured values to the mount form.${missingText}`
-            : currentLang() === "mix"
-              ? `已写入 ${changed} 个抓取字段 / Applied ${changed} values.${missingText}`
-              : `已写入 ${changed} 个抓取字段到当前挂载表单。${missingText}`)
-          : (currentLang() === "en"
-            ? `No matching captured values were found for the current mount form.${missingText}`
-            : currentLang() === "mix"
-              ? `当前挂载表单没有可匹配字段 / No matching captured values were found.${missingText}`
-              : `当前挂载表单没有可匹配的抓取字段。${missingText}`)
-      );
-    }
-
-    function applyRatePresetForMount(mountPath) {
-      const mode = String(document.getElementById("rate_limit_mode").value || "safe");
-      if (mode === "custom") return;
-      const selected = storageRecords.find((item) => {
-        const current = item.mount_path || item.mountPath || item.path || "/";
-        return String(current) === String(mountPath);
-      });
-      const driver = selected?.driver || selected?.driver_name || selected?.driverName || "";
-      const preset = chooseRatePreset(driver, mode);
-      if (!preset) return;
-      document.getElementById("openlist_page_size").value = String(preset.openlist_page_size);
-      document.getElementById("openlist_request_interval_ms").value = String(preset.openlist_request_interval_ms);
-      document.getElementById("queue_interval_ms").value = String(preset.queue_interval_ms);
-      setNotice("sync-notice", `已按 ${driver || "默认驱动"} 应用 ${mode} 频率策略。`);
-    }
-
     function toggleDrawer(forceVisible = null) {
       const drawer = document.getElementById("log-drawer");
       const hidden = forceVisible === null ? !drawer.classList.contains("hidden") : !forceVisible;
@@ -1828,163 +1555,6 @@
           await refreshStatus();
         });
       });
-    }
-
-    function buildPendingTree(items) {
-      const root = { name: "/", path: "/", directories: new Map(), files: [] };
-      for (const item of items) {
-        const path = String(item?.path || "");
-        const parts = path.split("/").filter(Boolean);
-        let cursor = root;
-        let current = "";
-        for (let index = 0; index < parts.length - 1; index += 1) {
-          const part = parts[index];
-          current += `/${part}`;
-          if (!cursor.directories.has(part)) {
-            cursor.directories.set(part, { name: part, path: current, directories: new Map(), files: [] });
-          }
-          cursor = cursor.directories.get(part);
-        }
-        cursor.files.push(item);
-      }
-      return root;
-    }
-
-    function collectNodeFilePaths(node) {
-      let result = [];
-      for (const file of node.files || []) {
-        if (file?.path) result.push(file.path);
-      }
-      for (const child of node.directories?.values() || []) {
-        result = result.concat(collectNodeFilePaths(child));
-      }
-      return result;
-    }
-
-    function refreshPendingDirectoryMap(root) {
-      pendingDirectoryFiles = new Map();
-      function walk(node) {
-        pendingDirectoryFiles.set(node.path, collectNodeFilePaths(node));
-        for (const child of node.directories?.values() || []) walk(child);
-      }
-      walk(root);
-    }
-
-    function renderPendingNode(node) {
-      const childDirs = [...(node.directories?.values() || [])].sort((a, b) => a.path.localeCompare(b.path, "zh-CN"));
-      const files = [...(node.files || [])].sort((a, b) => String(a.path || "").localeCompare(String(b.path || ""), "zh-CN"));
-      const allPaths = collectNodeFilePaths(node);
-      const checkedCount = allPaths.filter((path) => pendingSelection.has(path)).length;
-      const expanded = pendingExpanded.has(node.path);
-      return `
-        <div class="tree-node">
-          <div class="tree-row">
-            <button type="button" class="tree-toggle ${childDirs.length ? "" : "empty"}" data-toggle-node="${escapeHtml(node.path)}">${childDirs.length ? (expanded ? "-" : "+") : ""}</button>
-            <input type="checkbox" data-select-dir="${escapeHtml(node.path)}" ${allPaths.length && checkedCount === allPaths.length ? "checked" : ""}>
-            <div class="tree-label">
-              <div>${escapeHtml(node.name || "/")}</div>
-              <div class="mono">${escapeHtml(node.path)} | ${allPaths.length} 个文件</div>
-            </div>
-          </div>
-          ${expanded ? `
-            <div>
-              ${childDirs.map((child) => renderPendingNode(child)).join("")}
-              ${files.map((file) => `
-                <label class="tree-row">
-                  <span class="tree-toggle empty"></span>
-                  <input type="checkbox" data-select-file="${escapeHtml(file.path || "")}" ${pendingSelection.has(file.path) ? "checked" : ""}>
-                  <div class="tree-label">
-                    <div>${escapeHtml((file.path || "").split("/").filter(Boolean).pop() || file.path || "")}</div>
-                    <div class="mono">${escapeHtml(file.path || "")} | ${formatBytes(file.size)} | ${escapeHtml(file.reason || "-")}</div>
-                  </div>
-                </label>
-              `).join("")}
-            </div>
-          ` : ""}
-        </div>
-      `;
-    }
-
-    function syncPendingCheckboxState(root) {
-      root.querySelectorAll("[data-select-dir]").forEach((box) => {
-        const dir = box.getAttribute("data-select-dir");
-        const paths = pendingDirectoryFiles.get(dir) || [];
-        const count = paths.filter((path) => pendingSelection.has(path)).length;
-        box.checked = paths.length > 0 && count === paths.length;
-        box.indeterminate = count > 0 && count < paths.length;
-      });
-    }
-
-    function bindPendingEvents(items) {
-      const root = document.getElementById("pending-tree");
-      root.querySelectorAll("[data-toggle-node]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const node = button.getAttribute("data-toggle-node");
-          if (!node) return;
-          if (pendingExpanded.has(node)) pendingExpanded.delete(node);
-          else pendingExpanded.add(node);
-          renderPendingTree(items);
-        });
-      });
-      root.querySelectorAll("[data-select-file]").forEach((box) => {
-        box.addEventListener("change", () => {
-          const path = box.getAttribute("data-select-file");
-          if (!path) return;
-          if (box.checked) pendingSelection.add(path);
-          else pendingSelection.delete(path);
-          pendingSelectionTouched = true;
-          syncPendingCheckboxState(root);
-        });
-      });
-      root.querySelectorAll("[data-select-dir]").forEach((box) => {
-        box.addEventListener("change", () => {
-          const dir = box.getAttribute("data-select-dir");
-          const paths = pendingDirectoryFiles.get(dir) || [];
-          for (const path of paths) {
-            if (box.checked) pendingSelection.add(path);
-            else pendingSelection.delete(path);
-          }
-          pendingSelectionTouched = true;
-          renderPendingTree(items);
-        });
-      });
-    }
-
-    function renderPendingTree(items) {
-      const root = document.getElementById("pending-tree");
-      const list = Array.isArray(items) ? items : [];
-      latestPendingItems = list;
-      if (!list.length) {
-        root.textContent = currentLang() === "en" ? "No pending reupload files" : currentLang() === "mix" ? "暂无待补传文件 / No pending reupload files" : "暂无待补传文件";
-        pendingSelection = new Set();
-        pendingDirectoryFiles = new Map();
-        pendingExpanded = new Set(["/"]);
-        return;
-      }
-      const available = new Set(list.map((item) => item?.path).filter(Boolean));
-      pendingSelection = new Set([...pendingSelection].filter((path) => available.has(path)));
-      if (!pendingSelectionTouched && pendingSelection.size === 0) {
-        pendingSelection = new Set(available);
-      }
-      const tree = buildPendingTree(list);
-      refreshPendingDirectoryMap(tree);
-      if (pendingExpanded.size <= 1) {
-        for (const item of list) {
-          const parts = String(item.path || "").split("/").filter(Boolean);
-          let current = "";
-          for (let index = 0; index < Math.min(parts.length - 1, 2); index += 1) {
-            current += `/${parts[index]}`;
-            pendingExpanded.add(current);
-          }
-        }
-      }
-      const children = [...tree.directories.values()].sort((a, b) => a.path.localeCompare(b.path, "zh-CN"));
-      root.innerHTML = `
-        <div class="subtle" style="margin-bottom:10px;">${currentLang() === "en" ? `Total ${list.length} pending files. Expand, collapse, and select by real directory tree.` : currentLang() === "mix" ? `共 ${list.length} 个待补传文件 / Total ${list.length} pending files. 可按目录树展开、折叠和联动勾选。` : `共 ${list.length} 个待补传文件，可按目录树展开、折叠和联动勾选。`}</div>
-        ${children.map((child) => renderPendingNode(child)).join("")}
-      `;
-      bindPendingEvents(list);
-      syncPendingCheckboxState(root);
     }
 
     function renderStorages(payload) {
