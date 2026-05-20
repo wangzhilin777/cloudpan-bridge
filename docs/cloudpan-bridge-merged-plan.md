@@ -41,9 +41,9 @@
 
 - [x] 识别当前超出阈值的 Python 文件，并优先处理 `provider_registry.py`
 - [x] 将 `provider_registry.py` 内的大型静态常量拆到 `provider_registry_data/` 子模块
-- [x] 将主逻辑文件 `provider_registry.py` 压回 `100 KB` 优先线以内（当前约 60.6 KB）
+- [x] 将主逻辑文件 `provider_registry.py` 压回统一分级阈值的绿色区（当前约 60.6 KB，低于 `80 KB`）
 - [x] 拆分后编译与测试通过：`python -m compileall src tests`、`pytest -q -x`、`pytest -q`
-- [x] 继续评估并落地首轮细拆：已把 `webapp.py` 的运行时节流/待补传分组工具提到独立模块，主文件继续维持在 `100 KB` 优先线内
+- [x] 继续评估并落地首轮细拆：已把 `webapp.py` 的运行时节流/待补传分组工具提到独立模块，主文件继续维持在统一分级阈值的黄色区内，并保持接近 `100 KB` 优先目标线
 
 ### 里程碑 6：挂载驱动到 Source Profile 映射层（起步）
 
