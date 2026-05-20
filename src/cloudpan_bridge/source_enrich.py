@@ -73,6 +73,12 @@ def _extract_capture_cache_summary(captured: dict[str, Any]) -> dict[str, Any]:
                 normalized = "crc64"
             elif normalized == "md5hash":
                 normalized = "md5"
+            elif normalized in {"md5sum", "md5_sum"}:
+                normalized = "md5"
+            elif normalized in {"gcidhash", "gcid_hash"}:
+                normalized = "gcid"
+            elif normalized in {"pickcode", "pick_code"}:
+                normalized = "pickcode"
             elif normalized == "contenthash":
                 normalized = "content_hash"
             if normalized in CAPTURE_CACHE_HASH_KEYS and str(value or "").strip():

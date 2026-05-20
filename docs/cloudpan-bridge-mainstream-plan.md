@@ -89,6 +89,9 @@
   - 常见的 `camelCase / PascalCase / 连字符` 哈希键名会先归一化再进入统一提取流程
   - 已覆盖的真实变体包括 `contentMd5 / gcidHash / sha1Hash / crc64Hash / pickCode` 等
   - 这让 `189Cloud / Thunder / OneDrive / AliyunDriveOpen` 一类常见返回体不必每个 provider 单独再写一轮键名兼容
+- 抓取缓存摘要也同步学会识别这些真实哈希键名：
+  - `gcidHash / md5Sum / pickCode` 这类字段现在会被统一折叠成 `gcid / md5 / pickcode`
+  - 这样 `capture_cache_fast_hashes` 与后续目标能力判断，不会因为缓存键名写法不同而漏掉本来可命中的快传路径
 
 ## 摘要
 

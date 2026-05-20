@@ -1511,6 +1511,41 @@ def test_source_enrichment_runtime_counts_nested_capture_cache_entries(tmp_path:
     assert summary["hash_fields"] == ["content_hash", "sha1"]
 
 
+def test_source_enrichment_runtime_normalizes_capture_cache_fast_hash_aliases(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "thunder": {
+                            "status": "captured",
+                            "captured": {
+                                "authorization": "Bearer demo",
+                                "device_id": "dev-1",
+                                "entries": {
+                                    "data": {
+                                        "records": [
+                                            {"gcidHash": "a" * 40, "md5Sum": "b" * 32, "pickCode": "pc-1"}
+                                        ]
+                                    }
+                                },
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "thunder")
+    summary = runtime["capture_cache_summary"]
+    assert summary["available"] is True
+    assert summary["hash_fields"] == ["gcid", "md5", "pickcode"]
+    assert runtime["bridge_preparation_summary"]["capture_cache_hash_fields"] == ["gcid", "md5", "pickcode"]
+
+
 def test_bridge_runtime_reports_missing_keys_for_baidu_capture() -> None:
     runtime = build_bridge_runtime("baidu", {"cookie_header": "sid=1"})
     assert runtime["ready"] is False
@@ -6422,6 +6457,63 @@ def test_provider_capability_assess_prefers_capture_cache_route_when_available(t
     assert payload["sourceTargetRoute"]["preferred_execution_mode"] == "fast_upload"
     assert payload["sourceTargetRoute"]["capture_cache_fast_hashes"] == ["md5"]
     assert payload["targetHashAcceptance"]["captureCacheAccepts"] == ["md5"]
+    assert payload["targetHashAcceptance"]["bucket"] == "capture_cache_overlap"
+
+
+def test_provider_capability_assess_accepts_camel_case_capture_cache_fast_hashes_for_thunder(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "thunder": {
+                            "status": "captured",
+                            "captured": {
+                                "authorization": "Bearer demo",
+                                "device_id": "dev-1",
+                                "entries": {
+                                    "data": {
+                                        "records": [
+                                            {"gcidHash": "a" * 40, "md5Sum": "b" * 32}
+                                        ]
+                                    }
+                                },
+                            },
+                        }
+                    }
+                },
+                "sync": {
+                    "source_path": "/src",
+                    "target_path": "/dst"
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/capability_assess",
+        json={
+            "driver": "Thunder",
+            "analysis_summary": {
+                "total": 2,
+                "fast_upload_ready": 0,
+                "md5_ready": 0,
+                "gcid_ready": 0,
+                "missing_fast_upload": 2,
+                "sha1_ready": 2,
+            },
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sourceTargetRoute"]["decision_bucket"] == "api_capture_cache_candidate"
+    assert payload["sourceTargetRoute"]["capture_cache_fast_hashes"] == ["md5", "gcid"]
+    assert payload["targetHashAcceptance"]["captureCacheAccepts"] == ["md5", "gcid"]
     assert payload["targetHashAcceptance"]["bucket"] == "capture_cache_overlap"
 
 
