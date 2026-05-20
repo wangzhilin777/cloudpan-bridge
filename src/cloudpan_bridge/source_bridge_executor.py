@@ -65,6 +65,28 @@ HASH_LABEL_ALIASES = {
 
 HASH_ITEM_LABEL_KEYS = ("algorithm", "alg", "name", "type", "hash_type", "kind", "label", "key")
 HASH_ITEM_VALUE_KEYS = ("value", "hash", "digest", "checksum", "content", "content_hash", "etag", "md5", "sha1", "sha256", "gcid", "crc64", "pre_hash", "slice_md5")
+CAPTURE_PATH_CONTAINER_KEYS = ("file_hashes_by_path", "fingerprints_by_path", "hash_cache_by_path", "entry_hashes_by_path")
+CAPTURE_ID_CONTAINER_KEYS = ("file_hashes_by_id", "fingerprints_by_id", "hash_cache_by_id", "entry_hashes_by_id")
+CAPTURE_COLLECTION_KEYS = ("file_hashes", "fingerprints", "hash_cache", "entries", "items")
+PAYLOAD_PATH_KEYS = ("path", "file_path", "filePath", "source_path", "sourcePath", "full_path", "fullPath")
+PAYLOAD_ID_KEYS = (
+    "source_id",
+    "sourceId",
+    "file_id",
+    "fileId",
+    "id",
+    "fid",
+    "res_id",
+    "resId",
+    "resource_id",
+    "resourceId",
+    "fs_id",
+    "fsId",
+    "item_id",
+    "itemId",
+    "driveItemId",
+    "drive_item_id",
+)
 
 
 def _iter_collection_entries(value: Any) -> list[dict[str, Any]]:
@@ -96,6 +118,10 @@ def _canonicalize_hash_key_name(value: Any) -> str:
     while "__" in snake:
         snake = snake.replace("__", "_")
     return snake.strip("_")
+
+
+def _canonicalize_capture_key(value: Any) -> str:
+    return "".join(ch.lower() for ch in str(value or "") if ch.isalnum())
 
 
 def _normalize_hash_label(value: Any) -> str:
@@ -146,22 +172,39 @@ def _normalize_entry_path(value: Any) -> str:
 def _capture_payload_matches_entry(payload: dict[str, Any], entry: SourceEntry) -> bool:
     normalized_entry_path = _normalize_entry_path(entry.path)
     payload_paths = [
-        _normalize_entry_path(payload.get("path")),
-        _normalize_entry_path(payload.get("file_path")),
-        _normalize_entry_path(payload.get("source_path")),
-        _normalize_entry_path(payload.get("full_path")),
+        _normalize_entry_path(_resolve_payload_value(payload, key))
+        for key in PAYLOAD_PATH_KEYS
     ]
     if normalized_entry_path and normalized_entry_path in {path for path in payload_paths if path}:
         return True
     source_id = str(entry.source_id or "").strip()
     payload_ids = [
-        str(payload.get(key) or "").strip()
-        for key in ("source_id", "file_id", "id", "fid", "res_id", "fs_id", "item_id", "driveItemId", "drive_item_id")
-        if str(payload.get(key) or "").strip()
+        str(_resolve_payload_value(payload, key) or "").strip()
+        for key in PAYLOAD_ID_KEYS
+        if str(_resolve_payload_value(payload, key) or "").strip()
     ]
     if source_id and source_id in payload_ids:
         return True
     return False
+
+
+def _resolve_payload_value(payload: dict[str, Any], key: str) -> Any:
+    if key in payload:
+        return payload.get(key)
+    normalized_key = _canonicalize_capture_key(key)
+    for candidate_key, value in payload.items():
+        if _canonicalize_capture_key(candidate_key) == normalized_key:
+            return value
+    return None
+
+
+def _iter_capture_named_values(captured: dict[str, Any], aliases: tuple[str, ...]) -> list[Any]:
+    alias_set = {_canonicalize_capture_key(item) for item in aliases if str(item or "").strip()}
+    values: list[Any] = []
+    for key, value in captured.items():
+        if _canonicalize_capture_key(key) in alias_set:
+            values.append(value)
+    return values
 
 
 def _collect_capture_entry_payloads(entry: SourceEntry, runtime: dict[str, Any]) -> list[dict[str, Any]]:
@@ -171,8 +214,7 @@ def _collect_capture_entry_payloads(entry: SourceEntry, runtime: dict[str, Any])
     payloads: list[dict[str, Any]] = []
     normalized_entry_path = _normalize_entry_path(entry.path)
     if normalized_entry_path:
-        for key in ("file_hashes_by_path", "fingerprints_by_path", "hash_cache_by_path", "entry_hashes_by_path"):
-            mapping = captured.get(key)
+        for mapping in _iter_capture_named_values(captured, CAPTURE_PATH_CONTAINER_KEYS):
             if isinstance(mapping, dict):
                 direct = mapping.get(normalized_entry_path)
                 if isinstance(direct, dict):
@@ -182,14 +224,12 @@ def _collect_capture_entry_payloads(entry: SourceEntry, runtime: dict[str, Any])
                     payloads.append(_normalize_payload_aliases({str(inner_key): inner_value for inner_key, inner_value in alt.items()}))
     source_id = str(entry.source_id or "").strip()
     if source_id:
-        for key in ("file_hashes_by_id", "fingerprints_by_id", "hash_cache_by_id", "entry_hashes_by_id"):
-            mapping = captured.get(key)
+        for mapping in _iter_capture_named_values(captured, CAPTURE_ID_CONTAINER_KEYS):
             if isinstance(mapping, dict):
                 direct = mapping.get(source_id)
                 if isinstance(direct, dict):
                     payloads.append(_normalize_payload_aliases({str(inner_key): inner_value for inner_key, inner_value in direct.items()}))
-    for key in ("file_hashes", "fingerprints", "hash_cache", "entries", "items"):
-        collection = captured.get(key)
+    for collection in _iter_capture_named_values(captured, CAPTURE_COLLECTION_KEYS):
         for item in _iter_collection_entries(collection):
             normalized = _normalize_payload_aliases({str(inner_key): inner_value for inner_key, inner_value in item.items()})
             if _capture_payload_matches_entry(normalized, entry):

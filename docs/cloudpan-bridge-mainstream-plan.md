@@ -92,6 +92,10 @@
 - 抓取缓存摘要也同步学会识别这些真实哈希键名：
   - `gcidHash / md5Sum / pickCode` 这类字段现在会被统一折叠成 `gcid / md5 / pickcode`
   - 这样 `capture_cache_fast_hashes` 与后续目标能力判断，不会因为缓存键名写法不同而漏掉本来可命中的快传路径
+- 主流 provider 的抓取缓存容器键和条目定位键也继续向真实返回体靠拢：
+  - 现在兼容 `fileHashesByPath / entryHashesById` 这类驼峰缓存容器键
+  - 条目匹配时也兼容 `filePath / sourceId / fileId / resourceId / fsId` 等真实字段名
+  - 这让 `OneDrive / Thunder / AliyunDriveOpen` 一类浏览器抓取快照，即使不是仓库内部理想的 snake_case 结构，也能进入统一 enrich 流水线
 
 ## 摘要
 

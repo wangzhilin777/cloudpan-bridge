@@ -17,6 +17,19 @@ CAPTURE_CACHE_HASH_KEYS = ("md5", "gcid", "sha1", "sha256", "crc64", "pre_hash",
 CAPTURE_CACHE_NESTED_COLLECTION_KEYS = ("items", "entries", "files", "list", "records", "children", "value")
 
 
+def _canonicalize_capture_key(value: Any) -> str:
+    return "".join(ch.lower() for ch in str(value or "") if ch.isalnum())
+
+
+def _iter_capture_named_values(captured: dict[str, Any], aliases: tuple[str, ...]) -> list[Any]:
+    alias_set = {_canonicalize_capture_key(item) for item in aliases if str(item or "").strip()}
+    values: list[Any] = []
+    for key, value in captured.items():
+        if _canonicalize_capture_key(key) in alias_set:
+            values.append(value)
+    return values
+
+
 def _iter_capture_collection_entries(value: Any) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     if isinstance(value, list):
@@ -84,24 +97,21 @@ def _extract_capture_cache_summary(captured: dict[str, Any]) -> dict[str, Any]:
             if normalized in CAPTURE_CACHE_HASH_KEYS and str(value or "").strip():
                 hash_fields.add(normalized)
 
-    for key in CAPTURE_CACHE_PATH_KEYS:
-        mapping = captured.get(key)
+    for mapping in _iter_capture_named_values(captured, CAPTURE_CACHE_PATH_KEYS):
         if isinstance(mapping, dict):
             for item in mapping.values():
                 if isinstance(item, dict):
                     path_count += 1
                     collect_hash_fields(item)
 
-    for key in CAPTURE_CACHE_ID_KEYS:
-        mapping = captured.get(key)
+    for mapping in _iter_capture_named_values(captured, CAPTURE_CACHE_ID_KEYS):
         if isinstance(mapping, dict):
             for item in mapping.values():
                 if isinstance(item, dict):
                     id_count += 1
                     collect_hash_fields(item)
 
-    for key in CAPTURE_CACHE_COLLECTION_KEYS:
-        collection = captured.get(key)
+    for collection in _iter_capture_named_values(captured, CAPTURE_CACHE_COLLECTION_KEYS):
         for item in _iter_capture_collection_entries(collection):
             collection_count += 1
             collect_hash_fields(item)

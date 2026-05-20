@@ -1546,6 +1546,45 @@ def test_source_enrichment_runtime_normalizes_capture_cache_fast_hash_aliases(tm
     assert runtime["bridge_preparation_summary"]["capture_cache_hash_fields"] == ["gcid", "md5", "pickcode"]
 
 
+def test_source_enrichment_runtime_accepts_camel_case_capture_cache_container_keys(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "onedrive": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                                "fileHashesByPath": {
+                                    "/src/a.docx": {
+                                        "sha1Hash": "a" * 40,
+                                    }
+                                },
+                                "entryHashesById": {
+                                    "item-2": {
+                                        "contentHash": "sha1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                                    }
+                                },
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "onedrive")
+    summary = runtime["capture_cache_summary"]
+    assert summary["available"] is True
+    assert summary["path_entry_count"] == 1
+    assert summary["id_entry_count"] == 1
+    assert summary["lookup_modes"] == ["path", "source_id"]
+    assert summary["hash_fields"] == ["content_hash", "sha1"]
+
+
 def test_bridge_runtime_reports_missing_keys_for_baidu_capture() -> None:
     runtime = build_bridge_runtime("baidu", {"cookie_header": "sid=1"})
     assert runtime["ready"] is False
@@ -1796,6 +1835,56 @@ def test_execute_source_bridge_reads_nested_capture_cache_records_for_onedrive(t
     assert enriched.content_hash == "SHA1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     assert report["bridge_execution_state"] == "api_capture_cache_normalized"
     assert report["provider_stage"] == "api_capture_cache"
+
+
+def test_execute_source_bridge_reads_camel_case_capture_cache_entries_for_onedrive(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "onedrive": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                                "fileHashesByPath": {
+                                    "/src/a.docx": {
+                                        "sha1Hash": "a" * 40,
+                                    }
+                                },
+                                "entries": [
+                                    {
+                                        "filePath": "/src/b.docx",
+                                        "contentHash": "sha1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                                    },
+                                    {
+                                        "sourceId": "item-3",
+                                        "sha1Hash": "c" * 40,
+                                    },
+                                ],
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "onedrive")
+
+    enriched_path, report_path = execute_source_bridge(SourceEntry(path="/src/a.docx", md5="", size=10, provider="OneDrive"), runtime)
+    assert enriched_path.sha1 == "A" * 40
+    assert report_path["bridge_execution_state"] == "api_capture_cache_normalized"
+
+    enriched_collection, report_collection = execute_source_bridge(SourceEntry(path="/src/b.docx", md5="", size=10, provider="OneDrive"), runtime)
+    assert enriched_collection.content_hash == "SHA1:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+    assert report_collection["bridge_execution_state"] == "api_capture_cache_normalized"
+
+    enriched_id, report_id = execute_source_bridge(SourceEntry(path="/src/c.docx", md5="", size=10, provider="OneDrive", source_id="item-3"), runtime)
+    assert enriched_id.sha1 == "C" * 40
+    assert report_id["bridge_execution_state"] == "api_capture_cache_normalized"
 
 
 def test_execute_source_bridge_marks_non_fast_candidates_for_quark(tmp_path: Path) -> None:
