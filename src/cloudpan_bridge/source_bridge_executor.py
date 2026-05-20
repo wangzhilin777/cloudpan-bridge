@@ -109,6 +109,9 @@ def _iter_collection_entries(value: Any) -> list[dict[str, Any]]:
                 for item in nested_entries:
                     if isinstance(item, dict):
                         entries.append({str(inner_key): inner_value for inner_key, inner_value in item.items()})
+            elif isinstance(nested_entries, dict) and nested_entries and all(isinstance(item, dict) for item in nested_entries.values()):
+                for item in nested_entries.values():
+                    entries.append({str(inner_key): inner_value for inner_key, inner_value in item.items()})
         for nested_key in ("data", "result", "payload"):
             nested_value = value.get(nested_key)
             if isinstance(nested_value, (dict, list)):

@@ -106,6 +106,9 @@
   - `...by_path` 的 key 现在会做标准化匹配，兼容反斜杠路径、缺失前导 `/` 的 path key
   - `entries / items` 这类 collection 如果是“动态 id -> dict”的对象，而不是数组，也会被视作有效条目集合
   - 这样 `AliyunDriveOpen / OneDrive / Thunder / Baidu` 一类更杂的抓包快照，也更容易进入统一补指纹流水线
+- collection 容器内部的“嵌套 dict records”也继续补强了：
+  - 现在不仅支持 `records: []`，也支持 `records: {id1: {...}, id2: {...}}`
+  - 这类结构在部分目录接口或浏览器抓包转换结果里更常见，补上后 `capture_cache_summary` 与 `execute_source_bridge` 都能继续吃到对应条目
 - 统一体积分级阈值这轮也已落到实处：
   - 当前生产源码里最大的 Python / JS 文件是 `webapp.py`，约 `94.2 KB`
   - 前端主入口 `app.js` 约 `88.8 KB`
