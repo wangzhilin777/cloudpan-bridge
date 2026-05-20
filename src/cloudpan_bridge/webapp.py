@@ -40,7 +40,7 @@ from .provider_registry import (
     render_driver_coverage_audit_markdown,
     render_driver_coverage_scaffold_markdown,
 )
-from .source_adapter import build_source_provider_context
+from .source_adapter import build_source_provider_context, build_source_runtime_status
 from .fast_upload_decision import assess_directory_fast_upload
 from .target_adapter import build_target_preflight_capability, supported_target_keys
 from .syncer import (
@@ -1105,8 +1105,16 @@ def create_app(config_path: Path) -> FastAPI:
             for key, value in dict(persistent_state.target_states or {}).items()
         }
         active_target_state = persistent_state.get_target_state(active_target)
+        grouped = load_grouped_config_payload()
+        source_runtime = build_source_runtime_status(
+            config,
+            source_path=str(config.source_path or "/"),
+            mount_path=payload_nested_get(grouped, ("ui", "browser", "mounted_source"), ""),
+            requested_driver="",
+        )
         return {
             "sync": state,
+            "source_runtime": source_runtime,
             "active_target": active_target,
             "active_target_state": {
                 "target_key": active_target,

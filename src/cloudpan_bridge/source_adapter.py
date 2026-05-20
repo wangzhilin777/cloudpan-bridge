@@ -70,6 +70,32 @@ def build_source_provider_context(
     )
 
 
+def build_source_runtime_status(
+    config: AppConfig,
+    *,
+    source_path: str = "",
+    mount_path: str = "",
+    requested_driver: str = "",
+) -> dict[str, Any]:
+    context = build_source_provider_context(
+        config,
+        source_path=source_path,
+        mount_path=mount_path,
+        requested_driver=requested_driver,
+    )
+    return {
+        **context,
+        "provider_class": "OpenListSourceProvider",
+        "provider_factory": "create_source_provider",
+        "auth_state": {
+            "base_url": str(config.openlist_url or ""),
+            "username": str(config.openlist_username or ""),
+            "has_token": bool(str(config.openlist_token or "").strip()),
+        },
+        "direct_provider_candidate": bool(context.get("provider_key") not in {"", "generic_openlist_driver", "openlist"}),
+    }
+
+
 def source_ensure_auth(source: SourceProvider) -> None:
     if hasattr(source, "ensure_auth"):
         source.ensure_auth()  # type: ignore[call-arg]

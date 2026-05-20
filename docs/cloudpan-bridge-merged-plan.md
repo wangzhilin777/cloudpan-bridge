@@ -176,6 +176,14 @@
 - [x] `webapp.py` 的 source mapping 解析已复用 source adapter helper，避免页面侧和执行侧再维护两套路径
 - [ ] 后续仍需把这份 runtime context 进一步用于选择真正的直连 source provider，而不是目前先统一到 OpenList 首个实现
 
+### 里程碑 22：统一 Source Provider 运行态输出（起步）
+
+- [x] `source_adapter.py` 新增 `build_source_runtime_status()`，把 source provider 解析结果组织成稳定状态结构
+- [x] `/api/status` 现已回传独立的 `source_runtime`，不再只能从 `sync.current_source_context` 侧面推断
+- [x] `source_runtime` 已显式包含 `provider_class / provider_factory / auth_state / direct_provider_candidate`
+- [x] 相关回归覆盖了 runtime status 结构与 `/api/status` 输出
+- [ ] 后续仍需把这个运行态真正接到“选择直连 source provider 还是 OpenList provider”的执行分流上
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

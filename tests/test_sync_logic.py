@@ -26,6 +26,7 @@ from cloudpan_bridge.provider_capture import (
 )
 from cloudpan_bridge.source_adapter import OpenListSourceProvider, create_source_provider
 from cloudpan_bridge.source_adapter import (
+    build_source_runtime_status,
     SourceProviderCompatMixin,
     build_source_provider_context,
     resolve_source_mount_path,
@@ -725,6 +726,40 @@ def test_source_runtime_context_helper_reads_real_provider_context(tmp_path: Pat
         assert context["supports_fast_upload"] is True
     finally:
         provider.close()
+
+
+def test_build_source_runtime_status_exposes_provider_runtime_shape(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/alist/quark/demo",
+                    "target_path": "/dst",
+                },
+                "openlist": {
+                    "url": "http://127.0.0.1:5244",
+                    "token": "token-1",
+                    "username": "admin",
+                },
+                "source_session": {
+                    "mount_provider_mapping": {
+                        "/alist/quark": "quark",
+                    }
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_runtime_status(AppConfig.load(path))
+    assert runtime["provider_class"] == "OpenListSourceProvider"
+    assert runtime["provider_factory"] == "create_source_provider"
+    assert runtime["provider_key"] == "quark"
+    assert runtime["auth_state"]["base_url"] == "http://127.0.0.1:5244"
+    assert runtime["auth_state"]["username"] == "admin"
+    assert runtime["auth_state"]["has_token"] is True
+    assert runtime["direct_provider_candidate"] is True
 
 
 def test_sync_runner_uses_source_provider_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -3673,6 +3708,7 @@ def test_status_restores_provider_captures_from_config(tmp_path: Path) -> None:
     assert status.status_code == 200
     body = status.json()
     assert body["provider_captures"]["quark"]["captured"]["cookie_header"] == "sid=1; token=2"
+    assert body["source_runtime"]["provider_class"] == "OpenListSourceProvider"
     assert body["active_target"] == "guangya"
     assert body["active_target_state"]["has_state"] is True
     assert body["active_target_state"]["field_count"] == 3
