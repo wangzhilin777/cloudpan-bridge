@@ -36,6 +36,14 @@
 - [ ] Source / Target / Task 的文案、状态摘要和能力面板继续细化
 - [x] 本地验证通过：`/`、`/assets/app.css`、`/assets/app.js` 请求 200，`pytest -q` 通过
 
+### 里程碑 4：超大 Python 文件拆分（进行中）
+
+- [x] 识别当前超出阈值的 Python 文件，并优先处理 `provider_registry.py`
+- [x] 将 `provider_registry.py` 内的大型静态常量拆到 `provider_registry_data/` 子模块
+- [x] 将主逻辑文件 `provider_registry.py` 压缩到 100 KB 以内（当前约 60.6 KB）
+- [x] 拆分后编译与测试通过：`python -m compileall src tests`、`pytest -q -x`、`pytest -q`
+- [ ] 继续评估是否还需要对 `webapp.py`、`provider_capture.py`、`target_adapter.py` 做进一步细拆
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。
