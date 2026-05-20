@@ -160,6 +160,14 @@
 - [x] 对未知挂载驱动统一归入 `generic_openlist_driver`，并明确保守降级策略，而不是只回一个裸 `generic`
 - [ ] 后续仍需把这套统一 provider 语义继续接入更多直连 source provider，而不是只停留在 OpenList 挂载源
 
+### 里程碑 20：`/api/provider/captures` 升级为统一连接 Provider Catalog（起步）
+
+- [x] 保留现有抓取定义输出，同时补齐 `provider_key / auth_mode / auth_interface` 等标准字段
+- [x] `auth_interface` 已统一描述 `browser_capture / manual_fields / openlist_mount / direct_api / docs / recommended_defaults`
+- [x] `/api/provider/registry` 现已回传 `provider_catalog`，让前后端都能基于同一份连接 provider 目录工作
+- [x] 相关回归覆盖了复杂驱动的 catalog 输出，不破坏现有 `provider captures` 页面消费
+- [ ] 后续仍需把 catalog 与真正的直连 source provider 实现逐步绑实，而不是只停留在连接/抓取描述层
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

@@ -828,6 +828,8 @@ class ProviderCaptureManager:
                     "login_url": spec.login_url,
                     "recommended_drivers": list(spec.recommended_drivers),
                     "required_keys": list(spec.required_keys),
+                    "header_aliases": list(spec.header_aliases),
+                    "storage_aliases": list(spec.storage_aliases),
                     "description": spec.description,
                 }
             )

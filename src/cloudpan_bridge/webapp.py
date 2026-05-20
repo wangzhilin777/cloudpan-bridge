@@ -666,11 +666,70 @@ def create_app(config_path: Path) -> FastAPI:
                 guide = get_driver_guide(str(candidate or ""))
                 if guide:
                     break
+            provider_key = str(profile.get("key") or item.get("key") or "")
+            auth_mode = str(profile.get("loginMode") or "")
+            default_mount_values = dict(profile.get("defaultMountValues") or {})
+            guide_defaults = dict((guide or {}).get("defaults") or {})
+            recommended_defaults = {
+                **default_mount_values,
+                **guide_defaults,
+            }
+            required_keys = list(item.get("required_keys") or [])
+            header_aliases = list(item.get("header_aliases") or [])
+            storage_aliases = list(item.get("storage_aliases") or [])
+            capture_mode = str(item.get("capture_mode") or "browser").lower() or "browser"
+            direct_api_supported = bool(
+                provider_key
+                and provider_key != "generic"
+                and (
+                    bool(profile.get("supportsFingerprintEnrichment"))
+                    or required_keys
+                    or capture_mode in {"browser", "manual"}
+                )
+            )
             items.append(
                 {
                     **item,
+                    "provider_key": provider_key,
+                    "auth_mode": auth_mode,
                     "source_profile": profile,
                     "guide": guide,
+                    "auth_interface": {
+                        "auth_mode": auth_mode,
+                        "browser_capture": {
+                            "supported": capture_mode == "browser",
+                            "capture_mode": capture_mode,
+                            "login_url": str(item.get("login_url") or ""),
+                            "required_keys": required_keys,
+                            "header_aliases": header_aliases,
+                            "storage_aliases": storage_aliases,
+                        },
+                        "manual_fields": {
+                            "supported": True,
+                            "required_keys": required_keys,
+                            "header_aliases": header_aliases,
+                            "storage_aliases": storage_aliases,
+                        },
+                        "openlist_mount": {
+                            "supported": True,
+                            "driver_aliases": list(profile.get("driverAliases") or []),
+                            "default_mount_values": default_mount_values,
+                        },
+                        "direct_api": {
+                            "supported": direct_api_supported,
+                            "provider_key": provider_key,
+                            "supports_fingerprint_enrichment": bool(profile.get("supportsFingerprintEnrichment")),
+                            "likely_hashes": list(profile.get("likelyHashes") or []),
+                        },
+                        "docs": {
+                            "doc_url": str((guide or {}).get("docUrl") or ""),
+                            "doc_url_candidates": list((guide or {}).get("docUrlCandidates") or []),
+                        },
+                        "recommended_defaults": {
+                            "mount_values": recommended_defaults,
+                            "rate_profile": str(profile.get("recommendedRateProfile") or "safe"),
+                        },
+                    },
                 }
             )
         return items
@@ -1452,6 +1511,7 @@ def create_app(config_path: Path) -> FastAPI:
     def get_provider_registry() -> dict[str, Any]:
         implemented_targets = supported_target_keys()
         target_profiles = list_target_profiles()
+        provider_catalog = build_provider_capture_definition_payload()
         grouped = load_grouped_config_payload()
         source_context = resolve_source_mapping_context(
             {
@@ -1470,6 +1530,7 @@ def create_app(config_path: Path) -> FastAPI:
             "guides": list_driver_guides(),
             "source_profiles": list_source_profiles(),
             "target_profiles": target_profiles,
+            "provider_catalog": provider_catalog,
             "driver_matrix": build_driver_capability_matrix(target=config.target_key),
             "active_target": config.target_key,
             "source_mapping": dict(config.mount_provider_mapping or {}),

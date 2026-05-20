@@ -2065,6 +2065,7 @@ def test_provider_registry_endpoint_returns_current_source_mapping_context(tmp_p
     assert response.status_code == 200
     payload = response.json()
     assert payload["source_mapping"]["/alist/quark"] == "quark"
+    assert any(item["key"] == "quark" for item in payload["provider_catalog"])
     assert payload["current_source_context"]["mount_path"] == "/alist/quark"
     assert payload["current_source_context"]["source_profile_override"] == "quark"
     assert payload["current_source_context"]["effective_driver"] == "quark"
@@ -3736,7 +3737,18 @@ def test_provider_captures_endpoint_includes_complex_driver_specs(tmp_path: Path
     payload = response.json()
     providers = {item["key"]: item for item in payload["providers"]}
     assert providers["aliyundriveopen"]["recommended_drivers"] == ["AliyundriveOpen", "AliyunDrive", "Alipan"]
+    assert providers["aliyundriveopen"]["provider_key"] == "aliyundriveopen"
+    assert providers["aliyundriveopen"]["auth_mode"] == "refresh token + online api or own open platform app"
+    assert providers["aliyundriveopen"]["auth_interface"]["browser_capture"]["supported"] is True
+    assert providers["aliyundriveopen"]["auth_interface"]["manual_fields"]["supported"] is True
+    assert providers["aliyundriveopen"]["auth_interface"]["openlist_mount"]["supported"] is True
+    assert providers["aliyundriveopen"]["auth_interface"]["direct_api"]["supported"] is True
+    assert providers["aliyundriveopen"]["auth_interface"]["docs"]["doc_url"] == "https://doc.oplist.org/guide/drivers/aliyundrive_open"
+    assert providers["aliyundriveopen"]["auth_interface"]["recommended_defaults"]["rate_profile"] == "balanced"
     assert providers["p123"]["capture_mode"] == "manual"
+    assert providers["p123"]["auth_interface"]["browser_capture"]["supported"] is False
+    assert providers["p123"]["auth_interface"]["manual_fields"]["required_keys"] == ["username", "password"]
+    assert providers["p123"]["auth_interface"]["direct_api"]["supported"] is True
     assert providers["onedrive"]["required_keys"] == ["refresh_token"]
     assert providers["googledrive"]["required_keys"] == ["refresh_token"]
     assert providers["dropbox"]["required_keys"] == ["refresh_token"]
@@ -3766,6 +3778,7 @@ def test_provider_captures_endpoint_includes_complex_driver_specs(tmp_path: Path
     assert providers["p123"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/123.html"
     assert providers["googledrive"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/google_drive"
     assert providers["openlist"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/openlist"
+    assert providers["openlist"]["auth_interface"]["direct_api"]["supported"] is True
     assert providers["cloudreve"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/cloudreve_v4"
     assert providers["github"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/drivers/github"
     assert providers["alias"]["guide"]["docUrl"] == "https://doc.oplist.org/guide/advanced/alias"
