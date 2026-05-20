@@ -64,6 +64,26 @@ def _merge_entry_from_aliases(entry: SourceEntry, aliases_map: dict[str, list[st
     )
 
 
+def _attach_bridge_metadata(entry: SourceEntry, report: dict[str, Any]) -> None:
+    provider_specific = dict(entry.provider_specific or {})
+    candidate_hashes = [str(item).strip() for item in list(report.get("candidate_hashes") or []) if str(item).strip()]
+    if candidate_hashes:
+        provider_specific["__bridge_candidate_hashes"] = ",".join(candidate_hashes)
+    pending_reason = str(report.get("pending_reason") or "").strip()
+    if pending_reason:
+        provider_specific["__bridge_pending_reason"] = pending_reason
+    execution_state = str(report.get("bridge_execution_state") or "").strip()
+    if execution_state:
+        provider_specific["__bridge_execution_state"] = execution_state
+    provider_stage = str(report.get("provider_stage") or "").strip()
+    if provider_stage:
+        provider_specific["__bridge_provider_stage"] = provider_stage
+    transport_hint = str(report.get("bridge_transport_hint") or "").strip()
+    if transport_hint:
+        provider_specific["__bridge_transport_hint"] = transport_hint
+    entry.provider_specific = provider_specific
+
+
 def _fingerprint_presence(entry: SourceEntry) -> dict[str, bool]:
     return {
         "md5": bool(entry.md5),
@@ -136,6 +156,7 @@ def _normalize_session_snapshot(entry: SourceEntry, runtime: dict[str, Any], *, 
         pending_reason=pending_reason,
         message="已通过 session snapshot bridge 归并当前可见元数据。",
     )
+    _attach_bridge_metadata(merged, report)
     return merged, report
 
 
@@ -153,6 +174,7 @@ def _normalize_api_placeholder(entry: SourceEntry, runtime: dict[str, Any], *, e
         pending_reason=pending_reason,
         message="已命中 provider API bridge 准备态，当前版本先归并现有元数据，真实 API enrich 仍待后续接入。",
     )
+    _attach_bridge_metadata(merged, report)
     return merged, report
 
 
@@ -199,7 +221,7 @@ def execute_source_bridge(entry: SourceEntry, runtime: dict[str, Any]) -> tuple[
     provider_key = str(runtime.get("provider_key") or entry.provider or "").strip().lower()
     executor = SOURCE_BRIDGE_EXECUTORS.get(provider_key)
     if not executor:
-        return entry, {
+        report = {
             "changed": False,
             "added_hashes": [],
             "bridge_execution_state": "bridge_not_registered",
@@ -214,4 +236,6 @@ def execute_source_bridge(entry: SourceEntry, runtime: dict[str, Any]) -> tuple[
             "pending_reason": "bridge_not_registered",
             "message": "当前 provider 还没有 bridge executor。",
         }
+        _attach_bridge_metadata(entry, report)
+        return entry, report
     return executor(entry, runtime)

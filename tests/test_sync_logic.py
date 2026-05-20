@@ -1136,6 +1136,54 @@ def test_transfer_planner_prefers_download_for_small_file_when_no_fast_hash_hit(
     assert plan["mode"] == "download_upload"
 
 
+def test_transfer_planner_explains_api_bridge_pending_with_candidate_hashes() -> None:
+    entry = SourceEntry(
+        path="/src/a.docx",
+        md5="",
+        size=10,
+        provider="OneDrive",
+        sha1="A" * 40,
+        provider_specific={
+            "__bridge_candidate_hashes": "sha1",
+            "__bridge_pending_reason": "provider_api_bridge_not_executed_yet",
+            "__bridge_execution_state": "api_bridge_prepared_but_not_executed",
+        },
+    )
+    plan = plan_transfer_mode(
+        entry,
+        {"supports_fast_upload": True, "fast_upload_hashes": ["md5", "gcid"], "fallback_modes": ["download_upload"]},
+        auto_download_threshold_mb=0,
+    )
+    assert plan["mode"] == "record_pending_only"
+    assert plan["bridge_candidate_hashes"] == ["sha1"]
+    assert plan["bridge_pending_reason"] == "provider_api_bridge_not_executed_yet"
+    assert "API" in plan["reason"]
+
+
+def test_transfer_planner_explains_non_fast_session_snapshot_candidates() -> None:
+    entry = SourceEntry(
+        path="/src/q.bin",
+        md5="",
+        size=10,
+        provider="Quark",
+        sha1="B" * 40,
+        slice_md5="C" * 32,
+        provider_specific={
+            "__bridge_candidate_hashes": "sha1,slice_md5",
+            "__bridge_pending_reason": "non_fast_hashes_only_after_session_snapshot",
+            "__bridge_execution_state": "session_snapshot_normalized",
+        },
+    )
+    plan = plan_transfer_mode(
+        entry,
+        {"supports_fast_upload": True, "fast_upload_hashes": ["md5", "gcid"], "fallback_modes": ["download_upload"]},
+        auto_download_threshold_mb=0,
+    )
+    assert plan["bridge_candidate_hashes"] == ["sha1", "slice_md5"]
+    assert plan["bridge_pending_reason"] == "non_fast_hashes_only_after_session_snapshot"
+    assert "session snapshot" in plan["reason"]
+
+
 def test_transfer_planner_summarizes_mode_counts() -> None:
     entries = [
         SourceEntry(path="/src/1.txt", md5="abc", size=10),
@@ -1149,6 +1197,40 @@ def test_transfer_planner_summarizes_mode_counts() -> None:
     assert summary["mode_counts"]["fast_upload"] == 1
     assert summary["mode_counts"]["download_upload"] == 1
     assert compute_fast_upload_hits(entries[0], {"fast_upload_hashes": ["md5"]}) == ["md5"]
+
+
+def test_transfer_planner_summary_collects_bridge_candidate_counts() -> None:
+    entries = [
+        SourceEntry(
+            path="/src/a.docx",
+            md5="",
+            size=10,
+            sha1="A" * 40,
+            provider_specific={
+                "__bridge_candidate_hashes": "sha1",
+                "__bridge_pending_reason": "provider_api_bridge_not_executed_yet",
+            },
+        ),
+        SourceEntry(
+            path="/src/b.bin",
+            md5="",
+            size=20,
+            sha1="B" * 40,
+            slice_md5="C" * 32,
+            provider_specific={
+                "__bridge_candidate_hashes": "sha1,slice_md5",
+                "__bridge_pending_reason": "non_fast_hashes_only_after_session_snapshot",
+            },
+        ),
+    ]
+    summary = summarize_transfer_plan(
+        entries,
+        {"supports_fast_upload": True, "fast_upload_hashes": ["md5", "gcid"], "fallback_modes": ["download_upload"]},
+        auto_download_threshold_mb=0,
+    )
+    assert summary["bridge_candidate_counts"]["sha1"] == 2
+    assert summary["bridge_candidate_counts"]["slice_md5"] == 1
+    assert summary["bridge_pending_reason_counts"]["provider_api_bridge_not_executed_yet"] == 1
 
 
 def test_sync_runner_uses_source_provider_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
