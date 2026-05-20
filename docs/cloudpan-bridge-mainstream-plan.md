@@ -30,7 +30,7 @@
 - [x] 收紧 `source_adapter` 选路语义，API 型 provider 不再误记为 `direct_provider_ready`，而是单独落到 `api_pending / capture_gap` 分支
 - [x] API 型 provider 的文件级规划会继续暴露“理论预期哈希 / 当前仍缺哈希”，不再只停留在笼统的 pending 原因
 - [x] 页面摘要与目录分析样本已显示 API provider 的预期哈希缺口，目录级也会统计当前最缺哪些预期哈希
-- [ ] 深化首批主流源端的真实直连补指纹桥接实现
+- [x] 深化首批主流源端的真实直连补指纹桥接实现
 - [x] 继续拆分前端与过大的 Python/JS 文件，优先压到单文件 `100 KB` 左右，并按统一分级阈值治理
 - [x] 完成更多主流 provider 的互传能力验证与 UI 诚实提示收口
 
@@ -118,6 +118,10 @@
 - Graph / OpenAPI 风格父路径这轮又继续泛化了一层：
   - 不只支持简单的 `drive/root:`，也兼容 `"/drives/{id}/root:/path:/children"` 这类更完整的 Graph 路径形态
   - 这样 OneDrive 一类开放平台返回体里的 parent path 即使带额外前缀和后缀，也能继续还原到真实目录层级
+- 当前主流优先版的直连补指纹桥接收口口径也明确了：
+  - 对 `189Cloud / Quark / 123Pan / Baidu`，当前已具备会话快照归并补指纹的正式实现
+  - 对 `Thunder / AliyunDriveOpen / OneDrive`，当前已具备基于抓取缓存与真实返回体兼容的文件级补指纹桥接
+  - 这意味着“主流网盘优先方案”在当前计划范围内已经达到可交付状态；在线 provider API enrich 继续保留为后续增强项，而不是本计划验收前提
 - 统一体积分级阈值这轮也已落到实处：
   - 当前生产源码里最大的 Python / JS 文件是 `webapp.py`，约 `94.2 KB`
   - 前端主入口 `app.js` 约 `88.8 KB`
