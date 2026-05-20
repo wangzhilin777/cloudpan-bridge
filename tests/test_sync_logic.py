@@ -28,7 +28,7 @@ from cloudpan_bridge.source_adapter import OpenListSourceProvider, create_source
 from cloudpan_bridge.source_bridge_executor import execute_source_bridge
 from cloudpan_bridge.source_bridge_registry import prepare_source_bridge
 from cloudpan_bridge.source_enrich_bridge import build_bridge_runtime
-from cloudpan_bridge.source_enrich import build_source_enrichment_runtime, enrich_entry
+from cloudpan_bridge.source_enrich import build_source_enrichment_runtime, enrich_batch, enrich_entry
 from cloudpan_bridge.source_adapter import (
     build_source_provider_resolution,
     build_source_runtime_status,
@@ -1018,6 +1018,39 @@ def test_prepare_source_bridge_reports_transport_hint_for_quark() -> None:
     assert prepared["transport_hint"] == "cookie_snapshot"
     assert prepared["selected_field_names"] == ["cookie_header"]
     assert "md5" in prepared["fingerprint_expectation"]
+
+
+def test_enrich_batch_reports_bridge_candidate_and_pending_counts(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "quark": {
+                            "status": "captured",
+                            "captured": {
+                                "cookie_header": "sid=1; token=2",
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    entries = [
+        SourceEntry(path="/src/a.bin", md5="", size=10, provider="Quark", raw_hash_info={"sha1": "b" * 40, "slice_md5": "c" * 32}),
+        SourceEntry(path="/src/b.bin", md5="ABCDEF0123456789ABCDEF0123456789", size=10, provider="Quark", raw_hash_info={}),
+    ]
+    enriched, report = enrich_batch(entries, AppConfig.load(path))
+    assert enriched[0].sha1 == "B" * 40
+    assert report["candidate_hash_counts"]["sha1"] == 1
+    assert report["candidate_hash_counts"]["slice_md5"] == 1
+    assert report["pending_reason_counts"]["non_fast_hashes_only_after_session_snapshot"] == 1
+    assert report["bridge_execution_state_counts"]["session_snapshot_normalized"] == 2
+    assert report["fast_ready_after_bridge"] == 1
 
 
 def test_execute_source_bridge_marks_api_bridge_placeholder_for_onedrive(tmp_path: Path) -> None:
@@ -5955,6 +5988,8 @@ def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
     assert payload["removed_total"] == 1
     assert payload["target_key"] == "guangya"
     assert payload["fastUploadDecision"]["level"] == "native_fast_upload"
+    assert payload["sourceEnrichmentBatch"]["candidate_hash_counts"]["gcid"] == 1
+    assert payload["sourceEnrichmentBatch"]["bridge_execution_state_counts"]["api_bridge_prepared_but_not_executed"] == 1
     assert payload["truncated"] is True
 
 
@@ -5984,6 +6019,7 @@ def test_source_miaochuan_preview_endpoint_returns_payload(tmp_path: Path) -> No
     payload = response.json()
     assert payload["target_key"] == "guangya"
     assert payload["fastUploadDecision"]["level"] == "native_fast_upload"
+    assert payload["sourceEnrichmentBatch"]["candidate_hash_counts"]["gcid"] == 1
     assert payload["payload"]["totalFilesCount"] == 2
     assert payload["payload"]["files"][0]["path"] == "/a.bin"
     assert "\"gcid\": \"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\"" in payload["payload_text"]

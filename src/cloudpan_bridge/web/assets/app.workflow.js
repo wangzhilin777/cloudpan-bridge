@@ -85,6 +85,9 @@
     const transferPreviewText = sourceAnalyzeCache?.transferPlanPreview
       ? Object.entries(sourceAnalyzeCache.transferPlanPreview.mode_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ")
       : "-";
+    const enrichBatch = sourceAnalyzeCache?.sourceEnrichmentBatch || {};
+    const enrichBatchText = Object.entries(enrichBatch.candidate_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
+    const enrichPendingText = Object.entries(enrichBatch.pending_reason_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
     const quickActions = strategyQuickActions(strategy?.recommendedMode || "analyze_first", strategy);
     quickActionsRoot.innerHTML = quickActions.map((item) => (
       `<button class="secondary" type="button" data-capability-action="${escapeHtml(item.key)}">${escapeHtml(item.label)}</button>`
@@ -101,6 +104,8 @@
       <div class="mono">${currentLang() === "en" ? "Bridge runtime" : currentLang() === "mix" ? "桥接运行态 / Bridge runtime" : "桥接运行态"}: status=${escapeHtml(bridgeRuntime.status || "-")} | next=${escapeHtml(bridgeRuntime.next_action || "-")} | missing=${escapeHtml((bridgeRuntime.missing_keys || []).join(", ") || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Recommended rate profile" : currentLang() === "mix" ? "推荐频率 / Recommended rate profile" : "推荐频率"}: ${escapeHtml(sourceProfile.recommendedRateProfile || "-")}</div>
       <div class="mono">${escapeHtml(analysisLine)}</div>
+      <div class="mono">${currentLang() === "en" ? "Bridge candidate hashes" : currentLang() === "mix" ? "桥接候选哈希 / Bridge candidate hashes" : "桥接候选哈希"}: ${escapeHtml(enrichBatchText)}</div>
+      <div class="mono">${currentLang() === "en" ? "Bridge pending reasons" : currentLang() === "mix" ? "桥接挂起原因 / Bridge pending reasons" : "桥接挂起原因"}: ${escapeHtml(enrichPendingText)}</div>
       <div class="mono">${currentLang() === "en" ? "Transfer preview" : currentLang() === "mix" ? "传输预览 / Transfer preview" : "传输预览"}: ${escapeHtml(transferPreviewText)}</div>
       <div class="mono">${currentLang() === "en" ? "Suggested path" : currentLang() === "mix" ? "建议路径 / Suggested path" : "建议路径"}: ${escapeHtml(recommendedFlow || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Runtime rationale" : currentLang() === "mix" ? "动态理由 / Runtime rationale" : "动态理由"}: ${escapeHtml(rationaleText || "-")}</div>
@@ -118,6 +123,7 @@
     const summary = data?.summary || {};
     const decision = data?.fastUploadDecision || {};
     const enrichment = data?.sourceEnrichment || {};
+    const enrichBatch = data?.sourceEnrichmentBatch || {};
     const bridgeRuntime = enrichment.bridge_runtime || {};
     const transferPreview = data?.transferPlanPreview || {};
     const entries = Array.isArray(data?.entries) ? data.entries : [];
@@ -127,6 +133,9 @@
     }
     const providerCounts = Object.entries(summary.provider_counts || {}).map(([key, value]) => `${key}: ${value}`).join(" | ") || "-";
     const hashCounts = Object.entries(summary.hash_type_counts || {}).map(([key, value]) => `${key}: ${value}`).join(" | ") || "-";
+    const candidateCounts = Object.entries(enrichBatch.candidate_hash_counts || {}).map(([key, value]) => `${key}: ${value}`).join(" | ") || "-";
+    const pendingCounts = Object.entries(enrichBatch.pending_reason_counts || {}).map(([key, value]) => `${key}: ${value}`).join(" | ") || "-";
+    const bridgeStateCounts = Object.entries(enrichBatch.bridge_execution_state_counts || {}).map(([key, value]) => `${key}: ${value}`).join(" | ") || "-";
     const recommendation = summary.missing_md5 > 0
       ? (summary.gcid_ready > 0
         ? (currentLang() === "en"
@@ -153,6 +162,9 @@
           <div class="mono">${currentLang() === "en" ? "Fast upload decision" : currentLang() === "mix" ? "秒传决策 / Fast upload decision" : "秒传决策"}: ${escapeHtml(decision.level || "-")} | ${escapeHtml(decision.bucket || "-")}</div>
           <div class="mono">${currentLang() === "en" ? "Enrichment runtime" : currentLang() === "mix" ? "补指纹运行态 / Enrichment runtime" : "补指纹运行态"}: supported=${escapeHtml(String(!!enrichment.supported))} | capture_ready=${escapeHtml(String(!!enrichment.capture_ready))} | preferred=${escapeHtml((enrichment.preferred_hashes || []).join(", ") || "-")}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge runtime" : currentLang() === "mix" ? "桥接运行态 / Bridge runtime" : "桥接运行态"}: status=${escapeHtml(bridgeRuntime.status || "-")} | next=${escapeHtml(bridgeRuntime.next_action || "-")} | missing=${escapeHtml((bridgeRuntime.missing_keys || []).join(", ") || "-")}</div>
+          <div class="mono">${currentLang() === "en" ? "Bridge states" : currentLang() === "mix" ? "桥接执行态 / Bridge states" : "桥接执行态"}: ${escapeHtml(bridgeStateCounts)}</div>
+          <div class="mono">${currentLang() === "en" ? "Bridge candidate hashes" : currentLang() === "mix" ? "桥接候选哈希 / Bridge candidate hashes" : "桥接候选哈希"}: ${escapeHtml(candidateCounts)}</div>
+          <div class="mono">${currentLang() === "en" ? "Bridge pending reasons" : currentLang() === "mix" ? "桥接挂起原因 / Bridge pending reasons" : "桥接挂起原因"}: ${escapeHtml(pendingCounts)}</div>
           <div class="mono">${currentLang() === "en" ? "Transfer preview" : currentLang() === "mix" ? "传输预览 / Transfer preview" : "传输预览"}: ${escapeHtml(Object.entries(transferPreview.mode_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-")}</div>
           <div class="mono">provider: ${escapeHtml(providerCounts)}</div>
           <div class="mono">hash: ${escapeHtml(hashCounts)}</div>

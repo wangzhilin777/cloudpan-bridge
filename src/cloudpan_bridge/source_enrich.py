@@ -76,6 +76,11 @@ def enrich_batch(entries: list[SourceEntry], config: AppConfig, log: LogFn | Non
     enriched: list[SourceEntry] = []
     changed_count = 0
     added_hash_counts: dict[str, int] = {}
+    candidate_hash_counts: dict[str, int] = {}
+    pending_reason_counts: dict[str, int] = {}
+    bridge_execution_state_counts: dict[str, int] = {}
+    provider_stage_counts: dict[str, int] = {}
+    fast_ready_after_bridge = 0
     provider_key = str(entries[0].provider if entries else "").strip().lower()
     runtime = build_source_enrichment_runtime(config, provider_key)
     for entry in entries:
@@ -85,9 +90,27 @@ def enrich_batch(entries: list[SourceEntry], config: AppConfig, log: LogFn | Non
             changed_count += 1
             for field in list(report.get("added_hashes") or []):
                 added_hash_counts[field] = added_hash_counts.get(field, 0) + 1
+        for field in list(report.get("candidate_hashes") or []):
+            candidate_hash_counts[field] = candidate_hash_counts.get(field, 0) + 1
+        pending_reason = str(report.get("pending_reason") or "").strip()
+        if pending_reason:
+            pending_reason_counts[pending_reason] = pending_reason_counts.get(pending_reason, 0) + 1
+        execution_state = str(report.get("bridge_execution_state") or "").strip()
+        if execution_state:
+            bridge_execution_state_counts[execution_state] = bridge_execution_state_counts.get(execution_state, 0) + 1
+        provider_stage = str(report.get("provider_stage") or "").strip()
+        if provider_stage:
+            provider_stage_counts[provider_stage] = provider_stage_counts.get(provider_stage, 0) + 1
+        if report.get("fast_upload_ready_after_bridge"):
+            fast_ready_after_bridge += 1
     return enriched, {
         **runtime,
         "total": len(entries),
         "changed_count": changed_count,
         "added_hash_counts": added_hash_counts,
+        "candidate_hash_counts": candidate_hash_counts,
+        "pending_reason_counts": pending_reason_counts,
+        "bridge_execution_state_counts": bridge_execution_state_counts,
+        "provider_stage_counts": provider_stage_counts,
+        "fast_ready_after_bridge": fast_ready_after_bridge,
     }

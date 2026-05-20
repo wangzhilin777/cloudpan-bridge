@@ -41,7 +41,7 @@ from .provider_registry import (
     render_driver_coverage_scaffold_markdown,
 )
 from .source_adapter import build_source_provider_context, build_source_runtime_status
-from .source_enrich import build_source_enrichment_runtime
+from .source_enrich import build_source_enrichment_runtime, enrich_batch
 from .task_runtime import (
     build_current_task_snapshot as build_task_runtime_snapshot,
     resolve_source_mapping_context as resolve_task_source_mapping_context,
@@ -1734,13 +1734,14 @@ def create_app(config_path: Path) -> FastAPI:
         finally:
             runner.source.close()
         limit = max(1, int(resolve_payload_value(payload, "limit", default=200) or 200))
-        summary = summarize_source_entries(entries)
+        enriched_entries, enrich_batch_report = enrich_batch(entries, run_config, log=logger.info)
+        summary = summarize_source_entries(enriched_entries)
         preflight = build_target_preflight(target_key)
         fast_upload_decision = assess_directory_fast_upload(summary, target_capability=dict(preflight.get("adapter_capability") or {}))
         source_runtime = build_source_runtime_status(run_config, source_path=run_config.source_path)
         source_enrichment = build_source_enrichment_runtime(run_config, str(source_runtime.get("provider_key") or ""))
         transfer_preview = summarize_transfer_plan(
-            entries,
+            enriched_entries,
             dict(preflight.get("adapter_capability") or {}),
             auto_download_threshold_mb=run_config.auto_download_threshold_mb,
             allow_full_fallback=False,
@@ -1751,11 +1752,12 @@ def create_app(config_path: Path) -> FastAPI:
             "target_key": target_key,
             "fastUploadDecision": fast_upload_decision,
             "sourceEnrichment": source_enrichment,
+            "sourceEnrichmentBatch": enrich_batch_report,
             "transferPlanPreview": transfer_preview,
             "plan_total": len(plan),
             "removed_total": len(removed_paths),
-            "entries": [serialize_source_entry(entry) for entry in entries[:limit]],
-            "truncated": len(entries) > limit,
+            "entries": [serialize_source_entry(entry) for entry in enriched_entries[:limit]],
+            "truncated": len(enriched_entries) > limit,
         }
 
     @app.post("/api/source/miaochuan_preview")
@@ -1774,8 +1776,9 @@ def create_app(config_path: Path) -> FastAPI:
             entries, plan, removed_paths = runner.analyze()
         finally:
             runner.source.close()
-        miaochuan_payload = build_source_miaochuan_payload(entries, run_config.source_path)
-        summary = summarize_source_entries(entries)
+        enriched_entries, enrich_batch_report = enrich_batch(entries, run_config, log=logger.info)
+        miaochuan_payload = build_source_miaochuan_payload(enriched_entries, run_config.source_path)
+        summary = summarize_source_entries(enriched_entries)
         preflight = build_target_preflight(target_key)
         source_runtime = build_source_runtime_status(run_config, source_path=run_config.source_path)
         return {
@@ -1784,8 +1787,9 @@ def create_app(config_path: Path) -> FastAPI:
             "target_key": target_key,
             "fastUploadDecision": assess_directory_fast_upload(summary, target_capability=dict(preflight.get("adapter_capability") or {})),
             "sourceEnrichment": build_source_enrichment_runtime(run_config, str(source_runtime.get("provider_key") or "")),
+            "sourceEnrichmentBatch": enrich_batch_report,
             "transferPlanPreview": summarize_transfer_plan(
-                entries,
+                enriched_entries,
                 dict(preflight.get("adapter_capability") or {}),
                 auto_download_threshold_mb=run_config.auto_download_threshold_mb,
                 allow_full_fallback=False,
