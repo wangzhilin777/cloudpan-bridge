@@ -800,6 +800,8 @@ def test_build_source_runtime_status_exposes_provider_runtime_shape(tmp_path: Pa
     assert runtime["bridge_preparation"]["execution_state"] == "missing_capture"
     assert runtime["source_target_route"]["decision_bucket"] == "capture_gap_before_fast"
     assert runtime["source_target_route"]["bridge_recoverable_fast_hashes"] == ["md5"]
+    assert runtime["source_target_route"]["route_honesty"] == "capture_missing_before_fast_upload"
+    assert runtime["source_target_route"]["preferred_execution_mode"] == "record_pending_only"
 
 
 def test_source_provider_resolution_prefers_direct_candidate_but_falls_back_honestly(tmp_path: Path) -> None:
@@ -849,6 +851,8 @@ def test_source_provider_resolution_prefers_direct_candidate_but_falls_back_hone
     assert resolution["selected_provider_key"] == "quark"
     assert resolution["source_target_route"]["decision_bucket"] == "session_bridge_fast_candidate"
     assert resolution["source_target_route"]["next_focus"] == "validate_fast_hash_hit_rate"
+    assert resolution["source_target_route"]["route_honesty"] == "session_bridge_ready_but_transport_not_direct"
+    assert resolution["source_target_route"]["preferred_execution_mode"] == "fast_upload"
     assert "回退 OpenList" in resolution["fallback_reason"]
 
 
@@ -5767,6 +5771,8 @@ def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Pat
     assert payload["strategy"]["preferPendingTree"] is False
     assert payload["sourceTargetRoute"]["decision_bucket"] == "capture_gap_before_fast"
     assert payload["sourceTargetRoute"]["bridge_recoverable_fast_hashes"] == ["md5"]
+    assert payload["sourceTargetRoute"]["route_honesty"] == "capture_missing_before_fast_upload"
+    assert payload["sourceTargetRoute"]["fallback_execution_mode"] == "stream_upload"
 
 
 def test_provider_capability_assess_accepts_grouped_target_and_filters(tmp_path: Path) -> None:
@@ -5848,6 +5854,7 @@ def test_provider_capability_assess_prefers_enrichment_mode_when_directory_needs
     assert payload["strategy"]["recommendedMode"] == "enrich_then_direct"
     assert payload["sourceTargetRoute"]["decision_bucket"] == "capture_gap_before_fast"
     assert payload["sourceTargetRoute"]["bridge_recoverable_fast_hashes"] == ["md5", "gcid"]
+    assert payload["sourceTargetRoute"]["preferred_execution_mode"] == "record_pending_only"
     assert any(item["key"] == "provider_refresh_supported" for item in payload["strategy"]["suggestedActions"])
 
 
@@ -6438,6 +6445,7 @@ def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
     assert payload["transferPlanPreview"]["bridge_missing_expected_hash_counts"]["sha1"] == 1
     assert payload["transferPlanPreview"]["missing_target_fast_hash_counts"]["md5"] == 1
     assert payload["sourceTargetRoute"]["decision_bucket"] == "openlist_upload_path"
+    assert payload["sourceTargetRoute"]["route_honesty"] == "openlist_only_for_now"
     assert payload["entries"][0]["transferPlan"]["mode"] == "fast_upload"
     assert payload["entries"][0]["transferPlan"]["reason_code"] == "fast_hash_ready"
     assert payload["entries"][0]["transferPlan"]["next_action_hint"] == "direct_fast_upload_ready"
@@ -6473,6 +6481,7 @@ def test_source_miaochuan_preview_endpoint_returns_payload(tmp_path: Path) -> No
     assert payload["fastUploadDecision"]["level"] == "native_fast_upload"
     assert payload["sourceEnrichmentBatch"]["candidate_hash_counts"]["gcid"] == 1
     assert payload["sourceTargetRoute"]["decision_bucket"] == "openlist_upload_path"
+    assert payload["sourceTargetRoute"]["preferred_execution_mode"] == "stream_upload"
     assert payload["payload"]["totalFilesCount"] == 2
     assert payload["payload"]["files"][0]["path"] == "/a.bin"
     assert "\"gcid\": \"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\"" in payload["payload_text"]

@@ -121,6 +121,48 @@
     return pickText(ctx, pair[0], pair[1]);
   }
 
+  function sourceTargetRouteBucketText(ctx, key) {
+    const mapping = {
+      openlist_upload_path: ["先走 OpenList 源端再决定写入", "Use the OpenList source path first, then choose the write path"],
+      target_upload_only: ["目标端只能普通上传", "The target only supports normal upload"],
+      session_bridge_fast_candidate: ["会话桥接已具备快传候选", "Session bridge is ready for fast-upload candidates"],
+      api_bridge_fast_candidate: ["API 桥接理论可补齐快传", "API bridge can theoretically recover fast-upload hashes"],
+      capture_gap_before_fast: ["先补登录态再谈快传", "Capture fields must be collected before fast upload is realistic"],
+      native_hash_candidate: ["OpenList 元数据已接近可快传", "OpenList metadata is already close to fast-upload readiness"],
+      provider_candidate_but_fallback_first: ["有 provider 候选，但当前更适合补传", "A provider candidate exists, but fallback is still safer for now"],
+    };
+    const pair = mapping[String(key || "").trim()] || [key || "-", key || "-"];
+    return pickText(ctx, pair[0], pair[1]);
+  }
+
+  function sourceTargetRouteFocusText(ctx, key) {
+    const mapping = {
+      openlist_first: ["先看 OpenList 当前元数据覆盖率", "Inspect current OpenList metadata coverage first"],
+      target_fallback_upload: ["按目标端普通上传能力规划执行", "Plan execution around the target's normal upload path"],
+      validate_fast_hash_hit_rate: ["先验证快传哈希命中率", "Validate the fast-hash hit rate first"],
+      provider_api_enrich: ["优先补齐 provider API enrich", "Prioritize provider API enrichment"],
+      collect_provider_capture: ["先补关键登录态字段", "Collect the required capture fields first"],
+      inspect_openlist_hash_coverage: ["先确认 OpenList 是否已暴露关键哈希", "Check whether OpenList already exposes the key hashes"],
+      pending_tree_or_stream_upload: ["优先待补传树或普通上传", "Prefer the pending tree or normal upload first"],
+    };
+    const pair = mapping[String(key || "").trim()] || [key || "-", key || "-"];
+    return pickText(ctx, pair[0], pair[1]);
+  }
+
+  function sourceTargetRouteHonestyText(ctx, key) {
+    const mapping = {
+      openlist_only_for_now: ["当前仍以 OpenList 执行为主", "Execution still primarily relies on OpenList for now"],
+      target_has_no_metadata_fast_upload: ["目标端本身没有元数据秒传", "The target itself has no metadata fast-upload path"],
+      session_bridge_ready_but_transport_not_direct: ["会话桥接已 ready，但真实直连传输还没落地", "The session bridge is ready, but true direct transport is not implemented yet"],
+      provider_api_not_implemented_yet: ["理论 API enrich 可行，但真实实现尚未接通", "Theoretical API enrichment exists, but the real implementation is not connected yet"],
+      capture_missing_before_fast_upload: ["补齐关键登录态前，不应把它当作快传可用", "Do not treat this as fast-upload ready before the required capture fields exist"],
+      openlist_metadata_may_already_be_enough: ["可能只靠 OpenList 元数据就够了", "OpenList metadata may already be sufficient"],
+      provider_overlap_weak: ["源端与目标端快传哈希重叠较弱", "The overlap between source and target fast hashes is weak"],
+    };
+    const pair = mapping[String(key || "").trim()] || [key || "-", key || "-"];
+    return pickText(ctx, pair[0], pair[1]);
+  }
+
   function formatCountMap(ctx, counts, formatter) {
     return Object.entries(counts || {}).map(([key, value]) => `${formatter(ctx, key)}: ${value}`).join(" | ") || "-";
   }
@@ -135,6 +177,9 @@
     bridgeExpectationText,
     bridgeMaturityText,
     bridgeHonestyText,
+    sourceTargetRouteBucketText,
+    sourceTargetRouteFocusText,
+    sourceTargetRouteHonestyText,
     nextActionHintText,
     formatCountMap,
   };

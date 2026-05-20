@@ -204,14 +204,22 @@ def build_source_target_route_summary(
     capture_missing = bool(resolution.get("direct_provider_capture_missing")) or bridge_status == "bridge_capture_missing"
     decision_bucket = "openlist_upload_path"
     next_focus = "openlist_first"
+    route_honesty = "openlist_only_for_now"
+    preferred_execution_mode = "stream_upload"
+    fallback_execution_mode = target_fallback_modes[0] if target_fallback_modes else "record_pending_only"
     summary = "当前默认通过 OpenList 源端执行，再按目标端能力决定快传或普通上传。"
     if not target_fast_hashes:
         decision_bucket = "target_upload_only"
         next_focus = "target_fallback_upload"
+        route_honesty = "target_has_no_metadata_fast_upload"
+        preferred_execution_mode = target_fallback_modes[0] if target_fallback_modes else "stream_upload"
         summary = "当前目标端没有元数据秒传能力，这个源端组合会稳定落到普通上传/覆盖或补传路径。"
     elif direct_ready and bridge_recoverable_fast_hashes:
         decision_bucket = "session_bridge_fast_candidate"
         next_focus = "validate_fast_hash_hit_rate"
+        route_honesty = "session_bridge_ready_but_transport_not_direct"
+        preferred_execution_mode = "fast_upload"
+        fallback_execution_mode = target_fallback_modes[0] if target_fallback_modes else "record_pending_only"
         summary = (
             "当前源端会话桥接已 ready，且理论上能补到目标端所需的快传哈希；"
             f"优先关注 {', '.join(bridge_recoverable_fast_hashes)} 的命中率。"
@@ -219,6 +227,8 @@ def build_source_target_route_summary(
     elif api_pending and bridge_recoverable_fast_hashes:
         decision_bucket = "api_bridge_fast_candidate"
         next_focus = "provider_api_enrich"
+        route_honesty = "provider_api_not_implemented_yet"
+        preferred_execution_mode = "record_pending_only"
         summary = (
             "当前源端已进入 API bridge 准备态，但真实 enrich 还没落地；"
             f"理论上最值得补齐的是 {', '.join(bridge_recoverable_fast_hashes)}。"
@@ -226,6 +236,8 @@ def build_source_target_route_summary(
     elif capture_missing and bridge_recoverable_fast_hashes:
         decision_bucket = "capture_gap_before_fast"
         next_focus = "collect_provider_capture"
+        route_honesty = "capture_missing_before_fast_upload"
+        preferred_execution_mode = "record_pending_only"
         summary = (
             "当前源端理论上可以补到目标端快传哈希，但还缺关键登录态；"
             f"优先补齐 capture 后再验证 {', '.join(bridge_recoverable_fast_hashes)}。"
@@ -233,6 +245,8 @@ def build_source_target_route_summary(
     elif direct_candidate and native_fast_candidate_hashes:
         decision_bucket = "native_hash_candidate"
         next_focus = "inspect_openlist_hash_coverage"
+        route_honesty = "openlist_metadata_may_already_be_enough"
+        preferred_execution_mode = "fast_upload"
         summary = (
             "当前源端档案本身就偏向目标端认可的快传哈希，先检查 OpenList 当前目录是否已经暴露"
             f" {', '.join(native_fast_candidate_hashes)}。"
@@ -240,6 +254,8 @@ def build_source_target_route_summary(
     elif direct_candidate:
         decision_bucket = "provider_candidate_but_fallback_first"
         next_focus = "pending_tree_or_stream_upload"
+        route_honesty = "provider_overlap_weak"
+        preferred_execution_mode = "record_pending_only" if "download_upload" in target_fallback_modes else (target_fallback_modes[0] if target_fallback_modes else "stream_upload")
         summary = "当前源端虽然已有主流 provider 候选，但和目标端快传哈希重叠不强，建议优先保守补传。"
     return {
         "source_driver": str(context.get("effective_driver") or context.get("driver") or ""),
@@ -253,6 +269,9 @@ def build_source_target_route_summary(
         "bridge_recoverable_fast_hashes": bridge_recoverable_fast_hashes,
         "decision_bucket": decision_bucket,
         "next_focus": next_focus,
+        "route_honesty": route_honesty,
+        "preferred_execution_mode": preferred_execution_mode,
+        "fallback_execution_mode": fallback_execution_mode,
         "summary": summary,
         "selected_source_mode": str(resolution.get("selected_source_mode") or ""),
         "selected_provider_key": str(resolution.get("selected_provider_key") or ""),
