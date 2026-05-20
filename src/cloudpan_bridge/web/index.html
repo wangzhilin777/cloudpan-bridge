@@ -47,7 +47,8 @@
           <button class="tab" data-tab="mounts" data-i18n="tab.mounts">连接</button>
           <button class="tab" data-tab="source" data-i18n="tab.source">源目录</button>
           <button class="tab" data-tab="config" data-i18n="tab.config">目标端</button>
-          <button class="tab" data-tab="sync" data-i18n="tab.sync">同步</button>
+          <button class="tab" data-tab="task" data-i18n="tab.task">任务</button>
+          <button class="tab" data-tab="execute" data-i18n="tab.execute">执行</button>
           <button class="tab" data-tab="pending" data-i18n="tab.pending">补传</button>
           <button class="tab" id="tab-miaochuan-label" data-tab="miaochuan" data-i18n="tab.miaochuan">秒传</button>
           <button class="tab" data-tab="about" data-i18n="tab.about">关于</button>
@@ -126,7 +127,7 @@
 
         </section>
 
-        <section class="tab-panel" data-panel="sync">
+        <section class="tab-panel" data-panel="task">
           <div class="panel">
             <h2 class="help-anchor" data-i18n="panel.current_task" data-help-key="panel_current_task">当前任务</h2>
             <div class="panel-grid">
@@ -175,7 +176,9 @@
             </div>
             <div class="notice" id="task-mode-summary">等待任务策略分析...</div>
           </div>
+        </section>
 
+        <section class="tab-panel" data-panel="execute">
           <div class="panel">
             <h2 class="help-anchor" data-i18n="panel.sync_actions" data-help-key="panel_sync_actions">同步执行</h2>
             <div class="actions">

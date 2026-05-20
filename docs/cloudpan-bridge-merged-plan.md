@@ -144,6 +144,14 @@
 - [x] 原有回归测试已改为直接覆盖新模块，接口语义保持不变
 - [x] 相关回归通过：`python -m compileall src tests`、`node --check src/cloudpan_bridge/web/assets/app.js`、`pytest -q tests/test_sync_logic.py -k "pending_selected_execution_groups_run_deepest_directories_first or source_provider_helpers_fall_back_to_legacy_methods or rate_limit_cooldown"`、`pytest -q tests/test_sync_logic.py -x`
 
+### 里程碑 18：前端主流程拆成“任务 / 执行”双阶段（起步）
+
+- [x] 原 `sync` 页签已拆为 `task` 与 `execute` 两个独立阶段，分别承载任务配置与正式执行
+- [x] 主流程路线卡已扩成五段：`连接 -> 源端 -> 目标端 -> 任务 -> 执行`
+- [x] 前端门控与快捷动作已同步更新，执行类动作默认跳到 `execute`，兼容旧 `sync` 标签页状态回写
+- [x] 首页壳页测试已补充 `task / execute` 标签存在性检查
+- [ ] 后续仍需继续梳理“补传 / 秒传能力 / 关于”与主流程的边界，决定是否进一步弱化次级页签
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

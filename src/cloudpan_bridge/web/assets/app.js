@@ -258,17 +258,20 @@
       const connectionReady = Boolean(openlistUrl) || storageRecords.length > 0 || Boolean(mountedSource);
       const targetConfigured = Boolean(targetPreflightCache?.configured);
       const taskReady = connectionReady && sourceReady && targetConfigured && Boolean(targetPath);
+      const executionReady = taskReady;
       const guangyaMiaochuanReady = targetKey === "guangya" && targetConfigured;
       let currentStep = "connect";
       if (!connectionReady) currentStep = "connect";
       else if (!sourceReady) currentStep = "source";
       else if (!targetConfigured) currentStep = "target";
-      else currentStep = "task";
+      else if (!taskReady) currentStep = "task";
+      else currentStep = "execute";
       return {
         connectionReady,
         sourceReady,
         targetConfigured,
         taskReady,
+        executionReady,
         guangyaMiaochuanReady,
         currentStep,
         sourcePath,
@@ -309,11 +312,19 @@
         },
         {
           key: "task",
-          title: currentLang() === "en" ? "4. Run Task" : currentLang() === "mix" ? "4. 执行任务 / Run Task" : "4. 执行任务",
+          title: currentLang() === "en" ? "4. Configure Task" : currentLang() === "mix" ? "4. 配置任务 / Configure Task" : "4. 配置任务",
           ready: state.taskReady,
           detail: state.taskReady
-            ? (currentLang() === "en" ? `Ready: ${state.sourcePath} -> ${state.targetKey}:${state.targetPath}` : currentLang() === "mix" ? `可执行 / Ready: ${state.sourcePath} -> ${state.targetKey}:${state.targetPath}` : `可执行: ${state.sourcePath} -> ${state.targetKey}:${state.targetPath}`)
-            : (currentLang() === "en" ? "After source and target are ready, go to Sync to run analysis or execution." : currentLang() === "mix" ? "源端和目标端都就绪后，再去“同步”执行分析或正式同步。 / Run Sync after prerequisites." : "源端和目标端都就绪后，再去“同步”执行分析或正式同步。"),
+            ? (currentLang() === "en" ? `Ready: ${state.sourcePath} -> ${state.targetKey}:${state.targetPath}` : currentLang() === "mix" ? `任务已确认 / Ready: ${state.sourcePath} -> ${state.targetKey}:${state.targetPath}` : `任务已确认: ${state.sourcePath} -> ${state.targetKey}:${state.targetPath}`)
+            : (currentLang() === "en" ? "Confirm source_path, target_path, and sync strategy in the Task tab." : currentLang() === "mix" ? "去“任务”页确认 source_path、target_path 和同步策略。 / Confirm task settings first." : "去“任务”页确认 source_path、target_path 和同步策略。"),
+        },
+        {
+          key: "execute",
+          title: currentLang() === "en" ? "5. Execute" : currentLang() === "mix" ? "5. 执行同步 / Execute" : "5. 执行同步",
+          ready: state.executionReady,
+          detail: state.executionReady
+            ? (currentLang() === "en" ? "Ready: direct sync, queue, leaf mode, and pending recovery are available." : currentLang() === "mix" ? "可执行：可开始直接同步、队列、最底层模式和待补传恢复。 / Execution ready." : "可执行：可开始直接同步、队列、最底层模式和待补传恢复。")
+            : (currentLang() === "en" ? "After task settings are ready, switch to Run for actual execution." : currentLang() === "mix" ? "任务确认后，再去“执行”页启动正式同步。 / Open Run after task is ready." : "任务确认后，再去“执行”页启动正式同步。"),
         },
       ];
       root.innerHTML = steps.map((step) => {
@@ -335,7 +346,8 @@
         mounts: true,
         source: state.connectionReady,
         config: state.connectionReady,
-        sync: state.connectionReady && state.sourceReady,
+        task: state.connectionReady && state.sourceReady,
+        execute: state.executionReady,
         pending: state.connectionReady && state.targetConfigured,
         miaochuan: state.connectionReady && state.targetConfigured && state.guangyaMiaochuanReady,
         about: true,
@@ -349,7 +361,8 @@
         if (!enabled) {
           if (locked) tab.title = currentLang() === "en" ? "Login to the console first." : currentLang() === "mix" ? "请先登录控制台。 / Login to the console first." : "请先登录控制台。";
           else if (tabId === "source") tab.title = currentLang() === "en" ? "Complete OpenList connection first." : currentLang() === "mix" ? "请先完成 OpenList 连接。 / Complete OpenList connection first." : "请先完成 OpenList 连接。";
-          else if (tabId === "sync") tab.title = currentLang() === "en" ? "Pick a concrete source directory first." : currentLang() === "mix" ? "请先选定具体源目录。 / Pick a concrete source directory first." : "请先选定具体源目录。";
+          else if (tabId === "task") tab.title = currentLang() === "en" ? "Pick a concrete source directory first." : currentLang() === "mix" ? "请先选定具体源目录。 / Pick a concrete source directory first." : "请先选定具体源目录。";
+          else if (tabId === "execute") tab.title = currentLang() === "en" ? "Confirm the task configuration first." : currentLang() === "mix" ? "请先确认任务配置。 / Confirm task configuration first." : "请先确认任务配置。";
           else if (tabId === "pending" || tabId === "miaochuan") tab.title = currentLang() === "en" ? "Complete target configuration first." : currentLang() === "mix" ? "请先完成目标端配置。 / Complete target configuration first." : "请先完成目标端配置。";
         } else {
           tab.removeAttribute("title");
@@ -409,14 +422,20 @@
       return true;
     }
 
+    function normalizeTabId(tabId) {
+      if (tabId === "sync") return "task";
+      return tabId || "overview";
+    }
+
     function activateTab(tabId) {
+      const normalizedTabId = normalizeTabId(tabId);
       document.querySelectorAll(".tab").forEach((tab) => {
-        tab.classList.toggle("active", tab.dataset.tab === tabId);
+        tab.classList.toggle("active", tab.dataset.tab === normalizedTabId);
       });
       document.querySelectorAll(".tab-panel").forEach((panel) => {
-        panel.classList.toggle("active", panel.dataset.panel === tabId);
+        panel.classList.toggle("active", panel.dataset.panel === normalizedTabId);
       });
-      updatePanelState({ activeTab: tabId });
+      updatePanelState({ activeTab: normalizedTabId });
     }
 
     function t(key) {
@@ -488,7 +507,7 @@
       document.querySelectorAll(".tab").forEach((tab) => {
         tab.addEventListener("click", () => activateTab(tab.dataset.tab));
       });
-      activateTab(getPanelState().activeTab || "overview");
+      activateTab(normalizeTabId(getPanelState().activeTab || "overview"));
       applySavedCoverageFilters();
       const langSelect = document.getElementById("ui_language");
       langSelect.value = currentLang();
@@ -824,7 +843,7 @@
       if (strategy?.shouldAnalyzeFirst) push("analyze", "先分析当前目录", "Analyze current directory");
       if (mode === "direct_metadata_first") {
         if (isGuangya) push("to-miaochuan", "去秒传页", "Open flash-upload tab");
-        else push("to-sync", "去同步页", "Open sync tab");
+        else push("to-execute", "去执行页", "Open execution tab");
         push("run-direct", "直接同步当前目录", "Run direct sync");
       } else if (mode === "leaf_metadata_then_pending") {
         push("run-leaf-direct", "最底层边扫边秒传", "Run leaf scan sync");
@@ -833,7 +852,7 @@
         push("to-pending", "去补传页", "Open pending tab");
         push("run-leaf-full", "最底层边扫边同步+补传", "Run leaf sync with fallback");
       } else if (mode === "stream_relay_first") {
-        push("to-sync", "去同步页", "Open sync tab");
+        push("to-execute", "去执行页", "Open execution tab");
         push("run-direct", "直接同步当前目录", "Run direct sync");
       } else if (mode === "manual_verify_first") {
         push("to-mounts", "去挂载与驱动说明", "Open mounts and guides");
@@ -850,19 +869,20 @@
         },
         "to-miaochuan": () => activateTab("miaochuan"),
         "to-pending": () => activateTab("pending"),
-        "to-sync": () => activateTab("sync"),
+        "to-task": () => activateTab("task"),
+        "to-execute": () => activateTab("execute"),
         "to-mounts": () => activateTab("mounts"),
         "to-about": () => activateTab("about"),
         "run-direct": () => {
-          activateTab("sync");
+          activateTab("execute");
           document.getElementById("run-direct")?.click();
         },
         "run-leaf-direct": () => {
-          activateTab("sync");
+          activateTab("execute");
           document.getElementById("run-leaf-direct")?.click();
         },
         "run-leaf-full": () => {
-          activateTab("sync");
+          activateTab("execute");
           document.getElementById("run-leaf-full")?.click();
         },
       };

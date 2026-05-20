@@ -3,7 +3,8 @@ window.CloudPanBridgeData = (() => {
       zh: {
         "tab.overview": "总览",
         "tab.source": "源端",
-        "tab.sync": "任务执行",
+        "tab.task": "任务",
+        "tab.execute": "执行",
         "tab.pending": "补传",
         "tab.miaochuan": "快传能力",
         "tab.mounts": "连接",
@@ -147,7 +148,7 @@ window.CloudPanBridgeData = (() => {
         "label.sftp_target_password": "SFTP 密码",
         "desc.source_browser": "页面进入时会优先按配置里的 source_path 恢复当前浏览目录；如果该目录读取失败，再回退到挂载根目录。",
         "desc.source_analyze": "开始真正同步前，先做一次源目录分析。这里会统计当前目录中有多少文件带 MD5、多少文件带 GCID、各 provider 占比，以及抽样展示前几条源文件元数据。",
-        "desc.overview_flow": "推荐顺序：先在“连接”完成 OpenList 或直连接入，再到“源端”选目录，在“目标端”配置写入目标，最后到“任务执行”和“补传”完成同步。",
+        "desc.overview_flow": "推荐顺序：先在“连接”完成 OpenList 或直连接入，再到“源端”选目录，在“目标端”配置写入目标，然后在“任务”确认路径与策略，最后到“执行”和“补传”完成同步。",
         "desc.leaf_mode": "适合防风控慢跑。可以直接边扫边同步，也可以先把叶子目录加入队列后分批执行。",
         "desc.pending_tree": "这里按真实目录树展示，父目录勾选会联动所有子目录和文件。",
         "desc.miaochuan": "支持直接粘贴油猴或插件导出的 JSON。若你已自动抓取到光鸭 Authorization，会优先使用它。",
@@ -175,7 +176,8 @@ window.CloudPanBridgeData = (() => {
       en: {
         "tab.overview": "Overview",
         "tab.source": "Source",
-        "tab.sync": "Task and Run",
+        "tab.task": "Task",
+        "tab.execute": "Run",
         "tab.pending": "Reupload",
         "tab.miaochuan": "Fast Upload",
         "tab.mounts": "Connections",

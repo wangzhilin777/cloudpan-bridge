@@ -5862,3 +5862,5 @@ def test_index_page_contains_auth_lock_and_workflow_shell(tmp_path: Path) -> Non
     assert 'id="workflow-roadmap"' in text
     assert 'id="open-auth-login-inline"' in text
     assert 'id="overview-route-summary"' in text
+    assert 'data-tab="task"' in text
+    assert 'data-tab="execute"' in text
