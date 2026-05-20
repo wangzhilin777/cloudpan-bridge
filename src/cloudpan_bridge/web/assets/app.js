@@ -343,6 +343,7 @@
       populateTargetOptions();
       populateSourceProfileOverrideOptions();
       populateCoverageFilterOptions();
+      renderSourceDriverSummary();
       await refreshTargetPreflight();
       renderCapabilitySummary();
       renderAboutRegistry();
@@ -362,6 +363,7 @@
           method: "POST",
           body: JSON.stringify({
             driver: context.driver,
+            mount_path: context.mountPath,
             target: activeTargetKey(),
             analysis_summary: sourceAnalyzeCache?.summary || {},
           }),
@@ -663,6 +665,7 @@
       const targetProfile = capability.targetProfile || {};
       const notes = capability.notes || {};
       const assessedLevel = assessment?.assessedLevel || capability.level;
+      const sourceMappingContext = assessment?.sourceMappingContext || providerRegistryPayload?.current_source_context || {};
       const rationale = assessment?.rationale || {};
       const strategy = assessment?.strategy || {};
       const likelyHashes = Array.isArray(sourceProfile.likelyHashes) ? sourceProfile.likelyHashes : [];
@@ -712,6 +715,7 @@
       )).join("");
       root.innerHTML = `
         <div><strong>${escapeHtml(context.driver || "-")}</strong> -> <strong>${escapeHtml(targetProfile.labelZh || targetProfile.label || "Guangya")}</strong></div>
+        <div class="mono">${currentLang() === "en" ? "Source mapping" : currentLang() === "mix" ? "源映射 / Source mapping" : "源映射"}: requested=${escapeHtml(sourceMappingContext.requested_driver || context.mountedDriver || context.driver || "-")} | override=${escapeHtml(sourceMappingContext.source_profile_override || context.overrideProfile || "-")} | effective=${escapeHtml(sourceMappingContext.effective_driver || context.driver || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Capability level" : currentLang() === "mix" ? "静态等级 / Capability level" : "静态等级"}: ${escapeHtml(capabilityLevelText(capability.level))}</div>
         <div class="mono">${currentLang() === "en" ? "Runtime assessment" : currentLang() === "mix" ? "动态判断 / Runtime assessment" : "动态判断"}: ${escapeHtml(capabilityLevelText(assessedLevel))}</div>
         <div class="mono">${currentLang() === "en" ? "Execution mode" : currentLang() === "mix" ? "执行模式 / Execution mode" : "执行模式"}: ${escapeHtml(strategyModeText(strategy?.recommendedMode || "analyze_first"))}</div>
@@ -2008,6 +2012,8 @@
       const root = document.getElementById("source-driver-summary");
       if (!root) return;
       const context = currentDriverContext();
+      const backendContext = providerRegistryPayload?.current_source_context || {};
+      const assessedContext = capabilityAssessmentCache?.sourceMappingContext || {};
       const sourcePath = String(document.getElementById("source_path")?.value || configCache?.source_path || "/").trim() || "/";
       const browsingPath = String(currentDirectoryPath || "/").trim() || "/";
       const selectedMount = String(document.getElementById("mounted_source_select")?.value || "").trim();
@@ -2015,6 +2021,7 @@
       root.innerHTML = `
         <div class="mono">driver=${escapeHtml(context.driver || "-")} | mount=${escapeHtml(selectedMount || "-")} | rate=${escapeHtml(rateMode)}</div>
         <div class="mono">mounted_driver=${escapeHtml(context.mountedDriver || "-")} | override=${escapeHtml(context.overrideProfile || "-")}</div>
+        <div class="mono">backend_effective=${escapeHtml(assessedContext.effective_driver || backendContext.effective_driver || "-")} | backend_override=${escapeHtml(assessedContext.source_profile_override || backendContext.source_profile_override || "-")}</div>
         <div class="mono">source_path=${escapeHtml(sourcePath)} | browsing=${escapeHtml(browsingPath)}</div>
       `;
     }
