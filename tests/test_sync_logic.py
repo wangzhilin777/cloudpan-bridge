@@ -1597,6 +1597,44 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     assert payload["target_implementation_status"]["smb"]["selectable"] is True
 
 
+def test_provider_source_mapping_endpoint_roundtrip(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "source_session": {
+    "mount_provider_mapping": {
+      "/alist/quark": "quark"
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/provider/source_mapping")
+    assert response.status_code == 200
+    assert response.json()["items"]["/alist/quark"] == "quark"
+
+    update = client.post(
+        "/api/provider/source_mapping",
+        json={"mount_path": "/alist/quark", "profile_key": "generic"},
+    )
+    assert update.status_code == 200
+    assert update.json()["items"]["/alist/quark"] == "generic"
+
+    clear_response = client.post(
+        "/api/provider/source_mapping",
+        json={"mount_path": "/alist/quark", "profile_key": ""},
+    )
+    assert clear_response.status_code == 200
+    assert clear_response.json()["items"] == {}
+
+
 def test_target_preflight_endpoint_reports_supported_target(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(

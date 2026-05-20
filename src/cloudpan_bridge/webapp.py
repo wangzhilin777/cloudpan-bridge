@@ -299,6 +299,9 @@ def create_app(config_path: Path) -> FastAPI:
         merged = dict(base)
         for key, value in patch.items():
             if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                if not value:
+                    merged[key] = {}
+                    continue
                 merged[key] = deep_merge_dicts(dict(merged.get(key) or {}), value)
             else:
                 merged[key] = value
@@ -1416,6 +1419,46 @@ def create_app(config_path: Path) -> FastAPI:
                 }
                 for key in target_profiles.keys()
             },
+        }
+
+    @app.get("/api/provider/source_mapping")
+    def get_provider_source_mapping() -> dict[str, Any]:
+        return {
+            "items": dict(config.mount_provider_mapping or {}),
+        }
+
+    @app.post("/api/provider/source_mapping")
+    def save_provider_source_mapping(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        nonlocal config
+        raw = dict(payload or {})
+        mapping_payload = raw.get("mapping")
+        if isinstance(mapping_payload, dict):
+            next_mapping = {
+                normalize_posix_path(path): str(profile or "").strip()
+                for path, profile in mapping_payload.items()
+                if str(path).strip() and str(profile or "").strip()
+            }
+        else:
+            mount_path = normalize_posix_path(str(raw.get("mount_path") or "").strip())
+            if not mount_path:
+                raise HTTPException(status_code=400, detail="缺少 mount_path")
+            next_mapping = dict(config.mount_provider_mapping or {})
+            profile_key = str(raw.get("profile_key") or "").strip()
+            if profile_key:
+                next_mapping[mount_path] = profile_key
+            else:
+                next_mapping.pop(mount_path, None)
+        changed = save_grouped_config_updates({
+            ("source_session", "mount_provider_mapping"): next_mapping,
+        })
+        if changed:
+            config = AppConfig.load(config_path)
+            config.ensure_parent_dirs()
+            logger.info("源 Profile 覆盖映射已更新")
+        return {
+            "ok": True,
+            "changed": changed,
+            "items": dict(config.mount_provider_mapping or {}),
         }
 
     @app.get("/api/target/preflight")

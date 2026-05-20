@@ -471,7 +471,7 @@
       if (current.overrideProfile) select.value = current.overrideProfile;
     }
 
-    function saveSourceProfileOverrideSelection(value = "") {
+    async function saveSourceProfileOverrideSelection(value = "") {
       const selectedMount = String(document.getElementById("mounted_source_select")?.value || "").trim();
       if (!selectedMount) {
         setNotice("source-profile-override-notice", currentLang() === "en"
@@ -486,9 +486,19 @@
       if (normalized) map[selectedMount] = normalized;
       else delete map[selectedMount];
       setGroupedConfigValue(["source_session", "mount_provider_mapping"], map);
+      const result = await call("/api/provider/source_mapping", {
+        method: "POST",
+        body: JSON.stringify({
+          mount_path: selectedMount,
+          profile_key: normalized,
+        }),
+      });
+      if (result?.items && typeof result.items === "object") {
+        setGroupedConfigValue(["source_session", "mount_provider_mapping"], result.items);
+      }
       populateSourceProfileOverrideOptions();
       renderSourceDriverSummary();
-      refreshCapabilityAssessment();
+      await refreshCapabilityAssessment();
       setNotice("source-profile-override-notice", normalized
         ? (currentLang() === "en"
             ? `Saved override: ${selectedMount} -> ${normalized}`
@@ -2266,14 +2276,12 @@
       });
       document.getElementById("save-source-profile-override").onclick = withBusy("save-source-profile-override", "保存中...", async () => {
         const select = document.getElementById("source_profile_override");
-        const saved = saveSourceProfileOverrideSelection(select?.value || "");
-        if (saved) await saveConfig();
+        await saveSourceProfileOverrideSelection(select?.value || "");
       });
       document.getElementById("clear-source-profile-override").onclick = withBusy("clear-source-profile-override", "清除中...", async () => {
         const select = document.getElementById("source_profile_override");
         if (select) select.value = "";
-        const saved = saveSourceProfileOverrideSelection("");
-        if (saved) await saveConfig();
+        await saveSourceProfileOverrideSelection("");
       });
 
       document.getElementById("install-runtime").onclick = withBusy("install-runtime", "拉取中...", async () => {

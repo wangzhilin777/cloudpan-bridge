@@ -52,7 +52,8 @@
 - [x] `AppConfig` 正式接入 `mount_provider_mapping`，并补齐 round-trip 回归测试
 - [x] 当前驱动上下文优先读取覆盖值，再决定源端能力评估
 - [x] 覆盖保存/清除后会联动刷新源端摘要与任务能力判断
-- [ ] 后端补齐更正式的 mount/provider override 接口与矩阵回写
+- [x] 后端补齐正式的 `source_mapping` 读取/写入接口，并覆盖保存、清除、回读测试
+- [ ] 将 mapping 结果进一步写回能力矩阵与更多执行链路
 
 ## 摘要
 
