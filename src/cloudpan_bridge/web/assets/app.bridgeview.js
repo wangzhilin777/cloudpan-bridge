@@ -80,6 +80,18 @@
     return items.join(", ");
   }
 
+  function bridgeMaturityText(ctx, key) {
+    const mapping = {
+      session_snapshot_ready: ["会话快照已就绪", "Session snapshot ready"],
+      api_capture_ready_pending_provider_enrich: ["API 准备态已就绪", "API preparation ready"],
+      capture_missing: ["仍缺关键登录态", "Missing required capture fields"],
+      not_registered: ["未注册专用 bridge", "No dedicated bridge registered"],
+      unknown: ["需要人工复核", "Needs manual review"],
+    };
+    const pair = mapping[String(key || "").trim()] || [key || "-", key || "-"];
+    return pickText(ctx, pair[0], pair[1]);
+  }
+
   function formatCountMap(ctx, counts, formatter) {
     return Object.entries(counts || {}).map(([key, value]) => `${formatter(ctx, key)}: ${value}`).join(" | ") || "-";
   }
@@ -92,6 +104,7 @@
     transferModeText,
     bridgeTransportHintText,
     bridgeExpectationText,
+    bridgeMaturityText,
     formatCountMap,
   };
 })();

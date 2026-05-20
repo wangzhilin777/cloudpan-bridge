@@ -24,6 +24,8 @@
 - [x] 新增 `app.bridgeview.js`，把桥接挂起原因、桥接阶段、传输原因与执行模式文案从 `app.workflow.js` 剥离
 - [x] 把 `bridge_preparation_summary` 扁平化到 `sourceEnrichment` 运行态，直接暴露预期补指纹、命中字段组与 transport hint
 - [x] 页面摘要已显示主流 provider 的 bridge 准备态细节，不再只显示 `bridge_ready_but_api_pending` 这类状态码
+- [x] 新增 `bridge_maturity_summary`，把会话快照 ready、API 准备态、缺 capture、未注册 bridge 等阶段显式分层
+- [x] 为 `189Cloud / Quark / 123Pan / Baidu / Thunder / AliyunDriveOpen / OneDrive` 继续补专用 enrich/runtime 回归，强化首批主流 provider 覆盖
 - [ ] 深化首批主流源端的真实直连补指纹桥接实现
 - [ ] 继续拆分前端与过大的 Python/JS 文件，优先压到单文件 `100 KB` 左右，并按统一分级阈值治理
 - [ ] 完成更多主流 provider 的互传能力验证与 UI 诚实提示收口

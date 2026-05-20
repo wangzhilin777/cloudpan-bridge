@@ -25,6 +25,42 @@ def _build_bridge_preparation_summary(bridge_runtime: dict[str, Any]) -> dict[st
     }
 
 
+def _build_bridge_maturity_summary(bridge_runtime: dict[str, Any], bridge_preparation_summary: dict[str, Any]) -> dict[str, Any]:
+    status = str(bridge_runtime.get("status") or "").strip()
+    mode = str(bridge_runtime.get("mode") or "").strip()
+    execution_state = str(bridge_preparation_summary.get("execution_state") or "").strip()
+    ready = bool(bridge_runtime.get("ready"))
+    if status == "bridge_ready" and mode == "session_snapshot":
+        return {
+            "level": "session_snapshot_ready",
+            "honesty": "capture_ready_normalization_only",
+            "summary": "已具备会话快照归并能力，可提升当前目录的指纹覆盖率，但真实直连传输仍未落地。",
+        }
+    if status == "bridge_ready_but_api_pending" and ready:
+        return {
+            "level": "api_capture_ready_pending_provider_enrich",
+            "honesty": "api_prepared_not_executed",
+            "summary": "登录态已满足 API bridge 准备条件，但当前版本还没有真正执行 provider API 补指纹。",
+        }
+    if status == "bridge_capture_missing":
+        return {
+            "level": "capture_missing",
+            "honesty": "waiting_capture",
+            "summary": "当前还缺少关键登录态字段，暂时无法进入主流 provider 的补指纹准备态。",
+        }
+    if execution_state == "bridge_not_registered" or status == "bridge_not_declared":
+        return {
+            "level": "not_registered",
+            "honesty": "openlist_only",
+            "summary": "当前 provider 还没有注册专用 bridge，只能使用 OpenList 已暴露的元数据。",
+        }
+    return {
+        "level": "unknown",
+        "honesty": "manual_review",
+        "summary": "当前 bridge 运行态需要人工复核后再决定是否继续扩展。",
+    }
+
+
 def supports_enrichment(provider_key: str) -> bool:
     return str(provider_key or "").strip().lower() in MAINSTREAM_SOURCE_PROVIDERS
 
@@ -41,6 +77,7 @@ def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dic
     bridge_runtime = build_bridge_runtime(normalized, captured)
     capture_ready = bool(bridge_runtime.get("ready")) if capture_required else True
     bridge_preparation_summary = _build_bridge_preparation_summary(bridge_runtime)
+    bridge_maturity_summary = _build_bridge_maturity_summary(bridge_runtime, bridge_preparation_summary)
     return {
         "provider_key": normalized,
         "supported": supported,
@@ -55,6 +92,7 @@ def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dic
         "bridge_status": str(bridge_runtime.get("status") or (rule.get("bridge_status") or ("capture_guided_normalization" if supported else "not_supported"))),
         "bridge_runtime": bridge_runtime,
         "bridge_preparation_summary": bridge_preparation_summary,
+        "bridge_maturity_summary": bridge_maturity_summary,
         "runtime_mode": "openlist_first_provider_snapshot_enrichment" if supported else "openlist_only",
     }
 

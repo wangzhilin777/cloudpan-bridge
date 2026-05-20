@@ -41,6 +41,7 @@
     const sourceEnrichment = assessment?.sourceEnrichment || capability?.sourceEnrichment || {};
     const bridgeRuntime = sourceEnrichment.bridge_runtime || {};
     const bridgePreparation = sourceEnrichment.bridge_preparation_summary || bridgeRuntime.preparation || {};
+    const bridgeMaturity = sourceEnrichment.bridge_maturity_summary || {};
     const rationale = assessment?.rationale || {};
     const strategy = assessment?.strategy || {};
     const likelyHashes = Array.isArray(sourceProfile.likelyHashes) ? sourceProfile.likelyHashes : [];
@@ -107,6 +108,7 @@
       <div class="mono">${currentLang() === "en" ? "Fingerprint enrichment" : currentLang() === "mix" ? "补指纹能力 / Fingerprint enrichment" : "补指纹能力"}: ${supportsFingerprintEnrichment ? (currentLang() === "en" ? "declared" : currentLang() === "mix" ? "已声明 / declared" : "已声明") : (currentLang() === "en" ? "unknown" : currentLang() === "mix" ? "未知 / unknown" : "未知")}</div>
       <div class="mono">${currentLang() === "en" ? "Enrichment runtime" : currentLang() === "mix" ? "补指纹运行态 / Enrichment runtime" : "补指纹运行态"}: supported=${escapeHtml(String(!!sourceEnrichment.supported))} | capture_ready=${escapeHtml(String(!!sourceEnrichment.capture_ready))} | preferred=${escapeHtml((sourceEnrichment.preferred_hashes || []).join(", ") || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Bridge runtime" : currentLang() === "mix" ? "桥接运行态 / Bridge runtime" : "桥接运行态"}: status=${escapeHtml(bridgeRuntime.status || "-")} | next=${escapeHtml(bridgeRuntime.next_action || "-")} | missing=${escapeHtml((bridgeRuntime.missing_keys || []).join(", ") || "-")}</div>
+      <div class="mono">${currentLang() === "en" ? "Bridge maturity" : currentLang() === "mix" ? "桥接成熟度 / Bridge maturity" : "桥接成熟度"}: ${escapeHtml(bridgeView.bridgeMaturityText(ctx, bridgeMaturity.level || "-"))} | ${escapeHtml(bridgeMaturity.summary || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Bridge preparation" : currentLang() === "mix" ? "桥接准备态 / Bridge preparation" : "桥接准备态"}: ${escapeHtml(bridgeView.bridgeExecutionStateText(ctx, bridgePreparation.execution_state || "-"))} | ${escapeHtml(bridgeView.bridgeTransportHintText(ctx, bridgePreparation.transport_hint || "-"))}</div>
       <div class="mono">${currentLang() === "en" ? "Expected fingerprints" : currentLang() === "mix" ? "预期补指纹 / Expected fingerprints" : "预期补指纹"}: ${escapeHtml(bridgeView.bridgeExpectationText(ctx, bridgePreparation.fingerprint_expectation || []))} | ${currentLang() === "en" ? "Matched fields" : currentLang() === "mix" ? "命中字段 / Matched fields" : "命中字段"}=${escapeHtml((bridgePreparation.selected_field_names || []).join(", ") || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Recommended rate profile" : currentLang() === "mix" ? "推荐频率 / Recommended rate profile" : "推荐频率"}: ${escapeHtml(sourceProfile.recommendedRateProfile || "-")}</div>
@@ -135,6 +137,7 @@
     const enrichBatch = data?.sourceEnrichmentBatch || {};
     const bridgeRuntime = enrichment.bridge_runtime || {};
     const bridgePreparation = enrichment.bridge_preparation_summary || bridgeRuntime.preparation || {};
+    const bridgeMaturity = enrichment.bridge_maturity_summary || {};
     const transferPreview = data?.transferPlanPreview || {};
     const entries = Array.isArray(data?.entries) ? data.entries : [];
     if (!data) {
@@ -175,6 +178,7 @@
           <div class="mono">${currentLang() === "en" ? "Fast upload decision" : currentLang() === "mix" ? "秒传决策 / Fast upload decision" : "秒传决策"}: ${escapeHtml(decision.level || "-")} | ${escapeHtml(decision.bucket || "-")}</div>
           <div class="mono">${currentLang() === "en" ? "Enrichment runtime" : currentLang() === "mix" ? "补指纹运行态 / Enrichment runtime" : "补指纹运行态"}: supported=${escapeHtml(String(!!enrichment.supported))} | capture_ready=${escapeHtml(String(!!enrichment.capture_ready))} | preferred=${escapeHtml((enrichment.preferred_hashes || []).join(", ") || "-")}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge runtime" : currentLang() === "mix" ? "桥接运行态 / Bridge runtime" : "桥接运行态"}: status=${escapeHtml(bridgeRuntime.status || "-")} | next=${escapeHtml(bridgeRuntime.next_action || "-")} | missing=${escapeHtml((bridgeRuntime.missing_keys || []).join(", ") || "-")}</div>
+          <div class="mono">${currentLang() === "en" ? "Bridge maturity" : currentLang() === "mix" ? "桥接成熟度 / Bridge maturity" : "桥接成熟度"}: ${escapeHtml(bridgeView.bridgeMaturityText(ctx, bridgeMaturity.level || "-"))} | ${escapeHtml(bridgeMaturity.summary || "-")}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge preparation" : currentLang() === "mix" ? "桥接准备态 / Bridge preparation" : "桥接准备态"}: ${escapeHtml(bridgeView.bridgeExecutionStateText(ctx, bridgePreparation.execution_state || "-"))} | ${escapeHtml(bridgeView.bridgeTransportHintText(ctx, bridgePreparation.transport_hint || "-"))}</div>
           <div class="mono">${currentLang() === "en" ? "Expected fingerprints" : currentLang() === "mix" ? "预期补指纹 / Expected fingerprints" : "预期补指纹"}: ${escapeHtml(bridgeView.bridgeExpectationText(ctx, bridgePreparation.fingerprint_expectation || []))} | ${currentLang() === "en" ? "Matched fields" : currentLang() === "mix" ? "命中字段 / Matched fields" : "命中字段"}=${escapeHtml((bridgePreparation.selected_field_names || []).join(", ") || "-")}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge states" : currentLang() === "mix" ? "桥接执行态 / Bridge states" : "桥接执行态"}: ${escapeHtml(bridgeStateCounts)}</div>
@@ -228,6 +232,7 @@
     const sourceEnrichment = window.__cpbStatusCache?.sourceEnrichment || {};
     const bridgeRuntime = sourceEnrichment.bridge_runtime || {};
     const bridgePreparation = sourceEnrichment.bridge_preparation_summary || bridgeRuntime.preparation || {};
+    const bridgeMaturity = sourceEnrichment.bridge_maturity_summary || {};
     root.innerHTML = `
       <div class="mono">driver=${escapeHtml(context.driver || "-")} | mount=${escapeHtml(selectedMount || "-")} | rate=${escapeHtml(rateMode)}</div>
       <div class="mono">mounted_driver=${escapeHtml(context.mountedDriver || "-")} | override=${escapeHtml(context.overrideProfile || "-")}</div>
@@ -235,6 +240,7 @@
       <div class="mono">runtime_mount=${escapeHtml(runtimeContext.mount_path || "-")} | runtime_effective=${escapeHtml(runtimeContext.effective_driver || "-")}</div>
       <div class="mono">route_pref=${escapeHtml(sourceRuntime.requested_provider_preference || "-")} | route_selected=${escapeHtml(sourceRuntime.selected_source_mode || "-")} | route_provider=${escapeHtml(sourceRuntime.selected_provider_key || "-")}</div>
       <div class="mono">enrich_supported=${escapeHtml(String(!!sourceEnrichment.supported))} | capture_ready=${escapeHtml(String(!!sourceEnrichment.capture_ready))} | bridge=${escapeHtml(sourceEnrichment.bridge_status || "-")} | preferred=${escapeHtml((sourceEnrichment.preferred_hashes || []).join(", ") || "-")}</div>
+      <div class="mono">bridge_maturity=${escapeHtml(bridgeView.bridgeMaturityText(ctx, bridgeMaturity.level || "-"))} | honesty=${escapeHtml(bridgeMaturity.honesty || "-")}</div>
       <div class="mono">bridge_transport=${escapeHtml(bridgeView.bridgeTransportHintText(ctx, bridgePreparation.transport_hint || "-"))} | expected=${escapeHtml(bridgeView.bridgeExpectationText(ctx, bridgePreparation.fingerprint_expectation || []))}</div>
       <div class="mono">bridge_fields=${escapeHtml((bridgePreparation.selected_field_names || []).join(", ") || "-")} | prep_state=${escapeHtml(bridgeView.bridgeExecutionStateText(ctx, bridgePreparation.execution_state || "-"))}</div>
       <div class="mono">bridge_next=${escapeHtml(bridgeRuntime.next_action || "-")} | missing=${escapeHtml((bridgeRuntime.missing_keys || []).join(", ") || "-")}</div>

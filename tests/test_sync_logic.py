@@ -920,6 +920,7 @@ def test_source_enrichment_runtime_reports_mainstream_provider_capture_state(tmp
     assert runtime["bridge_preparation_summary"]["transport_hint"] == "authorization_plus_device_id"
     assert runtime["bridge_preparation_summary"]["fingerprint_expectation"] == ["gcid", "md5", "sha1"]
     assert runtime["bridge_preparation_summary"]["selected_field_names"] == ["authorization", "device_id"]
+    assert runtime["bridge_maturity_summary"]["level"] == "api_capture_ready_pending_provider_enrich"
 
 
 def test_source_enrichment_runtime_marks_session_bridge_ready_when_capture_available(tmp_path: Path) -> None:
@@ -947,6 +948,62 @@ def test_source_enrichment_runtime_marks_session_bridge_ready_when_capture_avail
     assert runtime["bridge_status"] == "bridge_ready"
     assert runtime["bridge_runtime"]["status"] == "bridge_ready"
     assert runtime["bridge_runtime"]["next_action"] == "prepare_quark_session_bridge"
+    assert runtime["bridge_maturity_summary"]["level"] == "session_snapshot_ready"
+
+
+def test_source_enrichment_runtime_reports_189cloud_session_bridge_summary(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "189cloud": {
+                            "status": "captured",
+                            "captured": {
+                                "cookie_header": "sid=1",
+                            },
+                        }
+                    },
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "189Cloud")
+    assert runtime["capture_ready"] is True
+    assert runtime["bridge_preparation_summary"]["transport_hint"] == "cookie_or_session_snapshot"
+    assert runtime["bridge_preparation_summary"]["fingerprint_expectation"] == ["md5"]
+    assert runtime["bridge_maturity_summary"]["level"] == "session_snapshot_ready"
+
+
+def test_source_enrichment_runtime_reports_123pan_session_bridge_summary(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "123pan": {
+                            "status": "captured",
+                            "captured": {
+                                "access_token": "token-123",
+                                "refresh_token": "refresh-123",
+                            },
+                        }
+                    },
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "123Pan")
+    assert runtime["capture_ready"] is True
+    assert runtime["bridge_preparation_summary"]["selected_field_names"] == ["access_token", "refresh_token"]
+    assert runtime["bridge_preparation_summary"]["fingerprint_expectation"] == ["md5", "sha1"]
+    assert runtime["bridge_maturity_summary"]["level"] == "session_snapshot_ready"
 
 
 def test_source_enrichment_promotes_hashes_from_existing_raw_fields(tmp_path: Path) -> None:
@@ -1101,6 +1158,14 @@ def test_bridge_runtime_reports_missing_keys_for_baidu_capture() -> None:
     assert runtime["ready"] is False
     assert runtime["status"] == "bridge_capture_missing"
     assert "bdstoken" in runtime["missing_keys"]
+
+
+def test_source_enrichment_runtime_reports_capture_missing_maturity(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "baidu")
+    assert runtime["capture_ready"] is False
+    assert runtime["bridge_maturity_summary"]["level"] == "capture_missing"
 
 
 def test_bridge_runtime_accepts_refresh_token_for_onedrive() -> None:
