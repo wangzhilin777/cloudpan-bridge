@@ -1,4 +1,6 @@
 (function () {
+  const bridgeView = window.CloudPanBridgeBridgeView || {};
+
   function renderCapabilitySummary(ctx) {
     const {
       currentDriverContext,
@@ -83,11 +85,13 @@
       `${currentLang() === "en" ? "Prefer pending tree" : currentLang() === "mix" ? "待补传树优先 / Prefer pending tree" : "待补传树优先"}=${strategy?.preferPendingTree ? "yes" : "no"}`,
     ].join(" | ");
     const transferPreviewText = sourceAnalyzeCache?.transferPlanPreview
-      ? Object.entries(sourceAnalyzeCache.transferPlanPreview.mode_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ")
+      ? bridgeView.formatCountMap(ctx, sourceAnalyzeCache.transferPlanPreview.mode_counts || {}, (_ctx, key) => bridgeView.transferModeText(ctx, key))
       : "-";
     const enrichBatch = sourceAnalyzeCache?.sourceEnrichmentBatch || {};
     const enrichBatchText = Object.entries(enrichBatch.candidate_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
-    const enrichPendingText = Object.entries(enrichBatch.pending_reason_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
+    const enrichPendingText = bridgeView.formatCountMap(ctx, enrichBatch.pending_reason_counts || {}, bridgeView.bridgePendingReasonText);
+    const transferReasonText = bridgeView.formatCountMap(ctx, sourceAnalyzeCache?.transferPlanPreview?.reason_code_counts || {}, bridgeView.transferReasonCodeText);
+    const transferStageText = bridgeView.formatCountMap(ctx, sourceAnalyzeCache?.transferPlanPreview?.bridge_provider_stage_counts || {}, bridgeView.bridgeProviderStageText);
     const quickActions = strategyQuickActions(strategy?.recommendedMode || "analyze_first", strategy);
     quickActionsRoot.innerHTML = quickActions.map((item) => (
       `<button class="secondary" type="button" data-capability-action="${escapeHtml(item.key)}">${escapeHtml(item.label)}</button>`
@@ -107,6 +111,8 @@
       <div class="mono">${currentLang() === "en" ? "Bridge candidate hashes" : currentLang() === "mix" ? "桥接候选哈希 / Bridge candidate hashes" : "桥接候选哈希"}: ${escapeHtml(enrichBatchText)}</div>
       <div class="mono">${currentLang() === "en" ? "Bridge pending reasons" : currentLang() === "mix" ? "桥接挂起原因 / Bridge pending reasons" : "桥接挂起原因"}: ${escapeHtml(enrichPendingText)}</div>
       <div class="mono">${currentLang() === "en" ? "Transfer preview" : currentLang() === "mix" ? "传输预览 / Transfer preview" : "传输预览"}: ${escapeHtml(transferPreviewText)}</div>
+      <div class="mono">${currentLang() === "en" ? "Transfer reason buckets" : currentLang() === "mix" ? "传输原因分桶 / Transfer reason buckets" : "传输原因分桶"}: ${escapeHtml(transferReasonText)}</div>
+      <div class="mono">${currentLang() === "en" ? "Bridge provider stages" : currentLang() === "mix" ? "桥接阶段分桶 / Bridge provider stages" : "桥接阶段分桶"}: ${escapeHtml(transferStageText)}</div>
       <div class="mono">${currentLang() === "en" ? "Suggested path" : currentLang() === "mix" ? "建议路径 / Suggested path" : "建议路径"}: ${escapeHtml(recommendedFlow || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Runtime rationale" : currentLang() === "mix" ? "动态理由 / Runtime rationale" : "动态理由"}: ${escapeHtml(rationaleText || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Throttle hint" : currentLang() === "mix" ? "节奏建议 / Throttle hint" : "节奏建议"}: ${escapeHtml(throttleHintText || "-")}</div>
@@ -134,8 +140,11 @@
     const providerCounts = Object.entries(summary.provider_counts || {}).map(([key, value]) => `${key}: ${value}`).join(" | ") || "-";
     const hashCounts = Object.entries(summary.hash_type_counts || {}).map(([key, value]) => `${key}: ${value}`).join(" | ") || "-";
     const candidateCounts = Object.entries(enrichBatch.candidate_hash_counts || {}).map(([key, value]) => `${key}: ${value}`).join(" | ") || "-";
-    const pendingCounts = Object.entries(enrichBatch.pending_reason_counts || {}).map(([key, value]) => `${key}: ${value}`).join(" | ") || "-";
-    const bridgeStateCounts = Object.entries(enrichBatch.bridge_execution_state_counts || {}).map(([key, value]) => `${key}: ${value}`).join(" | ") || "-";
+    const pendingCounts = bridgeView.formatCountMap(ctx, enrichBatch.pending_reason_counts || {}, bridgeView.bridgePendingReasonText);
+    const bridgeStateCounts = bridgeView.formatCountMap(ctx, enrichBatch.bridge_execution_state_counts || {}, bridgeView.bridgeExecutionStateText);
+    const bridgeStageCounts = bridgeView.formatCountMap(ctx, enrichBatch.provider_stage_counts || {}, bridgeView.bridgeProviderStageText);
+    const previewModeCounts = bridgeView.formatCountMap(ctx, transferPreview.mode_counts || {}, (_ctx, key) => bridgeView.transferModeText(ctx, key));
+    const previewReasonCounts = bridgeView.formatCountMap(ctx, transferPreview.reason_code_counts || {}, bridgeView.transferReasonCodeText);
     const recommendation = summary.missing_md5 > 0
       ? (summary.gcid_ready > 0
         ? (currentLang() === "en"
@@ -163,9 +172,11 @@
           <div class="mono">${currentLang() === "en" ? "Enrichment runtime" : currentLang() === "mix" ? "补指纹运行态 / Enrichment runtime" : "补指纹运行态"}: supported=${escapeHtml(String(!!enrichment.supported))} | capture_ready=${escapeHtml(String(!!enrichment.capture_ready))} | preferred=${escapeHtml((enrichment.preferred_hashes || []).join(", ") || "-")}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge runtime" : currentLang() === "mix" ? "桥接运行态 / Bridge runtime" : "桥接运行态"}: status=${escapeHtml(bridgeRuntime.status || "-")} | next=${escapeHtml(bridgeRuntime.next_action || "-")} | missing=${escapeHtml((bridgeRuntime.missing_keys || []).join(", ") || "-")}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge states" : currentLang() === "mix" ? "桥接执行态 / Bridge states" : "桥接执行态"}: ${escapeHtml(bridgeStateCounts)}</div>
+          <div class="mono">${currentLang() === "en" ? "Bridge stages" : currentLang() === "mix" ? "桥接阶段 / Bridge stages" : "桥接阶段"}: ${escapeHtml(bridgeStageCounts)}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge candidate hashes" : currentLang() === "mix" ? "桥接候选哈希 / Bridge candidate hashes" : "桥接候选哈希"}: ${escapeHtml(candidateCounts)}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge pending reasons" : currentLang() === "mix" ? "桥接挂起原因 / Bridge pending reasons" : "桥接挂起原因"}: ${escapeHtml(pendingCounts)}</div>
-          <div class="mono">${currentLang() === "en" ? "Transfer preview" : currentLang() === "mix" ? "传输预览 / Transfer preview" : "传输预览"}: ${escapeHtml(Object.entries(transferPreview.mode_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-")}</div>
+          <div class="mono">${currentLang() === "en" ? "Transfer preview" : currentLang() === "mix" ? "传输预览 / Transfer preview" : "传输预览"}: ${escapeHtml(previewModeCounts)}</div>
+          <div class="mono">${currentLang() === "en" ? "Transfer reason buckets" : currentLang() === "mix" ? "传输原因分桶 / Transfer reason buckets" : "传输原因分桶"}: ${escapeHtml(previewReasonCounts)}</div>
           <div class="mono">provider: ${escapeHtml(providerCounts)}</div>
           <div class="mono">hash: ${escapeHtml(hashCounts)}</div>
           <div class="mono">${escapeHtml((currentLang() === "en" ? decision?.rationale?.en : currentLang() === "mix" ? `${decision?.rationale?.zh || ""} / ${decision?.rationale?.en || ""}`.trim() : decision?.rationale?.zh) || "-")}</div>
@@ -178,6 +189,8 @@
             <div>${escapeHtml(item.path || "")}</div>
             <div class="mono">provider=${escapeHtml(item.provider || "-")} | hashType=${escapeHtml(item.hashType || "-")} | size=${escapeHtml(String(item.size ?? 0))}</div>
             <div class="mono">md5=${escapeHtml(item.md5 || "-")} | gcid=${escapeHtml(item.gcid || "-")} | sourceId=${escapeHtml(item.sourceId || "-")}</div>
+            <div class="mono">${currentLang() === "en" ? "planned" : currentLang() === "mix" ? "计划模式 / planned" : "计划模式"}=${escapeHtml(bridgeView.transferModeText(ctx, item.transferPlan?.mode || "-"))} | ${currentLang() === "en" ? "reason" : currentLang() === "mix" ? "原因 / reason" : "原因"}=${escapeHtml(bridgeView.transferReasonCodeText(ctx, item.transferPlan?.reason_code || "-"))}</div>
+            <div class="mono">${currentLang() === "en" ? "bridge stage" : currentLang() === "mix" ? "桥接阶段 / bridge stage" : "桥接阶段"}=${escapeHtml(bridgeView.bridgeProviderStageText(ctx, item.transferPlan?.bridge_provider_stage || "-"))} | ${currentLang() === "en" ? "pending" : currentLang() === "mix" ? "挂起 / pending" : "挂起"}=${escapeHtml(bridgeView.bridgePendingReasonText(ctx, item.transferPlan?.bridge_pending_reason || "-"))}</div>
           </div>
         </div>
       `).join("")}
@@ -251,7 +264,10 @@
     const statusTargetPreflight = window.__cpbStatusCache?.target_preflight || {};
     const statusTargetCapability = statusTargetPreflight?.adapter_capability || {};
     const transferPreviewText = sourceAnalyzeCache?.transferPlanPreview
-      ? Object.entries(sourceAnalyzeCache.transferPlanPreview.mode_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ")
+      ? bridgeView.formatCountMap(ctx, sourceAnalyzeCache.transferPlanPreview.mode_counts || {}, (_ctx, key) => bridgeView.transferModeText(ctx, key))
+      : "-";
+    const previewReasonText = sourceAnalyzeCache?.transferPlanPreview
+      ? bridgeView.formatCountMap(ctx, sourceAnalyzeCache.transferPlanPreview.reason_code_counts || {}, bridgeView.transferReasonCodeText)
       : "-";
     root.innerHTML = `
       <div class="mono">source=${escapeHtml(sourcePath)} -> target=${escapeHtml(targetKey)}:${escapeHtml(targetPath)}</div>
@@ -259,6 +275,7 @@
       <div class="mono">source_route_pref=${escapeHtml(sourcePreference)} | selected=${escapeHtml(sourceRuntime.selected_source_mode || "-")} | provider=${escapeHtml(sourceRuntime.selected_provider_key || "-")}</div>
       <div class="mono">target_fast_upload=${escapeHtml(String(!!statusTargetCapability.supports_fast_upload))} | hashes=${escapeHtml((statusTargetCapability.fast_upload_hashes || []).join(", ") || "-")} | fallback=${escapeHtml((statusTargetCapability.fallback_modes || []).join(", ") || "-")}</div>
       <div class="mono">transfer_preview=${escapeHtml(transferPreviewText)}</div>
+      <div class="mono">transfer_reason=${escapeHtml(previewReasonText)}</div>
       <div class="mono">delete_state=${deleteRemoved ? "on" : "off"} | delete_target=${deleteRealTarget ? "on" : "off"}</div>
       ${sourceRuntime.selection_reason ? `<div>${escapeHtml(sourceRuntime.selection_reason)}</div>` : ""}
       ${sourceRuntime.fallback_reason ? `<div>${escapeHtml(sourceRuntime.fallback_reason)}</div>` : ""}

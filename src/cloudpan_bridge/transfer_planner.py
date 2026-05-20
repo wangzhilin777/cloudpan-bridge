@@ -53,46 +53,62 @@ def plan_transfer_mode(
     threshold_bytes = max(0, int(auto_download_threshold_mb or 0)) * 1024 * 1024
     small_file_auto = bool(threshold_bytes > 0 and int(entry.size) <= threshold_bytes)
     mode = "record_pending_only"
+    reason_code = "no_auto_fallback"
     reason = "当前目标端不支持可直接使用的快传指纹，且本轮未允许自动降级。"
     if fast_hash_hits:
         mode = "fast_upload"
+        reason_code = "fast_hash_ready"
         reason = f"目标端支持当前文件的快传指纹: {', '.join(fast_hash_hits)}"
     elif "download_upload" in fallback_modes and small_file_auto:
         mode = "download_upload"
+        reason_code = "small_file_auto_fallback"
         reason = "文件命中小文件自动补传阈值，建议直接下载后上传。"
     elif "download_upload" in fallback_modes and allow_full_fallback:
         mode = "download_upload"
+        reason_code = "full_download_fallback_allowed"
         reason = "当前执行模式允许完整降级到下载后上传。"
     elif "stream_upload" in fallback_modes and allow_full_fallback:
         mode = "stream_upload"
+        reason_code = "full_stream_fallback_allowed"
         reason = "当前执行模式允许目标端走普通上传/流式写入。"
     elif "download_upload" in fallback_modes or "stream_upload" in fallback_modes:
         mode = "record_pending_only"
+        reason_code = "fallback_available_but_deferred"
         reason = "当前目标端可降级上传，但本轮建议先记录到待补传。"
     if not fast_hash_hits and bridge_candidates:
         pending_reason = str(bridge_meta.get("pending_reason") or "")
         supported_fast = [str(item or "").strip().lower() for item in list(capability.get("fast_upload_hashes") or capability.get("fastUploadHashes") or []) if str(item or "").strip()]
         if pending_reason == "provider_api_bridge_not_executed_yet":
+            reason_code = "provider_api_bridge_not_executed_yet"
             reason = (
                 "源端 bridge 已进入 API 准备态，但当前版本还没有执行真实 provider enrich；"
                 f"目前仅看到候选哈希: {', '.join(bridge_candidates)}"
             )
         elif pending_reason == "non_fast_hashes_only_after_session_snapshot":
+            reason_code = "non_fast_hashes_only_after_session_snapshot"
             reason = (
                 "源端 session snapshot 已补出候选哈希，但当前仍缺少目标端可直接快传的指纹；"
                 f"候选哈希: {', '.join(bridge_candidates)}"
             )
         elif supported_fast:
+            reason_code = "target_hash_not_supported"
             reason = (
                 "源端已补出候选哈希，但当前目标端不认这些快传指纹；"
                 f"源端候选={', '.join(bridge_candidates)}，目标端支持={', '.join(supported_fast)}"
             )
+    elif not fast_hash_hits and not capability.get("supports_fast_upload") and not capability.get("fast_upload_hashes") and ("download_upload" in fallback_modes or "stream_upload" in fallback_modes):
+        reason_code = "target_no_fast_capability"
+        reason = "当前目标端未声明元数据秒传能力，只能走普通上传、流式写入或下载补传。"
     return {
         "mode": mode,
+        "reason_code": reason_code,
         "reason": reason,
         "fast_hash_hits": fast_hash_hits,
         "bridge_candidate_hashes": bridge_candidates,
         "bridge_pending_reason": str(bridge_meta.get("pending_reason") or ""),
+        "bridge_execution_state": str(bridge_meta.get("execution_state") or ""),
+        "bridge_provider_stage": str(bridge_meta.get("provider_stage") or ""),
+        "bridge_transport_hint": str(bridge_meta.get("transport_hint") or ""),
         "supports_fast_upload": bool(capability.get("supports_fast_upload") or capability.get("fast_upload_hashes") or capability.get("fastUploadHashes")),
         "fallback_modes": fallback_modes,
         "auto_download_threshold_mb": max(0, int(auto_download_threshold_mb or 0)),
@@ -110,6 +126,10 @@ def summarize_transfer_plan(
     fast_hash_counts: dict[str, int] = {}
     bridge_candidate_counts: dict[str, int] = {}
     bridge_pending_reason_counts: dict[str, int] = {}
+    reason_code_counts: dict[str, int] = {}
+    bridge_execution_state_counts: dict[str, int] = {}
+    bridge_provider_stage_counts: dict[str, int] = {}
+    bridge_transport_hint_counts: dict[str, int] = {}
     for entry in entries:
         plan = plan_transfer_mode(
             entry,
@@ -123,15 +143,31 @@ def summarize_transfer_plan(
             fast_hash_counts[key] = fast_hash_counts.get(key, 0) + 1
         for key in list(plan.get("bridge_candidate_hashes") or []):
             bridge_candidate_counts[key] = bridge_candidate_counts.get(key, 0) + 1
+        reason_code = str(plan.get("reason_code") or "").strip()
+        if reason_code:
+            reason_code_counts[reason_code] = reason_code_counts.get(reason_code, 0) + 1
         pending_reason = str(plan.get("bridge_pending_reason") or "").strip()
         if pending_reason:
             bridge_pending_reason_counts[pending_reason] = bridge_pending_reason_counts.get(pending_reason, 0) + 1
+        bridge_execution_state = str(plan.get("bridge_execution_state") or "").strip()
+        if bridge_execution_state:
+            bridge_execution_state_counts[bridge_execution_state] = bridge_execution_state_counts.get(bridge_execution_state, 0) + 1
+        bridge_provider_stage = str(plan.get("bridge_provider_stage") or "").strip()
+        if bridge_provider_stage:
+            bridge_provider_stage_counts[bridge_provider_stage] = bridge_provider_stage_counts.get(bridge_provider_stage, 0) + 1
+        bridge_transport_hint = str(plan.get("bridge_transport_hint") or "").strip()
+        if bridge_transport_hint:
+            bridge_transport_hint_counts[bridge_transport_hint] = bridge_transport_hint_counts.get(bridge_transport_hint, 0) + 1
     return {
         "total": len(entries),
         "mode_counts": counts,
         "fast_hash_counts": fast_hash_counts,
         "bridge_candidate_counts": bridge_candidate_counts,
         "bridge_pending_reason_counts": bridge_pending_reason_counts,
+        "reason_code_counts": reason_code_counts,
+        "bridge_execution_state_counts": bridge_execution_state_counts,
+        "bridge_provider_stage_counts": bridge_provider_stage_counts,
+        "bridge_transport_hint_counts": bridge_transport_hint_counts,
         "auto_download_threshold_mb": max(0, int(auto_download_threshold_mb or 0)),
         "allow_full_fallback": bool(allow_full_fallback),
     }

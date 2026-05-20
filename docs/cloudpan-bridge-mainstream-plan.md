@@ -16,11 +16,14 @@
 - [x] 把会话桥接 `bridge_ready` 与 API pending 路由语义拆开，避免运行态继续把已可归并的 provider 标成 pending
 - [x] 拆出 `app.drivercapture.js`、`app.pending.js`，把驱动抓取面板与待补传目录树从 `app.js` 剥离
 - [x] 继续拆出 `app.registry.js`、`app.status.js`、`app.capability.js`，把关于页审计、运行概览和能力动作逻辑继续从 `app.js` 剥离
-- [x] 再拆出 `app.runtimeview.js`，把同步状态、运行时状态、目标端抓取状态从 `app.js` 剥离，并把 `app.js` 压回 100 KB 以内
+- [x] 再拆出 `app.runtimeview.js`，把同步状态、运行时状态、目标端抓取状态从 `app.js` 剥离，并把 `app.js` 压回 `100 KB` 优先线附近
 - [x] 支持从 `content_hash / etag` 里解析可识别的 `md5 / sha1` 候选，提升主流 provider 的补指纹命中率
 - [x] 收紧 API placeholder bridge 的 `pending_reason`，避免文件本身已具备快传哈希时仍被误记成 API pending
+- [x] 让传输预览继续输出 `reason_code / bridge_provider_stage / bridge_transport_hint` 等诚实摘要，避免页面只剩 mode 计数
+- [x] 目录分析样本条目附带 `transferPlan`，页面可直接看到当前文件会走快传、普通上传还是仅记录待补传
+- [x] 新增 `app.bridgeview.js`，把桥接挂起原因、桥接阶段、传输原因与执行模式文案从 `app.workflow.js` 剥离
 - [ ] 深化首批主流源端的真实直连补指纹桥接实现
-- [ ] 继续拆分前端与过大的 Python/JS 文件，尽量压到单文件 100 KB 以内
+- [ ] 继续拆分前端与过大的 Python/JS 文件，优先压到单文件 `100 KB` 左右，并按统一分级阈值治理
 - [ ] 完成更多主流 provider 的互传能力验证与 UI 诚实提示收口
 
 ## 摘要
@@ -195,7 +198,7 @@
 
 ### 5. 代码拆分约束
 
-这轮继续控制大文件体积，默认要求 Python 单文件尽量不超过 `100 KB`。实现者必须继续拆分：
+这轮继续控制大文件体积，默认按统一分级阈值治理；`100 KB` 仍是优先目标线。实现者必须继续拆分：
 
 - source provider enrich 逻辑拆到独立模块，不塞回 `webapp.py`
 - 秒传决策器独立为单模块，不把 provider 判断散在 `syncer.py`

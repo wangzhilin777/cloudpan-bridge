@@ -1298,6 +1298,9 @@ def test_transfer_planner_summary_collects_bridge_candidate_counts() -> None:
             provider_specific={
                 "__bridge_candidate_hashes": "sha1",
                 "__bridge_pending_reason": "provider_api_bridge_not_executed_yet",
+                "__bridge_execution_state": "api_bridge_prepared_but_not_executed",
+                "__bridge_provider_stage": "api_placeholder",
+                "__bridge_transport_hint": "refresh_token_or_authorization",
             },
         ),
         SourceEntry(
@@ -1309,6 +1312,9 @@ def test_transfer_planner_summary_collects_bridge_candidate_counts() -> None:
             provider_specific={
                 "__bridge_candidate_hashes": "sha1,slice_md5",
                 "__bridge_pending_reason": "non_fast_hashes_only_after_session_snapshot",
+                "__bridge_execution_state": "session_snapshot_normalized",
+                "__bridge_provider_stage": "session_snapshot",
+                "__bridge_transport_hint": "cookie_snapshot",
             },
         ),
     ]
@@ -1320,6 +1326,11 @@ def test_transfer_planner_summary_collects_bridge_candidate_counts() -> None:
     assert summary["bridge_candidate_counts"]["sha1"] == 2
     assert summary["bridge_candidate_counts"]["slice_md5"] == 1
     assert summary["bridge_pending_reason_counts"]["provider_api_bridge_not_executed_yet"] == 1
+    assert summary["reason_code_counts"]["provider_api_bridge_not_executed_yet"] == 1
+    assert summary["reason_code_counts"]["non_fast_hashes_only_after_session_snapshot"] == 1
+    assert summary["bridge_execution_state_counts"]["api_bridge_prepared_but_not_executed"] == 1
+    assert summary["bridge_provider_stage_counts"]["api_placeholder"] == 1
+    assert summary["bridge_transport_hint_counts"]["refresh_token_or_authorization"] == 1
 
 
 def test_sync_runner_uses_source_provider_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -6161,6 +6172,9 @@ def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
     assert payload["fastUploadDecision"]["level"] == "native_fast_upload"
     assert payload["sourceEnrichmentBatch"]["candidate_hash_counts"]["gcid"] == 1
     assert payload["sourceEnrichmentBatch"]["bridge_execution_state_counts"]["api_bridge_prepared_but_not_executed"] == 1
+    assert payload["transferPlanPreview"]["reason_code_counts"]["fast_hash_ready"] == 2
+    assert payload["entries"][0]["transferPlan"]["mode"] == "fast_upload"
+    assert payload["entries"][0]["transferPlan"]["reason_code"] == "fast_hash_ready"
     assert payload["truncated"] is True
 
 

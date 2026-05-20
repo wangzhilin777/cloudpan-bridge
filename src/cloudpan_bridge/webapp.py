@@ -49,6 +49,7 @@ from .task_runtime import (
 from .transfer_planner import summarize_transfer_plan
 from .fast_upload_decision import assess_directory_fast_upload
 from .target_adapter import build_target_preflight_capability, supported_target_keys
+from .transfer_planner import plan_transfer_mode
 from .syncer import (
     SyncRunner,
     build_source_miaochuan_payload,
@@ -1746,6 +1747,17 @@ def create_app(config_path: Path) -> FastAPI:
             auto_download_threshold_mb=run_config.auto_download_threshold_mb,
             allow_full_fallback=False,
         )
+        preview_entries: list[dict[str, Any]] = []
+        target_capability = dict(preflight.get("adapter_capability") or {})
+        for entry in enriched_entries[:limit]:
+            serialized = serialize_source_entry(entry)
+            serialized["transferPlan"] = plan_transfer_mode(
+                entry,
+                target_capability,
+                auto_download_threshold_mb=run_config.auto_download_threshold_mb,
+                allow_full_fallback=False,
+            )
+            preview_entries.append(serialized)
         return {
             "source_path": run_config.source_path,
             "summary": summary,
@@ -1756,7 +1768,7 @@ def create_app(config_path: Path) -> FastAPI:
             "transferPlanPreview": transfer_preview,
             "plan_total": len(plan),
             "removed_total": len(removed_paths),
-            "entries": [serialize_source_entry(entry) for entry in enriched_entries[:limit]],
+            "entries": preview_entries,
             "truncated": len(enriched_entries) > limit,
         }
 
