@@ -39,6 +39,7 @@ from .provider_registry import (
     render_driver_coverage_audit_markdown,
     render_driver_coverage_scaffold_markdown,
 )
+from .fast_upload_decision import assess_directory_fast_upload
 from .target_adapter import build_target_preflight_capability, supported_target_keys
 from .syncer import (
     SyncRunner,
@@ -1731,6 +1732,7 @@ def create_app(config_path: Path) -> FastAPI:
         nonlocal config
         payload = payload or {}
         source_path = str(resolve_payload_value(payload, "source_path", ("sync", "source_path"), config.source_path or "/")).strip()
+        target_key = str(resolve_payload_value(payload, "target_key", ("targets", "active_target"), config.target_key or "guangya")).strip() or "guangya"
         run_config = AppConfig.load(config_path)
         if AppConfig.is_managed_openlist_mode(run_config.openlist_mode):
             ensure_runtime_ready()
@@ -1742,9 +1744,14 @@ def create_app(config_path: Path) -> FastAPI:
         finally:
             runner.source.close()
         limit = max(1, int(resolve_payload_value(payload, "limit", default=200) or 200))
+        summary = summarize_source_entries(entries)
+        preflight = build_target_preflight(target_key)
+        fast_upload_decision = assess_directory_fast_upload(summary, target_capability=dict(preflight.get("adapter_capability") or {}))
         return {
             "source_path": run_config.source_path,
-            "summary": summarize_source_entries(entries),
+            "summary": summary,
+            "target_key": target_key,
+            "fastUploadDecision": fast_upload_decision,
             "plan_total": len(plan),
             "removed_total": len(removed_paths),
             "entries": [serialize_source_entry(entry) for entry in entries[:limit]],
@@ -1756,6 +1763,7 @@ def create_app(config_path: Path) -> FastAPI:
         nonlocal config
         payload = payload or {}
         source_path = str(resolve_payload_value(payload, "source_path", ("sync", "source_path"), config.source_path or "/")).strip()
+        target_key = str(resolve_payload_value(payload, "target_key", ("targets", "active_target"), config.target_key or "guangya")).strip() or "guangya"
         run_config = AppConfig.load(config_path)
         if AppConfig.is_managed_openlist_mode(run_config.openlist_mode):
             ensure_runtime_ready()
@@ -1768,9 +1776,12 @@ def create_app(config_path: Path) -> FastAPI:
             runner.source.close()
         miaochuan_payload = build_source_miaochuan_payload(entries, run_config.source_path)
         summary = summarize_source_entries(entries)
+        preflight = build_target_preflight(target_key)
         return {
             "source_path": run_config.source_path,
             "summary": summary,
+            "target_key": target_key,
+            "fastUploadDecision": assess_directory_fast_upload(summary, target_capability=dict(preflight.get("adapter_capability") or {})),
             "plan_total": len(plan),
             "removed_total": len(removed_paths),
             "payload": miaochuan_payload,

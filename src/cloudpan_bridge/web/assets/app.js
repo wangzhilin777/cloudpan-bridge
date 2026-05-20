@@ -1557,6 +1557,7 @@
       sourceAnalyzeCache = data || null;
       const root = document.getElementById("source-analyze-summary");
       const summary = data?.summary || {};
+      const decision = data?.fastUploadDecision || {};
       const entries = Array.isArray(data?.entries) ? data.entries : [];
       if (!data) {
         root.textContent = currentLang() === "en" ? "No analysis result" : currentLang() === "mix" ? "暂无分析结果 / No analysis result" : "暂无分析结果";
@@ -1587,8 +1588,10 @@
             <div>${escapeHtml(data.source_path || "-")}</div>
             <div class="mono">${currentLang() === "en" ? "Total files" : currentLang() === "mix" ? "文件总数 / Total files" : "文件总数"}: ${summary.total ?? 0} | ${currentLang() === "en" ? "Plan total" : currentLang() === "mix" ? "待同步 / Plan total" : "待同步"}: ${data.plan_total ?? 0} | ${currentLang() === "en" ? "Removed" : currentLang() === "mix" ? "源端已删除 / Removed" : "源端已删除"}: ${data.removed_total ?? 0}</div>
             <div class="mono">${currentLang() === "en" ? "MD5 ready" : currentLang() === "mix" ? "具备 MD5 / MD5 ready" : "具备 MD5"}: ${summary.md5_ready ?? 0} | GCID: ${summary.gcid_ready ?? 0} | ${currentLang() === "en" ? "Missing MD5" : currentLang() === "mix" ? "缺少 MD5 / Missing MD5" : "缺少 MD5"}: ${summary.missing_md5 ?? 0}</div>
+            <div class="mono">${currentLang() === "en" ? "Fast upload decision" : currentLang() === "mix" ? "秒传决策 / Fast upload decision" : "秒传决策"}: ${escapeHtml(decision.level || "-")} | ${escapeHtml(decision.bucket || "-")}</div>
             <div class="mono">provider: ${escapeHtml(providerCounts)}</div>
             <div class="mono">hash: ${escapeHtml(hashCounts)}</div>
+            <div class="mono">${escapeHtml((currentLang() === "en" ? decision?.rationale?.en : currentLang() === "mix" ? `${decision?.rationale?.zh || ""} / ${decision?.rationale?.en || ""}`.trim() : decision?.rationale?.zh) || "-")}</div>
             <div class="mono">${escapeHtml(recommendation)}</div>
           </div>
         </div>

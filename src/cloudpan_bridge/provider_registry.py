@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .openlist_admin import OpenListDriverField
+from .fast_upload_decision import assess_directory_fast_upload
 from .provider_capture import (
     build_capture_supported_driver_aliases,
     build_driver_capture_spec,
@@ -1177,10 +1178,13 @@ def assess_driver_target_capability(
                 },
             ]
 
+    fast_upload_decision = assess_directory_fast_upload(summary, target_capability=capability.get("targetCapability") or capability.get("targetProfile") or {})
+
     return {
         **capability,
         "analysisSummary": summary,
         "assessedLevel": assessed_level,
+        "fastUploadDecision": fast_upload_decision,
         "rationale": {
             "zh": rationale_zh,
             "en": rationale_en,

@@ -97,6 +97,7 @@ def summarize_source_entries(entries: list[SourceEntry]) -> dict[str, object]:
     pre_hash_ready = 0
     slice_md5_ready = 0
     content_hash_ready = 0
+    pickcode_ready = 0
     missing_md5 = 0
     missing_fast_upload = 0
     fast_upload_ready = 0
@@ -121,6 +122,8 @@ def summarize_source_entries(entries: list[SourceEntry]) -> dict[str, object]:
             slice_md5_ready += 1
         if entry.content_hash:
             content_hash_ready += 1
+        if entry.pickcode:
+            pickcode_ready += 1
         if entry.has_fast_upload_fingerprint:
             fast_upload_ready += 1
         else:
@@ -137,6 +140,7 @@ def summarize_source_entries(entries: list[SourceEntry]) -> dict[str, object]:
         "pre_hash_ready": pre_hash_ready,
         "slice_md5_ready": slice_md5_ready,
         "content_hash_ready": content_hash_ready,
+        "pickcode_ready": pickcode_ready,
         "fast_upload_ready": fast_upload_ready,
         "missing_md5": missing_md5,
         "missing_fast_upload": missing_fast_upload,

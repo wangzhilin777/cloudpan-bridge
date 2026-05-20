@@ -82,6 +82,14 @@
 - [x] 源摘要统计已补充 `sha256 / pre_hash / slice_md5 / content_hash` 覆盖率
 - [x] 相关回归通过：`python -m compileall src tests`、`pytest -q tests/test_sync_logic.py -x`
 
+### 里程碑 10：目录级秒传决策第一层落地（起步）
+
+- [x] 新增 `fast_upload_decision.py`，统一输出目录级秒传等级：`native_fast_upload / fast_upload_after_enrichment / partial_fast_upload / upload_only / download_then_upload / unsupported`
+- [x] `provider/capability_assess` 已回传 `fastUploadDecision`，把源分析摘要与目标端真实能力合并成目录级判断
+- [x] `source/analyze` 与 `source/miaochuan_preview` 已返回 `target_key + fastUploadDecision`，前端可以直接显示“当前目录秒传决策”
+- [x] 前端源分析摘要面板已显示目录级秒传等级、分桶与中英文解释
+- [x] 相关回归通过：`python -m compileall src tests`、`node --check src/cloudpan_bridge/web/assets/app.js`、`pytest -q tests/test_sync_logic.py -x`
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

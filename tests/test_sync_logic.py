@@ -9,6 +9,7 @@ from cloudpan_bridge.config import AppConfig
 from cloudpan_bridge.cli import build_parser
 from cloudpan_bridge.guangya_direct import GuangyaMiaochuanImporter
 from cloudpan_bridge.guangya import GuangyaService
+from cloudpan_bridge.fast_upload_decision import assess_directory_fast_upload
 from cloudpan_bridge.models import DirectImportResult, PendingFileState, QueueItemState, SourceEntry, SyncFileState, SyncPlanItem, SyncState, normalize_posix_path
 from cloudpan_bridge.openlist_admin import OpenListDriverField, OpenListDriverInfo, build_storage_payload
 from cloudpan_bridge.openlist import OpenListClient
@@ -4446,6 +4447,8 @@ def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Pat
     payload = response.json()
     assert payload["level"] == "fast_upload_partial"
     assert payload["assessedLevel"] == "fast_upload_supported"
+    assert payload["fastUploadDecision"]["level"] == "native_fast_upload"
+    assert payload["fastUploadDecision"]["bucket"] == "全部可秒传"
     assert payload["score"]["fastReady"] == 3
     assert payload["strategy"]["recommendedMode"] == "direct_metadata_first"
     assert payload["strategy"]["shouldAnalyzeFirst"] is False
@@ -5071,6 +5074,8 @@ def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
     assert payload["summary"]["gcid_ready"] == 1
     assert payload["plan_total"] == 1
     assert payload["removed_total"] == 1
+    assert payload["target_key"] == "guangya"
+    assert payload["fastUploadDecision"]["level"] == "native_fast_upload"
     assert payload["truncated"] is True
 
 
@@ -5098,9 +5103,31 @@ def test_source_miaochuan_preview_endpoint_returns_payload(tmp_path: Path) -> No
         response = client.post("/api/source/miaochuan_preview", json={"source_path": "/src"})
     assert response.status_code == 200
     payload = response.json()
+    assert payload["target_key"] == "guangya"
+    assert payload["fastUploadDecision"]["level"] == "native_fast_upload"
     assert payload["payload"]["totalFilesCount"] == 2
     assert payload["payload"]["files"][0]["path"] == "/a.bin"
     assert "\"gcid\": \"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\"" in payload["payload_text"]
+
+
+def test_assess_directory_fast_upload_supports_camel_case_target_capability() -> None:
+    payload = assess_directory_fast_upload(
+        {
+            "total": 5,
+            "fast_upload_ready": 0,
+            "missing_fast_upload": 5,
+            "sha256_ready": 5,
+            "pre_hash_ready": 2,
+        },
+        target_capability={
+            "fastUploadHashes": ["md5", "sha256"],
+            "fallbackModes": ["download_upload"],
+        },
+    )
+    assert payload["supports_fast_upload"] is True
+    assert payload["level"] == "fast_upload_after_enrichment"
+    assert payload["bucket"] == "需补指纹后再判断"
+    assert payload["enrichment_ready"] == 5
 
 
 def test_miaochuan_diagnose_payload_summary() -> None:
