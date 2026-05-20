@@ -6,15 +6,22 @@
 
 - [x] 删除 GitHub Actions 自动 Docker 镜像发布链路
 - [x] 修正托管 OpenList 的静默失败体验
-- [x] 明确拆分 `external_local / external_remote / managed_binary / managed_docker_placeholder`
+- [x] 明确拆分 `external_local / external_remote / managed_binary / managed_docker`
 - [x] 补齐控制台登录保护、模式独立配置和托管运行时状态展示
 - [x] `managed_binary` 缺失二进制时提示拉取本机运行时
 - [x] 外部模式与托管模式配置分组落地并兼容旧配置读取
 - [x] 相关后端与前端测试通过：`python -m compileall src tests`、`pytest -q`
 
+### 里程碑 2：OpenList Docker 托管模式落地
+
+- [x] `managed_docker` 从占位升级为真实实现
+- [x] Docker 运行时预检、状态展示、启动链路与容器重建逻辑落地
+- [x] Docker 模式独立配置字段、UI 展示与 README 文案同步
+- [x] 兼容旧配置 `managed_docker_placeholder` 读入并统一归档到 `managed_docker`
+- [x] 相关后端与前端测试通过：`python -m compileall src tests`、`pytest -q`
+
 ### 后续里程碑待推进
 
-- [ ] `managed_docker` 从占位升级为真实实现
 - [ ] 统一 Source / Target Provider 抽象与挂载驱动映射层
 - [ ] 秒传决策器与补指纹链路全面落地
 - [ ] 页面主流程完全切到“连接 -> 源端 -> 目标端 -> 任务 -> 执行”

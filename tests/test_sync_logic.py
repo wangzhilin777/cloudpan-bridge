@@ -91,36 +91,85 @@ def test_managed_runtime_status_requires_install_when_binary_missing(tmp_path: P
     assert "拉取" in status.message
 
 
-def test_managed_docker_placeholder_reports_not_implemented_without_docker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_managed_docker_reports_missing_docker_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("cloudpan_bridge.openlist_runtime.shutil.which", lambda _name: "")
     runtime = ManagedOpenListRuntime(
-        mode="managed_docker_placeholder",
+        mode="managed_docker",
         configured_url="http://127.0.0.1:5244",
         data_dir=tmp_path / "runtime",
         binary_path="",
         port=5244,
     )
     status = runtime.status()
-    assert status.mode == "managed_docker_placeholder"
+    assert status.mode == "managed_docker"
     assert status.install_required is False
     assert status.can_start is False
     assert status.docker_available is False
-    assert "未检测到本机 Docker" in status.message
+    assert "Docker CLI" in status.message
 
 
-def test_managed_docker_placeholder_reports_detected_docker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_managed_docker_reports_detected_docker_without_daemon(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("cloudpan_bridge.openlist_runtime.shutil.which", lambda _name: r"C:\Program Files\Docker\docker.exe")
     runtime = ManagedOpenListRuntime(
-        mode="managed_docker_placeholder",
+        mode="managed_docker",
         configured_url="http://127.0.0.1:5244",
         data_dir=tmp_path / "runtime",
         binary_path="",
         port=5244,
     )
+    monkeypatch.setattr(runtime, "_docker_daemon_available", lambda: False)
     status = runtime.status()
     assert status.docker_available is True
     assert status.docker_cli.endswith("docker.exe")
-    assert "已检测到本机 Docker" in status.message
+    assert status.docker_daemon_available is False
+    assert "daemon 不可用" in status.message
+
+
+def test_managed_docker_start_runs_container_when_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runtime = ManagedOpenListRuntime(
+        mode="managed_docker",
+        configured_url="http://127.0.0.1:5244",
+        data_dir=tmp_path / "runtime",
+        binary_path="",
+        port=5244,
+    )
+    monkeypatch.setattr("cloudpan_bridge.openlist_runtime.shutil.which", lambda _name: r"C:\Program Files\Docker\docker.exe")
+    monkeypatch.setattr(runtime, "_docker_daemon_available", lambda: True)
+    inspect_state: dict[str, object | None] = {"value": None}
+    calls: list[tuple[str, ...]] = []
+
+    def fake_inspect() -> dict[str, object] | None:
+        value = inspect_state["value"]
+        return value if isinstance(value, dict) else None
+
+    def fake_run_docker(*args: str, check: bool = False):  # noqa: ANN001
+        calls.append(tuple(args))
+        if args and args[0] == "run":
+            inspect_state["value"] = {
+                "Config": {"Image": runtime.docker_image},
+                "HostConfig": {
+                    "Binds": [runtime._docker_volume_spec()],
+                    "PortBindings": {runtime._docker_port_key(): [{"HostPort": str(runtime.port)}]},
+                },
+                "State": {"Running": True},
+            }
+
+        class Result:
+            returncode = 0
+            stdout = "ok"
+            stderr = ""
+
+        return Result()
+
+    monkeypatch.setattr(runtime, "_docker_inspect", fake_inspect)
+    monkeypatch.setattr(runtime, "_run_docker", fake_run_docker)
+    monkeypatch.setattr(runtime, "_is_alive", lambda _base_url: True)
+    monkeypatch.setattr("cloudpan_bridge.openlist_runtime.time.sleep", lambda _seconds: None)
+    status = runtime.start()
+    assert any(item and item[0] == "run" for item in calls)
+    assert status.mode == "managed_docker"
+    assert status.running is True
+    assert status.docker_container_exists is True
 
 
 def test_normalize_posix_path() -> None:

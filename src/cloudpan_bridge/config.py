@@ -46,6 +46,8 @@ class AppConfig:
     managed_openlist_bin: str = ""
     managed_openlist_data_dir: Path = Path(".runtime/openlist")
     managed_openlist_port: int = 5244
+    managed_openlist_docker_image: str = "openlistteam/openlist:latest"
+    managed_openlist_docker_container_name: str = "cloudpan-bridge-openlist"
     openlist_url: str = ""
     openlist_token: str = ""
     openlist_username: str = ""
@@ -132,6 +134,7 @@ class AppConfig:
         external_remote = dict(connections.get("external_remote", {}) or {})
         managed_connection = dict(connections.get("managed_binary", {}) or {})
         managed_runtime = dict(openlist.get("managed_runtime", {}) or {})
+        managed_docker = dict(openlist.get("managed_docker", {}) or {})
         managed_init_admin = dict(openlist.get("managed_init_admin", {}) or {})
         targets = dict(payload.get("targets", {}) or {})
         guangya = dict(targets.get("guangya", {}) or {})
@@ -180,6 +183,8 @@ class AppConfig:
             managed_openlist_bin=str(_pick(payload.get("managed_openlist_bin"), managed_runtime.get("bin"), default="")),
             managed_openlist_data_dir=Path(_pick(payload.get("managed_openlist_data_dir"), managed_runtime.get("data_dir"), default=".runtime/openlist")),
             managed_openlist_port=_int_or_default(_pick(payload.get("managed_openlist_port"), managed_runtime.get("port"), default=5244), 5244, minimum=1),
+            managed_openlist_docker_image=str(_pick(payload.get("managed_openlist_docker_image"), managed_docker.get("image"), default="openlistteam/openlist:latest")) or "openlistteam/openlist:latest",
+            managed_openlist_docker_container_name=str(_pick(payload.get("managed_openlist_docker_container_name"), managed_docker.get("container_name"), default="cloudpan-bridge-openlist")) or "cloudpan-bridge-openlist",
             openlist_url=effective_url,
             openlist_token=effective_token,
             openlist_username=effective_username,
@@ -259,7 +264,9 @@ class AppConfig:
             return "external_local"
         if normalized == "managed":
             return "managed_binary"
-        allowed = {"external_local", "external_remote", "managed_binary", "managed_docker_placeholder"}
+        if normalized == "managed_docker_placeholder":
+            return "managed_docker"
+        allowed = {"external_local", "external_remote", "managed_binary", "managed_docker"}
         return normalized if normalized in allowed else "external_local"
 
     @staticmethod
@@ -287,6 +294,8 @@ class AppConfig:
             "managed_openlist_bin": self.managed_openlist_bin,
             "managed_openlist_data_dir": str(self.managed_openlist_data_dir),
             "managed_openlist_port": self.managed_openlist_port,
+            "managed_openlist_docker_image": self.managed_openlist_docker_image,
+            "managed_openlist_docker_container_name": self.managed_openlist_docker_container_name,
             "openlist_url": self.openlist_url,
             "openlist_token": self.openlist_token,
             "openlist_username": self.openlist_username,
@@ -409,7 +418,9 @@ class AppConfig:
                     "password": self.managed_openlist_init_password,
                 },
                 "managed_docker": {
-                    "enabled": self.openlist_mode == "managed_docker_placeholder",
+                    "enabled": self.openlist_mode == "managed_docker",
+                    "image": self.managed_openlist_docker_image,
+                    "container_name": self.managed_openlist_docker_container_name,
                 },
             },
             "source_session": {
@@ -503,6 +514,8 @@ def write_example_config(path: Path) -> None:
         managed_openlist_bin="",
         managed_openlist_data_dir=Path(".runtime/openlist"),
         managed_openlist_port=5244,
+        managed_openlist_docker_image="openlistteam/openlist:latest",
+        managed_openlist_docker_container_name="cloudpan-bridge-openlist",
         openlist_url="http://127.0.0.1:5244",
         openlist_token="",
         openlist_username="admin",

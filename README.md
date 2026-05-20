@@ -873,8 +873,8 @@ docker compose restart cloudpan-bridge
   - 连接远程服务器、NAS 或局域网里的现成 OpenList
 - `managed_binary`
   - 由 CloudPan Bridge 在本机直接启动 `openlist.exe/alist.exe`
-- `managed_docker_placeholder`
-  - 目前只保留文案与状态位，不会真的自动创建 OpenList 容器
+- `managed_docker`
+  - 由 CloudPan Bridge 通过本机 Docker 创建并启动 OpenList 容器
 
 关于 `managed_binary`，当前行为是：
 
@@ -895,7 +895,7 @@ docker version
 docker info
 ```
 
-若这两条都通过，说明本机 Docker 环境至少已可用；但本项目当前并不会自动帮你创建 OpenList 容器。
+若这两条都通过，说明本机 Docker 环境至少已可用；当前项目会在 `managed_docker` 模式下复用本机 Docker 来创建和启动 OpenList 容器。
 
 ### GitHub 自动打包
 

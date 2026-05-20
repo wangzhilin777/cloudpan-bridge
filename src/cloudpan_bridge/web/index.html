@@ -697,7 +697,7 @@
                   <option value="external_local" data-i18n-option="option.openlist_mode.external_local">external_local</option>
                   <option value="external_remote" data-i18n-option="option.openlist_mode.external_remote">external_remote</option>
                   <option value="managed_binary" data-i18n-option="option.openlist_mode.managed_binary">managed_binary</option>
-                  <option value="managed_docker_placeholder" data-i18n-option="option.openlist_mode.managed_docker_placeholder">managed_docker_placeholder</option>
+                  <option value="managed_docker" data-i18n-option="option.openlist_mode.managed_docker">managed_docker</option>
                 </select>
               </div>
               <div>
@@ -725,7 +725,7 @@
                 <label class="help-anchor" data-i18n="label.openlist_password" data-help-key="openlist_password">OpenList 密码</label>
                 <input id="openlist_password" type="password">
               </div>
-              <div data-managed-only>
+              <div data-managed-binary-only>
                 <label class="help-anchor" data-i18n="label.managed_openlist_bin" data-help-key="managed_openlist_bin">托管 OpenList 可执行文件</label>
                 <input id="managed_openlist_bin">
               </div>
@@ -736,6 +736,14 @@
               <div data-managed-only>
                 <label class="help-anchor" data-i18n="label.managed_openlist_port" data-help-key="managed_openlist_port">托管 OpenList 端口</label>
                 <input id="managed_openlist_port" type="number" min="1">
+              </div>
+              <div data-managed-docker-only>
+                <label class="help-anchor" data-i18n="label.managed_openlist_docker_image" data-help-key="managed_openlist_docker_image">Docker 镜像</label>
+                <input id="managed_openlist_docker_image">
+              </div>
+              <div data-managed-docker-only>
+                <label class="help-anchor" data-i18n="label.managed_openlist_docker_container_name" data-help-key="managed_openlist_docker_container_name">Docker 容器名</label>
+                <input id="managed_openlist_docker_container_name">
               </div>
               <div data-managed-only>
                 <label data-i18n="label.managed_openlist_init_username">托管初始化管理员账号</label>
@@ -1044,7 +1052,8 @@
   <script>
     const CONFIG_FIELDS = [
       "source_path", "target_path", "openlist_mode", "managed_openlist_bin", "managed_openlist_data_dir",
-      "managed_openlist_port", "openlist_url", "openlist_token", "openlist_username", "openlist_password",
+      "managed_openlist_port", "managed_openlist_docker_image", "managed_openlist_docker_container_name",
+      "openlist_url", "openlist_token", "openlist_username", "openlist_password",
       "managed_openlist_init_username", "managed_openlist_init_password",
       "target_key", "guangya_phone", "guangya_authorization", "guangya_access_token", "guangya_refresh_token",
       "guangya_device_id", "local_target_root", "webdav_target_url", "webdav_target_username", "webdav_target_password", "s3_target_endpoint", "s3_target_bucket", "s3_target_prefix", "s3_target_access_key", "s3_target_secret_key", "s3_target_region", "seafile_target_url", "seafile_target_token", "seafile_target_username", "seafile_target_password", "seafile_target_repo_id", "seafile_target_repo_name", "azureblob_target_account_url", "azureblob_target_container", "azureblob_target_prefix", "azureblob_target_account_name", "azureblob_target_account_key", "smb_target_url", "smb_target_username", "smb_target_password", "ftp_target_url", "ftp_target_username", "ftp_target_password", "sftp_target_url", "sftp_target_username", "sftp_target_password", "delete_removed", "target_delete_removed", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
@@ -1058,6 +1067,8 @@
       managed_openlist_bin: ["openlist", "managed_runtime", "bin"],
       managed_openlist_data_dir: ["openlist", "managed_runtime", "data_dir"],
       managed_openlist_port: ["openlist", "managed_runtime", "port"],
+      managed_openlist_docker_image: ["openlist", "managed_docker", "image"],
+      managed_openlist_docker_container_name: ["openlist", "managed_docker", "container_name"],
       openlist_url: ["openlist", "url"],
       openlist_token: ["openlist", "token"],
       openlist_username: ["openlist", "username"],
@@ -1116,6 +1127,8 @@
     const CONFIG_FIELD_DEFAULTS = {
       openlist_mode: "external_local",
       managed_openlist_port: 5244,
+      managed_openlist_docker_image: "openlistteam/openlist:latest",
+      managed_openlist_docker_container_name: "cloudpan-bridge-openlist",
       managed_openlist_init_username: "admin",
       target_key: "guangya",
       delete_removed: false,
@@ -1239,6 +1252,8 @@
         "label.managed_openlist_bin": "托管 OpenList 可执行文件",
         "label.managed_openlist_data_dir": "托管 OpenList 数据目录",
         "label.managed_openlist_port": "托管 OpenList 端口",
+        "label.managed_openlist_docker_image": "Docker 镜像",
+        "label.managed_openlist_docker_container_name": "Docker 容器名",
         "label.managed_openlist_init_username": "托管初始化管理员账号",
         "label.managed_openlist_init_password": "托管初始化管理员密码",
         "label.log_file": "日志文件",
@@ -1303,7 +1318,7 @@
         "option.openlist_mode.external_local": "外部模式（本机）",
         "option.openlist_mode.external_remote": "外部模式（远程）",
         "option.openlist_mode.managed_binary": "托管模式（本机二进制）",
-        "option.openlist_mode.managed_docker_placeholder": "托管模式（Docker 预留）",
+        "option.openlist_mode.managed_docker": "托管模式（Docker）",
         "option.rate_limit_mode.safe": "稳妥",
         "option.rate_limit_mode.balanced": "平衡",
         "option.rate_limit_mode.fast": "快速",
@@ -1406,6 +1421,8 @@
         "label.managed_openlist_bin": "Managed OpenList Binary",
         "label.managed_openlist_data_dir": "Managed OpenList Data Dir",
         "label.managed_openlist_port": "Managed OpenList Port",
+        "label.managed_openlist_docker_image": "Docker Image",
+        "label.managed_openlist_docker_container_name": "Docker Container Name",
         "label.managed_openlist_init_username": "Managed Init Admin Username",
         "label.managed_openlist_init_password": "Managed Init Admin Password",
         "label.log_file": "Log File",
@@ -1470,7 +1487,7 @@
         "option.openlist_mode.external_local": "External (Local)",
         "option.openlist_mode.external_remote": "External (Remote)",
         "option.openlist_mode.managed_binary": "Managed (Binary)",
-        "option.openlist_mode.managed_docker_placeholder": "Managed (Docker Placeholder)",
+        "option.openlist_mode.managed_docker": "Managed (Docker)",
         "option.rate_limit_mode.safe": "Safe",
         "option.rate_limit_mode.balanced": "Balanced",
         "option.rate_limit_mode.fast": "Fast",
@@ -1530,7 +1547,7 @@
         btn_apply_driver_defaults: "把内置的保守默认值直接回填到当前驱动表单。",
         btn_create_storage: "把当前驱动字段提交给 OpenList，正式创建挂载。",
         panel_config: "全局基础配置区，影响 OpenList 连接方式、频率控制和状态文件位置。",
-        openlist_mode: "现在分为外部本机、外部远程、本机二进制托管和 Docker 预留模式。切模式后，会切换到各自独立保存的连接快照。",
+        openlist_mode: "现在分为外部本机、外部远程、本机二进制托管和 Docker 托管模式。切模式后，会切换到各自独立保存的连接快照。",
         rate_limit_mode: "不同预设会自动套用分页大小和间隔。safe 最稳，fast 最激进。",
         openlist_url: "外部模式下通常填现有 OpenList 地址；托管模式下实际以托管实例地址为准。",
         openlist_token: "如果你已经有可直接使用的 OpenList Token，可填这里；否则可用用户名密码登录自动回写。",
@@ -1539,6 +1556,8 @@
         managed_openlist_bin: "托管模式要启动的 OpenList 可执行文件路径。",
         managed_openlist_data_dir: "托管 OpenList 的工作数据目录，通常会保存它自己的配置和数据库。",
         managed_openlist_port: "托管模式启动的 OpenList 监听端口，别和现有端口冲突。",
+        managed_openlist_docker_image: "Docker 托管模式使用的 OpenList 镜像名。",
+        managed_openlist_docker_container_name: "Docker 托管模式使用的容器名；如果同名容器配置不一致，启动时会自动重建。",
         managed_openlist_init_username: "仅用于托管初始化说明的管理员账号，不等同于当前连接凭证。",
         managed_openlist_init_password: "如果留空，后端会把它视为“尚未明确设置初始化密码”，并在状态区提醒。",
         app_admin_username: "CloudPan Bridge 控制台自己的管理员账号。留空表示不启用控制台登录保护。",
@@ -1601,7 +1620,7 @@
         btn_apply_driver_defaults: "Apply built-in conservative defaults to the current driver form.",
         btn_create_storage: "Submit the current driver form to OpenList and create the mount.",
         panel_config: "Global settings for connection mode, throttling, and state files.",
-        openlist_mode: "Modes are split into external local, external remote, managed binary, and a Docker placeholder. Each mode keeps its own connection snapshot.",
+        openlist_mode: "Modes are split into external local, external remote, managed binary, and managed Docker. Each mode keeps its own connection snapshot.",
         rate_limit_mode: "Each preset adjusts page size and request intervals. safe is most conservative; fast is most aggressive.",
         openlist_url: "Usually the URL of your external OpenList. In managed mode the actual runtime URL may differ.",
         openlist_token: "If you already have a usable OpenList token, put it here. Otherwise login and write it back automatically.",
@@ -1610,6 +1629,8 @@
         managed_openlist_bin: "Executable path used in managed mode.",
         managed_openlist_data_dir: "Data directory for managed OpenList.",
         managed_openlist_port: "Listening port for managed OpenList.",
+        managed_openlist_docker_image: "Docker image used by managed Docker mode.",
+        managed_openlist_docker_container_name: "Container name used by managed Docker mode. A mismatched existing container will be recreated on start.",
         managed_openlist_init_username: "Initialization-only admin username for managed mode. It is not the same thing as the current connection credential.",
         managed_openlist_init_password: "If blank, the backend treats it as not explicitly set yet and will warn in runtime status.",
         app_admin_username: "Admin username for the CloudPan Bridge console itself. Leave blank to disable console login protection.",
@@ -1889,7 +1910,7 @@
     function getOpenListConnectionGroupedPath(mode) {
       const normalized = normalizeOpenListMode(mode);
       if (normalized === "external_remote") return ["openlist", "connections", "external_remote"];
-      if (normalized === "managed_binary" || normalized === "managed_docker_placeholder") return ["openlist", "connections", "managed_binary"];
+      if (normalized === "managed_binary" || normalized === "managed_docker") return ["openlist", "connections", "managed_binary"];
       return ["openlist", "connections", "external_local"];
     }
 
@@ -1899,7 +1920,7 @@
         external_local: currentLang() === "en" ? "External (Local)" : currentLang() === "mix" ? "外部模式（本机） / External (Local)" : "外部模式（本机）",
         external_remote: currentLang() === "en" ? "External (Remote)" : currentLang() === "mix" ? "外部模式（远程） / External (Remote)" : "外部模式（远程）",
         managed_binary: currentLang() === "en" ? "Managed (Binary)" : currentLang() === "mix" ? "托管模式（本机二进制） / Managed (Binary)" : "托管模式（本机二进制）",
-        managed_docker_placeholder: currentLang() === "en" ? "Managed (Docker Placeholder)" : currentLang() === "mix" ? "托管模式（Docker 预留） / Managed (Docker Placeholder)" : "托管模式（Docker 预留）",
+        managed_docker: currentLang() === "en" ? "Managed (Docker)" : currentLang() === "mix" ? "托管模式（Docker） / Managed (Docker)" : "托管模式（Docker）",
       };
       return labels[normalized] || normalized;
     }
@@ -1919,6 +1940,8 @@
         managed_openlist_bin: String(managedRuntime.bin || ""),
         managed_openlist_data_dir: String(managedRuntime.data_dir || ".runtime/openlist"),
         managed_openlist_port: String(managedRuntime.port || 5244),
+        managed_openlist_docker_image: String((getGroupedConfigValue(["openlist", "managed_docker", "image"], "") || "openlistteam/openlist:latest")),
+        managed_openlist_docker_container_name: String((getGroupedConfigValue(["openlist", "managed_docker", "container_name"], "") || "cloudpan-bridge-openlist")),
         managed_openlist_init_username: String(managedInitAdmin.username || "admin"),
         managed_openlist_init_password: String(managedInitAdmin.password || ""),
       };
@@ -1951,6 +1974,11 @@
         data_dir: String(document.getElementById("managed_openlist_data_dir")?.value || ".runtime/openlist"),
         port: normalizeFormValue("managed_openlist_port", document.getElementById("managed_openlist_port")?.value || 5244),
       });
+      setGroupedConfigValue(["openlist", "managed_docker"], {
+        enabled: normalized === "managed_docker",
+        image: String(document.getElementById("managed_openlist_docker_image")?.value || "openlistteam/openlist:latest"),
+        container_name: String(document.getElementById("managed_openlist_docker_container_name")?.value || "cloudpan-bridge-openlist"),
+      });
       setGroupedConfigValue(["openlist", "managed_init_admin"], {
         username: String(document.getElementById("managed_openlist_init_username")?.value || "admin"),
         password: String(document.getElementById("managed_openlist_init_password")?.value || ""),
@@ -1969,13 +1997,19 @@
       document.querySelectorAll("[data-managed-only]").forEach((el) => {
         el.classList.toggle("hidden", !runtimeManaged);
       });
+      document.querySelectorAll("[data-managed-binary-only]").forEach((el) => {
+        el.classList.toggle("hidden", mode !== "managed_binary");
+      });
+      document.querySelectorAll("[data-managed-docker-only]").forEach((el) => {
+        el.classList.toggle("hidden", mode !== "managed_docker");
+      });
       document.querySelectorAll("[data-external-only]").forEach((el) => {
         el.classList.toggle("hidden", runtimeManaged);
       });
       const installBtn = document.getElementById("install-runtime");
       if (installBtn) installBtn.classList.toggle("hidden", mode !== "managed_binary");
       const runtimeBtn = document.getElementById("start-runtime");
-      if (runtimeBtn) runtimeBtn.classList.toggle("hidden", mode === "managed_docker_placeholder");
+      if (runtimeBtn) runtimeBtn.classList.toggle("hidden", false);
     }
 
     function getConfigFieldValue(config, field) {
@@ -3660,6 +3694,9 @@
         <div class="mono">${currentLang() === "en" ? "Binary" : currentLang() === "mix" ? "可执行文件 / Binary" : "可执行文件"}: ${escapeHtml(runtime?.binary || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Data dir" : currentLang() === "mix" ? "数据目录 / Data dir" : "数据目录"}: ${escapeHtml(runtime?.data_dir || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Docker CLI" : currentLang() === "mix" ? "Docker CLI / Docker CLI" : "Docker CLI"}: ${escapeHtml(runtime?.docker_cli || "-")} ${runtime?.docker_available ? "" : `(${currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未检测到 / missing" : "未检测到"})`}</div>
+        <div class="mono">${currentLang() === "en" ? "Docker daemon" : currentLang() === "mix" ? "Docker daemon / Docker daemon" : "Docker daemon"}: ${runtime?.docker_daemon_available ? yesText : noText}</div>
+        <div class="mono">${currentLang() === "en" ? "Docker image" : currentLang() === "mix" ? "Docker 镜像 / Docker image" : "Docker 镜像"}: ${escapeHtml(runtime?.docker_image || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Docker container" : currentLang() === "mix" ? "Docker 容器 / Docker container" : "Docker 容器"}: ${escapeHtml(runtime?.docker_container_name || "-")} ${runtime?.docker_container_exists ? "" : `(${currentLang() === "en" ? "not created" : currentLang() === "mix" ? "未创建 / not created" : "未创建"})`}</div>
         <div class="mono">${currentLang() === "en" ? "Install required" : currentLang() === "mix" ? "需要拉取 / Install required" : "需要拉取"}: ${canInstall ? yesText : noText}</div>
         <div class="mono">${escapeHtml(runtime?.message || "")}</div>
         ${runtime?.suggested_action ? `<div class="mono">${escapeHtml(runtime.suggested_action)}</div>` : ""}

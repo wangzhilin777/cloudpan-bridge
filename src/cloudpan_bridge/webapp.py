@@ -169,6 +169,8 @@ def create_app(config_path: Path) -> FastAPI:
         port=config.managed_openlist_port,
         init_admin_username=config.managed_openlist_init_username,
         init_admin_password=config.managed_openlist_init_password,
+        docker_image=config.managed_openlist_docker_image,
+        docker_container_name=config.managed_openlist_docker_container_name,
     )
     auth_cookie_name = "cpb_session"
     auth_sessions: set[str] = set()
@@ -211,6 +213,8 @@ def create_app(config_path: Path) -> FastAPI:
         runtime.port = config.managed_openlist_port
         runtime.init_admin_username = str(config.managed_openlist_init_username or "admin").strip() or "admin"
         runtime.init_admin_password = str(config.managed_openlist_init_password or "")
+        runtime.docker_image = str(config.managed_openlist_docker_image or "openlistteam/openlist:latest").strip() or "openlistteam/openlist:latest"
+        runtime.docker_container_name = str(config.managed_openlist_docker_container_name or "cloudpan-bridge-openlist").strip() or "cloudpan-bridge-openlist"
         runtime.data_dir.mkdir(parents=True, exist_ok=True)
         return runtime
 
