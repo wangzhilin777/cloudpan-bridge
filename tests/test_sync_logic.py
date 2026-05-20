@@ -6247,6 +6247,8 @@ def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Pat
     assert payload["sourceTargetRoute"]["bridge_recoverable_fast_hashes"] == ["md5"]
     assert payload["sourceTargetRoute"]["route_honesty"] == "capture_missing_before_fast_upload"
     assert payload["sourceTargetRoute"]["fallback_execution_mode"] == "stream_upload"
+    assert payload["targetHashAcceptance"]["bridgeRecoverableAccepts"] == ["md5"]
+    assert payload["targetHashAcceptance"]["bucket"] == "bridge_recoverable_overlap"
 
 
 def test_provider_capability_assess_accepts_grouped_target_and_filters(tmp_path: Path) -> None:
@@ -6387,6 +6389,8 @@ def test_provider_capability_assess_prefers_capture_cache_route_when_available(t
     assert payload["sourceTargetRoute"]["route_honesty"] == "capture_cache_available_before_live_api"
     assert payload["sourceTargetRoute"]["preferred_execution_mode"] == "fast_upload"
     assert payload["sourceTargetRoute"]["capture_cache_fast_hashes"] == ["md5"]
+    assert payload["targetHashAcceptance"]["captureCacheAccepts"] == ["md5"]
+    assert payload["targetHashAcceptance"]["bucket"] == "capture_cache_overlap"
 
 
 def test_provider_capability_assess_without_analysis_requires_probe_first(tmp_path: Path) -> None:
@@ -6491,6 +6495,9 @@ def test_provider_capability_assess_download_only_prefers_pending_tree(tmp_path:
     assert payload["assessedLevel"] == "download_upload_only"
     assert payload["strategy"]["recommendedMode"] == "pending_tree_first"
     assert payload["strategy"]["preferPendingTree"] is True
+    assert payload["targetHashAcceptance"]["bucket"] == "bridge_recoverable_overlap"
+    assert payload["targetHashAcceptance"]["bridgeRecoverableAccepts"] == ["md5"]
+    assert "sha1" in payload["targetHashAcceptance"]["declaredButTargetUnsupported"]
 
 
 def test_provider_capability_openlist_target_defaults_to_download_upload_only(tmp_path: Path) -> None:

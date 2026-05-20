@@ -1143,6 +1143,52 @@ def assess_driver_target_capability(
 
     fast_upload_decision = assess_directory_fast_upload(summary, target_capability=capability.get("targetCapability") or capability.get("targetProfile") or {})
 
+    source_hashes_declared = [
+        str(item or "").strip().lower()
+        for item in [
+            *list(source_profile.get("likelyHashes") or []),
+            *list(source_profile.get("hashFieldsSupported") or []),
+        ]
+        if str(item or "").strip()
+    ]
+    source_hashes_declared = list(dict.fromkeys(source_hashes_declared))
+    target_fast_hashes = [
+        str(item or "").strip().lower()
+        for item in list((capability.get("targetProfile") or {}).get("fastUploadHashes") or [])
+        if str(item or "").strip()
+    ]
+    direct_native_accepts = [item for item in source_hashes_declared if item in target_fast_hashes]
+    declared_but_target_unsupported = [item for item in source_hashes_declared if item not in target_fast_hashes]
+    bridge_recoverable_hashes = [
+        str(item or "").strip().lower()
+        for item in list((capability.get("sourceTargetRoute") or {}).get("bridge_recoverable_fast_hashes") or [])
+        if str(item or "").strip()
+    ]
+    capture_cache_hashes = [
+        str(item or "").strip().lower()
+        for item in list((capability.get("sourceTargetRoute") or {}).get("capture_cache_fast_hashes") or [])
+        if str(item or "").strip()
+    ]
+    acceptance_bucket = "target_upload_only"
+    acceptance_summary_zh = "当前目标端主要按普通上传/覆盖处理，不承诺元数据秒传。"
+    acceptance_summary_en = "The current target mainly follows normal upload/overwrite and does not promise metadata-based fast upload."
+    if target_fast_hashes and direct_native_accepts:
+        acceptance_bucket = "native_fast_hash_overlap"
+        acceptance_summary_zh = f"源端常见哈希与目标端快传哈希已有直接重叠：{', '.join(direct_native_accepts)}。"
+        acceptance_summary_en = f"The source already overlaps with target fast-upload hashes directly: {', '.join(direct_native_accepts)}."
+    elif target_fast_hashes and bridge_recoverable_hashes:
+        acceptance_bucket = "bridge_recoverable_overlap"
+        acceptance_summary_zh = f"当前更依赖桥接补指纹后再命中目标端快传哈希：{', '.join(bridge_recoverable_hashes)}。"
+        acceptance_summary_en = f"The current path relies more on bridge enrichment before it can hit target fast-upload hashes: {', '.join(bridge_recoverable_hashes)}."
+    elif target_fast_hashes and capture_cache_hashes:
+        acceptance_bucket = "capture_cache_overlap"
+        acceptance_summary_zh = f"当前可优先消费抓取缓存里的目标端快传哈希：{', '.join(capture_cache_hashes)}。"
+        acceptance_summary_en = f"The current path can consume target fast-upload hashes from the capture cache first: {', '.join(capture_cache_hashes)}."
+    elif target_fast_hashes and declared_but_target_unsupported:
+        acceptance_bucket = "source_hashes_not_accepted_by_target"
+        acceptance_summary_zh = f"源端常见哈希存在，但当前目标端不认这些哈希：{', '.join(declared_but_target_unsupported)}。"
+        acceptance_summary_en = f"The source exposes likely hashes, but the current target does not accept them: {', '.join(declared_but_target_unsupported)}."
+
     if not should_analyze_first:
         if assessed_level == "fast_upload_supported":
             recommended_mode = "direct_metadata_first"
@@ -1276,6 +1322,19 @@ def assess_driver_target_capability(
         "analysisSummary": summary,
         "assessedLevel": assessed_level,
         "fastUploadDecision": fast_upload_decision,
+        "targetHashAcceptance": {
+            "bucket": acceptance_bucket,
+            "sourceDeclaredHashes": source_hashes_declared,
+            "targetFastHashes": target_fast_hashes,
+            "directNativeAccepts": direct_native_accepts,
+            "bridgeRecoverableAccepts": bridge_recoverable_hashes,
+            "captureCacheAccepts": capture_cache_hashes,
+            "declaredButTargetUnsupported": declared_but_target_unsupported,
+            "summary": {
+                "zh": acceptance_summary_zh,
+                "en": acceptance_summary_en,
+            },
+        },
         "rationale": {
             "zh": rationale_zh,
             "en": rationale_en,
@@ -1302,3 +1361,38 @@ def assess_driver_target_capability(
             "gcidReadyRatio": round(gcid_ratio, 4),
         },
     }
+
+
+def enrich_target_hash_acceptance(
+    assessment: dict[str, Any] | None,
+    source_target_route: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    result = dict(assessment or {})
+    acceptance = dict(result.get("targetHashAcceptance") or {})
+    route = dict(source_target_route or result.get("sourceTargetRoute") or {})
+    bridge_recoverable = [
+        str(item or "").strip().lower()
+        for item in list(route.get("bridge_recoverable_fast_hashes") or [])
+        if str(item or "").strip()
+    ]
+    capture_cache = [
+        str(item or "").strip().lower()
+        for item in list(route.get("capture_cache_fast_hashes") or [])
+        if str(item or "").strip()
+    ]
+    acceptance["bridgeRecoverableAccepts"] = bridge_recoverable
+    acceptance["captureCacheAccepts"] = capture_cache
+    if bridge_recoverable:
+        acceptance["bucket"] = "bridge_recoverable_overlap"
+        acceptance["summary"] = {
+            "zh": f"当前更依赖桥接补指纹后再命中目标端快传哈希：{', '.join(bridge_recoverable)}。",
+            "en": f"The current path relies more on bridge enrichment before it can hit target fast-upload hashes: {', '.join(bridge_recoverable)}.",
+        }
+    if capture_cache:
+        acceptance["bucket"] = "capture_cache_overlap"
+        acceptance["summary"] = {
+            "zh": f"当前可优先消费抓取缓存里的目标端快传哈希：{', '.join(capture_cache)}。",
+            "en": f"The current path can consume target fast-upload hashes from the capture cache first: {', '.join(capture_cache)}.",
+        }
+    result["targetHashAcceptance"] = acceptance
+    return result

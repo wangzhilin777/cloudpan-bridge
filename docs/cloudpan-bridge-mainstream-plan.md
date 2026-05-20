@@ -80,6 +80,11 @@
   - 现在支持从 `data / result / payload` 下的 `list / records / value / children` 递归读取缓存条目
   - 按 `source_id` 匹配时新增兼容 `fs_id / item_id / driveItemId / drive_item_id`
   - 这让 `OneDrive / Baidu / 123Pan` 一类常见“外层包一层 data/result”的抓取快照也能进入统一 enrich 流水线
+- 能力评估与页面摘要现在新增了“目标端哈希接受度”这一层：
+  - 会区分源端当前原生就重叠的快传哈希
+  - 会区分桥接后理论可补到的目标端快传哈希
+  - 会区分抓取缓存里已经可直接喂给目标端的快传哈希
+  - 也会明确显示源端常见哈希里哪些当前目标端根本不认，避免多目标端切换时只剩笼统 recommended flow
 
 ## 摘要
 

@@ -29,6 +29,7 @@ from .provider_registry import (
     build_driver_coverage_scaffold,
     filter_driver_coverage_audit,
     assess_driver_target_capability,
+    enrich_target_hash_acceptance,
     build_source_mapping_context as build_registry_source_mapping_context,
     build_driver_capability_matrix,
     build_driver_target_capability,
@@ -1688,7 +1689,7 @@ def create_app(config_path: Path) -> FastAPI:
             target_key=target,
             target_capability=dict(build_target_preflight(target).get("adapter_capability") or {}),
         )
-        return result
+        return enrich_target_hash_acceptance(result, result["sourceTargetRoute"])
 
     @app.get("/api/openlist/storages")
     def get_openlist_storages(page: int = 1, per_page: int = 200) -> dict[str, Any]:
