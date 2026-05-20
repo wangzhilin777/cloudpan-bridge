@@ -34,6 +34,11 @@
       margin: 0 auto;
       padding: 20px;
     }
+    body.auth-locked .app {
+      visibility: hidden;
+      pointer-events: none;
+      user-select: none;
+    }
     .hero {
       display: flex;
       justify-content: space-between;
@@ -123,6 +128,34 @@
       margin-bottom: 6px;
       color: var(--muted);
       font-size: 13px;
+    }
+    .help-anchor {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .help-tip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.84);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: help;
+      user-select: none;
+      flex: 0 0 auto;
+    }
+    .help-tip:hover,
+    .help-tip:focus {
+      border-color: var(--accent);
+      color: var(--accent);
+      outline: none;
     }
     input[type="text"],
     input[type="password"],
@@ -340,6 +373,26 @@
     .auth-dialog-card {
       width: min(420px, 100%);
     }
+    .auth-input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: #fff;
+      color: var(--text);
+      appearance: none;
+      -webkit-appearance: none;
+      box-shadow: none;
+      outline: none;
+    }
+    .auth-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(12, 122, 99, 0.14);
+    }
+    .auth-input::-ms-reveal,
+    .auth-input::-ms-clear {
+      display: none;
+    }
     @media (max-width: 1180px) {
       .shell {
         grid-template-columns: 1fr;
@@ -404,7 +457,7 @@
 
         <section class="tab-panel active" data-panel="overview">
           <div class="panel">
-            <h2 data-i18n="panel.overview">运行概览</h2>
+            <h2 class="help-anchor" data-i18n="panel.overview" data-help-key="panel_overview">运行概览</h2>
             <div class="status-grid">
               <div class="status-card">
                 <strong data-i18n="card.runtime">OpenList Runtime</strong>
@@ -420,11 +473,13 @@
               </div>
             </div>
             <div class="actions">
-              <button class="secondary" id="start-runtime" data-i18n="btn.start_runtime">启动托管 OpenList</button>
-              <button class="secondary" id="login-openlist" data-i18n="btn.login_openlist">登录 OpenList 并写回 Token</button>
-              <button class="secondary" id="capture-guangya" data-i18n="btn.capture_guangya" data-target-only="guangya">打开光鸭登录并自动抓取</button>
-              <button class="warn" id="run-direct-overview" data-i18n="btn.direct_sync">直接同步当前目录</button>
+              <button class="secondary" id="install-runtime" data-i18n="btn.install_runtime">拉取本机 OpenList 运行时</button>
+              <button class="secondary" id="start-runtime" data-i18n="btn.start_runtime" data-help-key="btn_start_runtime">启动托管 OpenList</button>
+              <button class="secondary" id="login-openlist" data-i18n="btn.login_openlist" data-help-key="btn_login_openlist">登录 OpenList 并写回 Token</button>
+              <button class="secondary" id="capture-guangya" data-i18n="btn.capture_guangya" data-target-only="guangya" data-help-key="btn_capture_guangya">打开光鸭登录并自动抓取</button>
+              <button class="warn" id="run-direct-overview" data-i18n="btn.direct_sync" data-help-key="btn_direct_sync">直接同步当前目录</button>
             </div>
+            <div class="notice" id="runtime-action-notice">等待运行时检查。</div>
           </div>
 
           <div class="panel">
@@ -435,26 +490,30 @@
           </div>
 
           <div class="panel">
-            <h2 data-i18n="panel.current_task">当前任务</h2>
+            <h2 class="help-anchor" data-i18n="panel.current_task" data-help-key="panel_current_task">当前任务</h2>
             <div class="panel-grid">
               <div>
-                <label data-i18n="label.source_path">当前源目录</label>
+                <label class="help-anchor" data-i18n="label.source_path" data-help-key="source_path">当前源目录</label>
                 <input id="source_path">
               </div>
               <div>
-                <label id="target-path-label" data-i18n="label.target_path">光鸭目标目录</label>
+                <label data-i18n="label.target_key">当前目标端</label>
+                <select id="target_key"></select>
+              </div>
+              <div>
+                <label class="help-anchor" id="target-path-label" data-i18n="label.target_path" data-help-key="target_path">光鸭目标目录</label>
                 <input id="target_path">
               </div>
               <div>
-                <label data-i18n="label.mounted_source_select">已挂载源目录</label>
-                <select id="mounted_source_select"></select>
-              </div>
-              <div>
-                <label data-i18n="label.effective_openlist_url">OpenList 实际访问地址</label>
+                <label class="help-anchor" data-i18n="label.effective_openlist_url" data-help-key="effective_openlist_url">OpenList 实际访问地址</label>
                 <input id="effective_openlist_url" readonly>
               </div>
               <div>
-                <label data-i18n="label.auto_download_threshold_mb">小文件自动补传阈值(MB，0=只记录)</label>
+                <label class="help-anchor" data-i18n="label.mounted_source_select" data-help-key="mounted_source_select">已挂载源目录</label>
+                <select id="mounted_source_select"></select>
+              </div>
+              <div>
+                <label class="help-anchor" data-i18n="label.auto_download_threshold_mb" data-help-key="auto_download_threshold_mb">小文件自动补传阈值(MB，0=只记录)</label>
                 <input id="auto_download_threshold_mb" type="number" min="0">
               </div>
               <div class="col-span-2">
@@ -473,21 +532,21 @@
               </div>
             </div>
             <div class="actions">
-              <button class="accent" id="save-config-overview" data-i18n="btn.save_task_config">保存当前任务配置</button>
-              <button class="secondary" id="use-mounted-source" data-i18n="btn.use_mounted_source">使用挂载源目录</button>
+              <button class="accent" id="save-config-overview" data-i18n="btn.save_task_config" data-help-key="btn_save_task_config">保存当前任务配置</button>
+              <button class="secondary" id="use-mounted-source" data-i18n="btn.use_mounted_source" data-help-key="btn_use_mounted_source">使用挂载源目录</button>
             </div>
           </div>
         </section>
 
         <section class="tab-panel" data-panel="source">
           <div class="panel">
-            <h2 data-i18n="panel.source_browser">目录浏览</h2>
+            <h2 class="help-anchor" data-i18n="panel.source_browser" data-help-key="panel_source_browser">目录浏览</h2>
             <div class="subtle" data-i18n="desc.source_browser">页面进入时会优先按配置里的 <code>source_path</code> 恢复当前浏览目录；如果该目录读取失败，再回退到挂载根目录。</div>
             <div class="actions">
-              <button class="secondary" id="browse-root" data-i18n="btn.browse_root">浏览挂载根目录</button>
-              <button class="secondary" id="browse-up" data-i18n="btn.browse_up">返回上级</button>
-              <button class="secondary" id="browse-refresh" data-i18n="btn.browse_refresh">刷新当前目录</button>
-              <button class="accent" id="use-current-dir" data-i18n="btn.use_current_dir">使用当前目录作为源目录</button>
+              <button class="secondary" id="browse-root" data-i18n="btn.browse_root" data-help-key="btn_browse_root">浏览挂载根目录</button>
+              <button class="secondary" id="browse-up" data-i18n="btn.browse_up" data-help-key="btn_browse_up">返回上级</button>
+              <button class="secondary" id="browse-refresh" data-i18n="btn.browse_refresh" data-help-key="btn_browse_refresh">刷新当前目录</button>
+              <button class="accent" id="use-current-dir" data-i18n="btn.use_current_dir" data-help-key="btn_use_current_dir">使用当前目录作为源目录</button>
             </div>
             <div class="notice" id="dir-notice">等待操作</div>
             <div class="mono" id="dir-current">当前浏览: 未载入</div>
@@ -495,11 +554,11 @@
           </div>
 
           <div class="panel">
-            <h2 data-i18n="panel.source_analyze">源端元数据分析</h2>
+            <h2 class="help-anchor" data-i18n="panel.source_analyze" data-help-key="panel_source_analyze">源端元数据分析</h2>
             <div class="subtle" data-i18n="desc.source_analyze">开始真正同步前，先做一次源目录分析。这里会统计当前目录中有多少文件带 MD5、多少文件带 GCID、各 provider 占比，以及抽样展示前几条源文件元数据。</div>
             <div class="actions">
-              <button class="secondary" id="analyze-source" data-i18n="btn.analyze_source">分析当前源目录</button>
-              <button class="secondary" id="build-source-miaochuan" data-i18n="btn.build_source_miaochuan">生成当前源目录秒传 JSON</button>
+              <button class="secondary" id="analyze-source" data-i18n="btn.analyze_source" data-help-key="btn_analyze_source">分析当前源目录</button>
+              <button class="secondary" id="build-source-miaochuan" data-i18n="btn.build_source_miaochuan" data-help-key="btn_build_source_miaochuan">生成当前源目录秒传 JSON</button>
             </div>
             <div class="notice" id="source-analyze-notice">等待分析</div>
             <div class="mount-list" id="source-analyze-summary">暂无分析结果</div>
@@ -509,24 +568,24 @@
 
         <section class="tab-panel" data-panel="sync">
           <div class="panel">
-            <h2 data-i18n="panel.sync_actions">同步执行</h2>
+            <h2 class="help-anchor" data-i18n="panel.sync_actions" data-help-key="panel_sync_actions">同步执行</h2>
             <div class="actions">
-              <button class="secondary" id="run-dry" data-i18n="btn.run_dry">只看计划 dry-run</button>
-              <button class="warn" id="run-direct" data-i18n="btn.direct_sync">直接同步当前目录</button>
-              <button class="secondary" id="run-next-queue" data-i18n="btn.run_next_queue">执行队列下一个</button>
-              <button class="secondary" id="run-all-queue" data-i18n="btn.run_all_queue">连续执行整个队列</button>
+              <button class="secondary" id="run-dry" data-i18n="btn.run_dry" data-help-key="btn_run_dry">只看计划 dry-run</button>
+              <button class="warn" id="run-direct" data-i18n="btn.direct_sync" data-help-key="btn_direct_sync">直接同步当前目录</button>
+              <button class="secondary" id="run-next-queue" data-i18n="btn.run_next_queue" data-help-key="btn_run_next_queue">执行队列下一个</button>
+              <button class="secondary" id="run-all-queue" data-i18n="btn.run_all_queue" data-help-key="btn_run_all_queue">连续执行整个队列</button>
             </div>
             <div class="notice" id="sync-notice">等待操作</div>
           </div>
 
           <div class="panel">
-            <h2 data-i18n="panel.leaf_mode">最底层目录模式</h2>
+            <h2 class="help-anchor" data-i18n="panel.leaf_mode" data-help-key="panel_leaf_mode">最底层目录模式</h2>
             <div class="subtle" data-i18n="desc.leaf_mode">适合防风控慢跑。可以直接边扫边同步，也可以先把叶子目录加入队列后分批执行。</div>
             <div class="actions">
-              <button class="secondary" id="add-current-queue" data-i18n="btn.add_current_queue">当前目录加入队列</button>
-              <button class="secondary" id="add-leaf-queue" data-i18n="btn.add_leaf_queue">当前目录最底层批量入队</button>
-              <button class="warn" id="run-leaf-direct" data-i18n="btn.run_leaf_direct">最底层边扫边秒传</button>
-              <button class="warn" id="run-leaf-full" data-i18n="btn.run_leaf_full">最底层边扫边同步+补传</button>
+              <button class="secondary" id="add-current-queue" data-i18n="btn.add_current_queue" data-help-key="btn_add_current_queue">当前目录加入队列</button>
+              <button class="secondary" id="add-leaf-queue" data-i18n="btn.add_leaf_queue" data-help-key="btn_add_leaf_queue">当前目录最底层批量入队</button>
+              <button class="warn" id="run-leaf-direct" data-i18n="btn.run_leaf_direct" data-help-key="btn_run_leaf_direct">最底层边扫边秒传</button>
+              <button class="warn" id="run-leaf-full" data-i18n="btn.run_leaf_full" data-help-key="btn_run_leaf_full">最底层边扫边同步+补传</button>
             </div>
           </div>
 
@@ -538,12 +597,12 @@
 
         <section class="tab-panel" data-panel="pending">
           <div class="panel">
-            <h2 data-i18n="panel.pending_tree">待补传目录树</h2>
+            <h2 class="help-anchor" data-i18n="panel.pending_tree" data-help-key="panel_pending_tree">待补传目录树</h2>
             <div class="actions">
               <button class="secondary" id="pending-select-all" data-i18n="btn.select_all">全选</button>
               <button class="secondary" id="pending-clear-all" data-i18n="btn.clear_all">全不选</button>
-              <button class="warn" id="pending-run-selected" data-i18n="btn.pending_run_selected">补传已勾选文件</button>
-              <button class="warn" id="pending-run-stream" data-i18n="btn.pending_run_stream">按勾选目录最底层顺序补传</button>
+              <button class="warn" id="pending-run-selected" data-i18n="btn.pending_run_selected" data-help-key="btn_pending_run_selected">补传已勾选文件</button>
+              <button class="warn" id="pending-run-stream" data-i18n="btn.pending_run_stream" data-help-key="btn_pending_run_stream">按勾选目录最底层顺序补传</button>
             </div>
             <div class="subtle" data-i18n="desc.pending_tree">这里按真实目录树展示，父目录勾选会联动所有子目录和文件。</div>
             <div class="tree-wrap" id="pending-tree">暂无待补传文件</div>
@@ -552,13 +611,13 @@
 
         <section class="tab-panel" data-panel="miaochuan">
           <div class="panel">
-            <h2 id="miaochuan-panel-title" data-i18n="panel.miaochuan">秒传 JSON 直导</h2>
+            <h2 class="help-anchor" id="miaochuan-panel-title" data-i18n="panel.miaochuan" data-help-key="panel_miaochuan">秒传 JSON 直导</h2>
             <div class="subtle" id="miaochuan-desc" data-i18n="desc.miaochuan">支持直接粘贴油猴或插件导出的 JSON。若你已自动抓取到光鸭 Authorization，会优先使用它。</div>
-            <label data-i18n="label.miaochuan_payload">秒传 JSON</label>
+            <label class="help-anchor" data-i18n="label.miaochuan_payload" data-help-key="miaochuan_payload">秒传 JSON</label>
             <textarea id="miaochuan_payload" placeholder='{"files":[{"path":"/demo.zip","size":"123","etag":"md5"}]}'></textarea>
             <div class="actions">
-              <button class="secondary" id="diagnose-miaochuan" data-i18n="btn.diagnose_miaochuan">诊断当前秒传 JSON</button>
-              <button class="warn" id="run-miaochuan" data-i18n="btn.run_miaochuan">直接导入光鸭</button>
+              <button class="secondary" id="diagnose-miaochuan" data-i18n="btn.diagnose_miaochuan" data-help-key="btn_diagnose_miaochuan">诊断当前秒传 JSON</button>
+              <button class="warn" id="run-miaochuan" data-i18n="btn.run_miaochuan" data-help-key="btn_run_miaochuan">直接导入光鸭</button>
             </div>
             <div class="notice" id="miaochuan-notice">等待操作</div>
             <div class="mount-list" id="miaochuan-diagnosis">暂无诊断结果</div>
@@ -576,11 +635,11 @@
           </div>
 
           <div class="panel">
-            <h2 data-i18n="panel.provider_capture">源网盘登录抓取</h2>
+            <h2 class="help-anchor" data-i18n="panel.provider_capture" data-help-key="panel_provider_capture">源网盘登录抓取</h2>
             <div class="subtle" data-i18n="desc.provider_capture">如果还没有挂载，或想直接从网页登录态抓取 Cookie / Token / Header，可以先在这里选网盘类型，打开登录页抓取，再一键写入当前挂载表单。</div>
             <div class="panel-grid">
               <div>
-                <label data-i18n="label.provider_select">源网盘类型</label>
+                <label class="help-anchor" data-i18n="label.provider_select" data-help-key="provider_select">源网盘类型</label>
                 <select id="provider-select"></select>
               </div>
               <div>
@@ -588,7 +647,7 @@
                 <div class="notice" id="provider-driver-hint">等待选择网盘类型。</div>
               </div>
               <div class="col-span-2">
-                <label>Login URL</label>
+                <label class="help-anchor" data-help-key="provider_login_url">Login URL</label>
                 <input id="provider-login-url" placeholder="https://...">
               </div>
               <div class="col-span-2">
@@ -596,17 +655,17 @@
               </div>
             </div>
             <div class="actions">
-              <button class="secondary" id="start-provider-capture" data-i18n="btn.start_provider_capture">打开网页登录并抓取</button>
-              <button class="secondary" id="show-provider-guide" data-i18n="btn.show_provider_guide">查看该网盘接入流程</button>
-              <button class="accent" id="apply-provider-fields" data-i18n="btn.apply_provider_fields">写入当前挂载表单</button>
+              <button class="secondary" id="start-provider-capture" data-i18n="btn.start_provider_capture" data-help-key="btn_start_provider_capture">打开网页登录并抓取</button>
+              <button class="secondary" id="show-provider-guide" data-i18n="btn.show_provider_guide" data-help-key="btn_show_provider_guide">查看该网盘接入流程</button>
+              <button class="accent" id="apply-provider-fields" data-i18n="btn.apply_provider_fields" data-help-key="btn_apply_provider_fields">写入当前挂载表单</button>
             </div>
           </div>
 
           <div class="panel">
-            <h2 data-i18n="panel.create_mount">新增挂载</h2>
+            <h2 class="help-anchor" data-i18n="panel.create_mount" data-help-key="panel_create_mount">新增挂载</h2>
             <div class="panel-grid">
               <div>
-                <label data-i18n="label.driver_select">驱动类型</label>
+                <label class="help-anchor" data-i18n="label.driver_select" data-help-key="driver_select">驱动类型</label>
                 <select id="driver-select"></select>
               </div>
               <div>
@@ -621,26 +680,28 @@
               </div>
             </div>
             <div class="actions">
-              <button class="secondary" id="show-driver-guide" data-i18n="btn.show_driver_guide">查看接入流程</button>
-              <button class="secondary" id="apply-driver-defaults" data-i18n="btn.apply_driver_defaults">套用推荐默认值</button>
-              <button class="accent" id="create-storage" data-i18n="btn.create_storage">创建挂载</button>
+              <button class="secondary" id="show-driver-guide" data-i18n="btn.show_driver_guide" data-help-key="btn_show_driver_guide">查看接入流程</button>
+              <button class="secondary" id="apply-driver-defaults" data-i18n="btn.apply_driver_defaults" data-help-key="btn_apply_driver_defaults">套用推荐默认值</button>
+              <button class="accent" id="create-storage" data-i18n="btn.create_storage" data-help-key="btn_create_storage">创建挂载</button>
             </div>
           </div>
         </section>
 
         <section class="tab-panel" data-panel="config">
           <div class="panel">
-            <h2 data-i18n="panel.config">基础配置</h2>
+            <h2 class="help-anchor" data-i18n="panel.config" data-help-key="panel_config">基础配置</h2>
             <div class="panel-grid">
               <div>
-                <label data-i18n="label.openlist_mode">OpenList 模式</label>
+                <label class="help-anchor" data-i18n="label.openlist_mode" data-help-key="openlist_mode">OpenList 模式</label>
                 <select id="openlist_mode">
-                  <option value="external" data-i18n-option="option.openlist_mode.external">external</option>
-                  <option value="managed" data-i18n-option="option.openlist_mode.managed">managed</option>
+                  <option value="external_local" data-i18n-option="option.openlist_mode.external_local">external_local</option>
+                  <option value="external_remote" data-i18n-option="option.openlist_mode.external_remote">external_remote</option>
+                  <option value="managed_binary" data-i18n-option="option.openlist_mode.managed_binary">managed_binary</option>
+                  <option value="managed_docker_placeholder" data-i18n-option="option.openlist_mode.managed_docker_placeholder">managed_docker_placeholder</option>
                 </select>
               </div>
               <div>
-                <label data-i18n="label.rate_limit_mode">Rate Limit 模式</label>
+                <label class="help-anchor" data-i18n="label.rate_limit_mode" data-help-key="rate_limit_mode">Rate Limit 模式</label>
                 <select id="rate_limit_mode">
                   <option value="safe" data-i18n-option="option.rate_limit_mode.safe">safe</option>
                   <option value="balanced" data-i18n-option="option.rate_limit_mode.balanced">balanced</option>
@@ -649,75 +710,79 @@
                 </select>
               </div>
               <div>
-                <label data-i18n="label.openlist_url">OpenList 地址</label>
+                <label class="help-anchor" data-i18n="label.openlist_url" data-help-key="openlist_url">OpenList 地址</label>
                 <input id="openlist_url">
               </div>
               <div>
-                <label data-i18n="label.openlist_token">OpenList Token</label>
+                <label class="help-anchor" data-i18n="label.openlist_token" data-help-key="openlist_token">OpenList Token</label>
                 <input id="openlist_token">
               </div>
               <div>
-                <label data-i18n="label.openlist_username">OpenList 用户名</label>
+                <label class="help-anchor" data-i18n="label.openlist_username" data-help-key="openlist_username">OpenList 用户名</label>
                 <input id="openlist_username">
               </div>
               <div>
-                <label data-i18n="label.openlist_password">OpenList 密码</label>
+                <label class="help-anchor" data-i18n="label.openlist_password" data-help-key="openlist_password">OpenList 密码</label>
                 <input id="openlist_password" type="password">
               </div>
-              <div>
-                <label data-i18n="label.managed_openlist_bin">托管 OpenList 可执行文件</label>
+              <div data-managed-only>
+                <label class="help-anchor" data-i18n="label.managed_openlist_bin" data-help-key="managed_openlist_bin">托管 OpenList 可执行文件</label>
                 <input id="managed_openlist_bin">
               </div>
-              <div>
-                <label data-i18n="label.managed_openlist_data_dir">托管 OpenList 数据目录</label>
+              <div data-managed-only>
+                <label class="help-anchor" data-i18n="label.managed_openlist_data_dir" data-help-key="managed_openlist_data_dir">托管 OpenList 数据目录</label>
                 <input id="managed_openlist_data_dir">
               </div>
-              <div>
-                <label data-i18n="label.managed_openlist_port">托管 OpenList 端口</label>
+              <div data-managed-only>
+                <label class="help-anchor" data-i18n="label.managed_openlist_port" data-help-key="managed_openlist_port">托管 OpenList 端口</label>
                 <input id="managed_openlist_port" type="number" min="1">
               </div>
+              <div data-managed-only>
+                <label data-i18n="label.managed_openlist_init_username">托管初始化管理员账号</label>
+                <input id="managed_openlist_init_username">
+              </div>
+              <div data-managed-only>
+                <label data-i18n="label.managed_openlist_init_password">托管初始化管理员密码</label>
+                <input id="managed_openlist_init_password" type="password" placeholder="留空表示启动时自动生成建议密码">
+              </div>
               <div>
-                <label>控制台管理员账号</label>
+                <label class="help-anchor" data-help-key="app_admin_username">控制台管理员账号</label>
                 <input id="app_admin_username" placeholder="留空表示不启用控制台登录">
               </div>
               <div>
-                <label>控制台管理员密码</label>
+                <label class="help-anchor" data-help-key="app_admin_password">控制台管理员密码</label>
                 <input id="app_admin_password" type="password" placeholder="留空表示不启用控制台登录">
               </div>
               <div>
-                <label data-i18n="label.log_file">日志文件</label>
+                <label class="help-anchor" data-i18n="label.log_file" data-help-key="log_file">日志文件</label>
                 <input id="log_file">
               </div>
               <div>
-                <label data-i18n="label.temp_dir">临时下载目录</label>
+                <label class="help-anchor" data-i18n="label.temp_dir" data-help-key="temp_dir">临时下载目录</label>
                 <input id="temp_dir">
               </div>
               <div>
-                <label data-i18n="label.state_file">状态文件</label>
+                <label class="help-anchor" data-i18n="label.state_file" data-help-key="state_file">状态文件</label>
                 <input id="state_file">
               </div>
               <div>
-                <label data-i18n="label.openlist_page_size">OpenList 每页数</label>
+                <label class="help-anchor" data-i18n="label.openlist_page_size" data-help-key="openlist_page_size">OpenList 每页数</label>
                 <input id="openlist_page_size" type="number" min="1">
               </div>
               <div>
-                <label data-i18n="label.openlist_request_interval_ms">OpenList 请求间隔(ms)</label>
+                <label class="help-anchor" data-i18n="label.openlist_request_interval_ms" data-help-key="openlist_request_interval_ms">OpenList 请求间隔(ms)</label>
                 <input id="openlist_request_interval_ms" type="number" min="0">
               </div>
               <div>
-                <label data-i18n="label.queue_interval_ms">目录间隔(ms)</label>
+                <label class="help-anchor" data-i18n="label.queue_interval_ms" data-help-key="queue_interval_ms">目录间隔(ms)</label>
                 <input id="queue_interval_ms" type="number" min="0">
               </div>
             </div>
           </div>
 
           <div class="panel">
-            <h2 id="target-auth-panel-title" data-i18n="panel.guangya_auth">光鸭登录信息</h2>
+            <h2 id="target-auth-panel-title" data-i18n="panel.guangya_auth">目标端配置</h2>
             <div class="panel-grid">
-              <div>
-              <label data-i18n="label.target_key">当前目标端</label>
-                <select id="target_key"></select>
-              </div>
               <div id="target-auth-guide" class="notice col-span-2">当前目标端说明将显示在这里。</div>
               <div data-target-only="guangya">
                 <label data-i18n="label.guangya_phone">光鸭手机号</label>
@@ -962,11 +1027,11 @@
       <div class="stack">
         <div>
           <label>用户名</label>
-          <input id="auth-username" autocomplete="username">
+          <input id="auth-username" class="auth-input" autocomplete="username">
         </div>
         <div>
           <label>密码</label>
-          <input id="auth-password" type="password" autocomplete="current-password">
+          <input id="auth-password" class="auth-input" type="password" autocomplete="current-password">
         </div>
         <div class="notice" id="auth-notice">等待登录。</div>
         <div class="actions">
@@ -980,6 +1045,7 @@
     const CONFIG_FIELDS = [
       "source_path", "target_path", "openlist_mode", "managed_openlist_bin", "managed_openlist_data_dir",
       "managed_openlist_port", "openlist_url", "openlist_token", "openlist_username", "openlist_password",
+      "managed_openlist_init_username", "managed_openlist_init_password",
       "target_key", "guangya_phone", "guangya_authorization", "guangya_access_token", "guangya_refresh_token",
       "guangya_device_id", "local_target_root", "webdav_target_url", "webdav_target_username", "webdav_target_password", "s3_target_endpoint", "s3_target_bucket", "s3_target_prefix", "s3_target_access_key", "s3_target_secret_key", "s3_target_region", "seafile_target_url", "seafile_target_token", "seafile_target_username", "seafile_target_password", "seafile_target_repo_id", "seafile_target_repo_name", "azureblob_target_account_url", "azureblob_target_container", "azureblob_target_prefix", "azureblob_target_account_name", "azureblob_target_account_key", "smb_target_url", "smb_target_username", "smb_target_password", "ftp_target_url", "ftp_target_username", "ftp_target_password", "sftp_target_url", "sftp_target_username", "sftp_target_password", "delete_removed", "target_delete_removed", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
       "auto_download_threshold_mb", "rate_limit_mode", "log_file", "temp_dir", "state_file",
@@ -996,6 +1062,8 @@
       openlist_token: ["openlist", "token"],
       openlist_username: ["openlist", "username"],
       openlist_password: ["openlist", "password"],
+      managed_openlist_init_username: ["openlist", "managed_init_admin", "username"],
+      managed_openlist_init_password: ["openlist", "managed_init_admin", "password"],
       target_key: ["targets", "active_target"],
       guangya_phone: ["targets", "guangya", "phone"],
       guangya_authorization: ["targets", "guangya", "authorization"],
@@ -1046,8 +1114,9 @@
       app_admin_password: ["app", "admin_password"],
     };
     const CONFIG_FIELD_DEFAULTS = {
-      openlist_mode: "external",
+      openlist_mode: "external_local",
       managed_openlist_port: 5244,
+      managed_openlist_init_username: "admin",
       target_key: "guangya",
       delete_removed: false,
       target_delete_removed: false,
@@ -1096,7 +1165,7 @@
         "panel.provider_capture": "源网盘登录抓取",
         "panel.create_mount": "新增挂载",
         "panel.config": "基础配置",
-        "panel.guangya_auth": "光鸭登录信息",
+        "panel.guangya_auth": "目标端配置",
         "panel.logs": "实时日志",
         "panel.about": "关于与计划",
         "panel.source_profiles": "源端 Profiles",
@@ -1106,6 +1175,7 @@
         "card.runtime": "OpenList Runtime",
         "card.sync": "同步状态",
         "card.capture": "光鸭抓取",
+        "btn.install_runtime": "拉取本机 OpenList 运行时",
         "btn.start_runtime": "启动托管 OpenList",
         "btn.login_openlist": "登录 OpenList 并写回 Token",
         "btn.capture_guangya": "打开光鸭登录并自动抓取",
@@ -1169,6 +1239,8 @@
         "label.managed_openlist_bin": "托管 OpenList 可执行文件",
         "label.managed_openlist_data_dir": "托管 OpenList 数据目录",
         "label.managed_openlist_port": "托管 OpenList 端口",
+        "label.managed_openlist_init_username": "托管初始化管理员账号",
+        "label.managed_openlist_init_password": "托管初始化管理员密码",
         "label.log_file": "日志文件",
         "label.temp_dir": "临时下载目录",
         "label.state_file": "状态文件",
@@ -1228,8 +1300,10 @@
         "btn.export_coverage_md": "导出覆盖审计 Markdown",
         "btn.export_coverage_scaffold_json": "导出待补 Scaffold JSON",
         "btn.export_coverage_scaffold_md": "导出补全任务 Markdown",
-        "option.openlist_mode.external": "外部模式",
-        "option.openlist_mode.managed": "托管模式",
+        "option.openlist_mode.external_local": "外部模式（本机）",
+        "option.openlist_mode.external_remote": "外部模式（远程）",
+        "option.openlist_mode.managed_binary": "托管模式（本机二进制）",
+        "option.openlist_mode.managed_docker_placeholder": "托管模式（Docker 预留）",
         "option.rate_limit_mode.safe": "稳妥",
         "option.rate_limit_mode.balanced": "平衡",
         "option.rate_limit_mode.fast": "快速",
@@ -1258,7 +1332,7 @@
         "panel.provider_capture": "Source Provider Capture",
         "panel.create_mount": "Create Mount",
         "panel.config": "Base Config",
-        "panel.guangya_auth": "Guangya Auth",
+        "panel.guangya_auth": "Target Configuration",
         "panel.logs": "Live Logs",
         "panel.about": "About and Plan",
         "panel.source_profiles": "Source Profiles",
@@ -1269,6 +1343,7 @@
         "card.sync": "Sync Status",
         "card.capture": "Guangya Capture",
         "btn.start_runtime": "Start Managed OpenList",
+        "btn.install_runtime": "Install Local OpenList Runtime",
         "btn.login_openlist": "Login OpenList and Save Token",
         "btn.capture_guangya": "Open Guangya Login Capture",
         "btn.direct_sync": "Sync Current Source",
@@ -1331,6 +1406,8 @@
         "label.managed_openlist_bin": "Managed OpenList Binary",
         "label.managed_openlist_data_dir": "Managed OpenList Data Dir",
         "label.managed_openlist_port": "Managed OpenList Port",
+        "label.managed_openlist_init_username": "Managed Init Admin Username",
+        "label.managed_openlist_init_password": "Managed Init Admin Password",
         "label.log_file": "Log File",
         "label.temp_dir": "Temp Download Dir",
         "label.state_file": "State File",
@@ -1390,14 +1467,160 @@
         "btn.export_coverage_md": "Export Coverage Markdown",
         "btn.export_coverage_scaffold_json": "Export Scaffold JSON",
         "btn.export_coverage_scaffold_md": "Export Task Markdown",
-        "option.openlist_mode.external": "External",
-        "option.openlist_mode.managed": "Managed",
+        "option.openlist_mode.external_local": "External (Local)",
+        "option.openlist_mode.external_remote": "External (Remote)",
+        "option.openlist_mode.managed_binary": "Managed (Binary)",
+        "option.openlist_mode.managed_docker_placeholder": "Managed (Docker Placeholder)",
         "option.rate_limit_mode.safe": "Safe",
         "option.rate_limit_mode.balanced": "Balanced",
         "option.rate_limit_mode.fast": "Fast",
         "option.rate_limit_mode.custom": "Custom"
       },
       mix: {}
+    };
+    const HELP_TEXT = {
+      zh: {
+        panel_overview: "这里看整体运行状态和常用快捷入口，适合先确认 OpenList、目标端和同步状态。",
+        btn_install_runtime: "当你选择本机二进制托管，但当前机器还没有 OpenList 可执行文件时，先用这个按钮拉取本机运行时。",
+        btn_start_runtime: "仅托管模式会用到。由本项目按配置自动拉起 OpenList。",
+        btn_login_openlist: "使用当前填写的 OpenList 地址、用户名和密码登录，并把 Token 写回配置。",
+        btn_capture_guangya: "打开光鸭网页登录抓取，尽量自动补齐 Authorization、access token、refresh token 和 device id。",
+        btn_direct_sync: "立即对当前 source_path 执行一次同步。默认语义是新增 + 覆盖，不会自动删除目标端文件。",
+        panel_current_task: "这里是本次任务最常改的源目录、目标目录和补传阈值设置。",
+        source_path: "真正参与扫描和同步的源目录。可手填，也可从目录浏览或挂载下拉写入。",
+        target_path: "目标端保存目录。源目录内容会按相对路径映射到这里。",
+        mounted_source_select: "从当前 OpenList 已挂载目录里选一个入口，再写回 source_path。",
+        effective_openlist_url: "当前实际正在使用的 OpenList 地址。托管模式下可能和手填地址不同。",
+        auto_download_threshold_mb: "秒传未命中的文件，小于等于这个值会自动走下载后上传。设为 0 表示只记录待补传，不自动补。",
+        btn_save_task_config: "保存当前任务相关配置，不用滚动到底部再统一保存。",
+        btn_use_mounted_source: "把当前下拉选中的挂载目录直接写入 source_path。",
+        panel_source_browser: "用于浏览 OpenList 目录并快速定位 source_path，本身不会开始同步。",
+        btn_browse_root: "回到 OpenList 挂载根目录重新选路径。",
+        btn_browse_up: "回到当前浏览目录的上一级。",
+        btn_browse_refresh: "重新读取当前目录列表。",
+        btn_use_current_dir: "把当前浏览到的目录直接设为 source_path。",
+        panel_source_analyze: "先只分析元数据，不真正上传。适合先判断当前目录有没有 MD5、GCID 等快传条件。",
+        btn_analyze_source: "统计当前目录的文件数、MD5/GCID 可用性和 provider 分布。",
+        btn_build_source_miaochuan: "基于当前目录元数据生成一份可继续导入的秒传 JSON 预览。",
+        panel_sync_actions: "正式执行区。这里的动作会真正启动同步或队列任务。",
+        btn_run_dry: "只生成计划，不实际上传，适合先看会改哪些文件。",
+        btn_run_next_queue: "按目录队列顺序，只执行下一个启用项。",
+        btn_run_all_queue: "连续执行目录队列里的所有启用项。",
+        panel_leaf_mode: "大目录慢跑模式。会下钻到最底层目录后逐个执行，通常更稳。",
+        btn_add_current_queue: "把当前目录作为一个队列任务加入。",
+        btn_add_leaf_queue: "扫描当前目录下面所有叶子目录，再批量加入队列。",
+        btn_run_leaf_direct: "扫描到一个最底层目录就立即同步一个，然后继续下一个。",
+        btn_run_leaf_full: "最底层目录立即同步；秒传未命中时，也允许按阈值走补传。",
+        panel_pending_tree: "这里管理所有待补传文件，按真实目录树显示，可按目录联动勾选。",
+        btn_pending_run_selected: "仅对当前勾选的文件执行补传。",
+        btn_pending_run_stream: "按勾选目录的最底层顺序逐批补传，更适合多目录慢跑。",
+        panel_miaochuan: "适合已经拿到外部插件或脚本导出的秒传 JSON 时直接导入。",
+        miaochuan_payload: "把外部导出的秒传 JSON 粘贴在这里，通常包含 path、size、etag 等快传字段。",
+        btn_diagnose_miaochuan: "先检查这份 JSON 是否格式正确、包含多少可用条目。",
+        btn_run_miaochuan: "直接把当前 JSON 交给目标端处理。",
+        panel_provider_capture: "源网盘网页登录抓取区。适合还没挂载，或想先抓 Cookie/Token/Header 再回填挂载表单。",
+        provider_select: "选择你要抓登录态的源网盘类型。",
+        provider_login_url: "默认会给推荐登录页；如果你更清楚实际登录入口，也可以手工改成那个地址。",
+        btn_start_provider_capture: "打开网页并尝试抓取登录态。部分驱动会退化成手动凭证模式。",
+        btn_show_provider_guide: "查看当前源网盘的接入流程、字段说明和文档入口。",
+        btn_apply_provider_fields: "把刚抓到的字段尽量自动回填到下面的挂载创建表单里。",
+        panel_create_mount: "根据 OpenList 驱动动态生成挂载字段，用来新建一个源挂载。",
+        driver_select: "选择 OpenList 驱动类型，下面会动态加载该驱动的字段和默认值。",
+        btn_show_driver_guide: "打开当前驱动的接入说明。",
+        btn_apply_driver_defaults: "把内置的保守默认值直接回填到当前驱动表单。",
+        btn_create_storage: "把当前驱动字段提交给 OpenList，正式创建挂载。",
+        panel_config: "全局基础配置区，影响 OpenList 连接方式、频率控制和状态文件位置。",
+        openlist_mode: "现在分为外部本机、外部远程、本机二进制托管和 Docker 预留模式。切模式后，会切换到各自独立保存的连接快照。",
+        rate_limit_mode: "不同预设会自动套用分页大小和间隔。safe 最稳，fast 最激进。",
+        openlist_url: "外部模式下通常填现有 OpenList 地址；托管模式下实际以托管实例地址为准。",
+        openlist_token: "如果你已经有可直接使用的 OpenList Token，可填这里；否则可用用户名密码登录自动回写。",
+        openlist_username: "用于 OpenList 登录获取 Token 的用户名。",
+        openlist_password: "与 OpenList 用户名配套，用于自动登录和写回 Token。",
+        managed_openlist_bin: "托管模式要启动的 OpenList 可执行文件路径。",
+        managed_openlist_data_dir: "托管 OpenList 的工作数据目录，通常会保存它自己的配置和数据库。",
+        managed_openlist_port: "托管模式启动的 OpenList 监听端口，别和现有端口冲突。",
+        managed_openlist_init_username: "仅用于托管初始化说明的管理员账号，不等同于当前连接凭证。",
+        managed_openlist_init_password: "如果留空，后端会把它视为“尚未明确设置初始化密码”，并在状态区提醒。",
+        app_admin_username: "CloudPan Bridge 控制台自己的管理员账号。留空表示不启用控制台登录保护。",
+        app_admin_password: "CloudPan Bridge 控制台自己的管理员密码。用户名和密码都填写时才启用登录保护。",
+        log_file: "本项目实时日志文件路径。右侧日志抽屉显示的内容主要来自这里。",
+        temp_dir: "下载补传时的临时缓存目录。",
+        state_file: "同步状态、待补传和目录队列等持久化信息保存位置。",
+        openlist_page_size: "每次向 OpenList 列目录时请求的条目数。越大越快，但也更容易触发风控。",
+        openlist_request_interval_ms: "两次 OpenList 请求之间的等待间隔，单位毫秒。",
+        queue_interval_ms: "目录之间执行的等待间隔，单位毫秒。大目录慢跑时很关键。"
+      },
+      en: {
+        panel_overview: "Runtime overview and quick entry points for OpenList, target auth, and sync state.",
+        btn_install_runtime: "When managed binary mode is selected but no local OpenList executable is available, use this to fetch a local runtime first.",
+        btn_start_runtime: "Used in managed mode to launch OpenList from the configured binary and data directory.",
+        btn_login_openlist: "Login with the current OpenList URL, username, and password, then save the token back to config.",
+        btn_capture_guangya: "Open Guangya login capture and try to collect authorization, access token, refresh token, and device id.",
+        btn_direct_sync: "Run a sync on the current source_path now. Default behavior is add + overwrite without deleting target files.",
+        panel_current_task: "Core task settings for this run: source directory, target path, and reupload threshold.",
+        source_path: "The real source directory to scan and sync.",
+        target_path: "The destination path on the active target adapter.",
+        mounted_source_select: "Choose an existing mounted source root from OpenList and write it into source_path.",
+        effective_openlist_url: "The actual OpenList endpoint currently in use.",
+        auto_download_threshold_mb: "Files at or below this size auto fallback to download-upload when fast upload misses. Set 0 to only record them as pending.",
+        btn_save_task_config: "Save the task-related fields here without scrolling to the global save button.",
+        btn_use_mounted_source: "Write the selected mounted source into source_path.",
+        panel_source_browser: "Browse OpenList directories and locate the source path without starting sync.",
+        btn_browse_root: "Jump back to the OpenList mount root.",
+        btn_browse_up: "Go to the parent directory.",
+        btn_browse_refresh: "Reload the current directory listing.",
+        btn_use_current_dir: "Use the current browsed directory as source_path.",
+        panel_source_analyze: "Analyze metadata first without uploading anything.",
+        btn_analyze_source: "Collect file counts, MD5/GCID availability, and provider distribution.",
+        btn_build_source_miaochuan: "Build a flash-upload JSON preview from the current source metadata.",
+        panel_sync_actions: "Actual execution area. Actions here start real sync or queue tasks.",
+        btn_run_dry: "Generate the plan only without uploading.",
+        btn_run_next_queue: "Run only the next enabled queue item.",
+        btn_run_all_queue: "Run all enabled queue items in order.",
+        panel_leaf_mode: "Leaf-directory mode for large trees. Usually slower but safer.",
+        btn_add_current_queue: "Add the current directory as one queue job.",
+        btn_add_leaf_queue: "Scan all leaf directories under the current path and add them to the queue.",
+        btn_run_leaf_direct: "When a leaf directory is found, sync it immediately, then continue.",
+        btn_run_leaf_full: "Leaf sync mode with fallback reupload allowed.",
+        panel_pending_tree: "Manage pending reupload files as a real directory tree.",
+        btn_pending_run_selected: "Run reupload only for the selected files.",
+        btn_pending_run_stream: "Run reupload leaf-by-leaf following the selected directory order.",
+        panel_miaochuan: "Use this when you already have a flash-upload JSON from an external script or plugin.",
+        miaochuan_payload: "Paste the exported flash-upload JSON here.",
+        btn_diagnose_miaochuan: "Validate the JSON and preview usable items first.",
+        btn_run_miaochuan: "Submit the current JSON directly to the target side.",
+        panel_provider_capture: "Web-login capture area for source providers.",
+        provider_select: "Choose which source provider login state you want to capture.",
+        provider_login_url: "A recommended login page is provided by default, but you can replace it with a more exact one.",
+        btn_start_provider_capture: "Open the login page and try to capture credentials.",
+        btn_show_provider_guide: "Show onboarding guide and docs for the current source provider.",
+        btn_apply_provider_fields: "Apply the captured fields into the mount form below.",
+        panel_create_mount: "Create a new source mount using OpenList driver fields.",
+        driver_select: "Choose an OpenList driver type. The form below updates dynamically.",
+        btn_show_driver_guide: "Open the current driver's setup guide.",
+        btn_apply_driver_defaults: "Apply built-in conservative defaults to the current driver form.",
+        btn_create_storage: "Submit the current driver form to OpenList and create the mount.",
+        panel_config: "Global settings for connection mode, throttling, and state files.",
+        openlist_mode: "Modes are split into external local, external remote, managed binary, and a Docker placeholder. Each mode keeps its own connection snapshot.",
+        rate_limit_mode: "Each preset adjusts page size and request intervals. safe is most conservative; fast is most aggressive.",
+        openlist_url: "Usually the URL of your external OpenList. In managed mode the actual runtime URL may differ.",
+        openlist_token: "If you already have a usable OpenList token, put it here. Otherwise login and write it back automatically.",
+        openlist_username: "OpenList username used to obtain a token.",
+        openlist_password: "Password paired with the OpenList username.",
+        managed_openlist_bin: "Executable path used in managed mode.",
+        managed_openlist_data_dir: "Data directory for managed OpenList.",
+        managed_openlist_port: "Listening port for managed OpenList.",
+        managed_openlist_init_username: "Initialization-only admin username for managed mode. It is not the same thing as the current connection credential.",
+        managed_openlist_init_password: "If blank, the backend treats it as not explicitly set yet and will warn in runtime status.",
+        app_admin_username: "Admin username for the CloudPan Bridge console itself. Leave blank to disable console login protection.",
+        app_admin_password: "Admin password for the CloudPan Bridge console itself. Protection is enabled only when both fields are filled.",
+        log_file: "Runtime log file path used by the live log drawer.",
+        temp_dir: "Temporary cache directory for download-upload fallback.",
+        state_file: "Persistent state for sync history, pending items, and queue progress.",
+        openlist_page_size: "Number of entries requested from OpenList per page.",
+        openlist_request_interval_ms: "Delay between OpenList requests in milliseconds.",
+        queue_interval_ms: "Delay between directory jobs in milliseconds."
+      }
     };
     const DRIVER_FIELD_I18N = {
       mountpath: { zh: "挂载路径", en: "Mount Path" },
@@ -1509,6 +1732,10 @@
       document.getElementById("auth-dialog").classList.add("hidden");
     }
 
+    function setAppLockedState(locked) {
+      document.body.classList.toggle("auth-locked", Boolean(locked));
+    }
+
     function stopAutoRefresher() {
       if (autoRefresher) {
         clearInterval(autoRefresher);
@@ -1542,6 +1769,7 @@
       }
       if (loginBtn) loginBtn.classList.toggle("hidden", authState.enabled && authState.authenticated);
       if (logoutBtn) logoutBtn.classList.toggle("hidden", !authState.enabled || !authState.authenticated);
+      setAppLockedState(authState.enabled && !authState.authenticated);
     }
 
     async function fetchAuthStatus() {
@@ -1573,10 +1801,12 @@
       if (status.enabled && !status.authenticated) {
         stopAutoRefresher();
         appBootstrapped = false;
+        setAppLockedState(true);
         showAuthDialog("控制台已开启登录保护，请先登录。");
         return false;
       }
       hideAuthDialog();
+      setAppLockedState(false);
       await bootstrapProtectedApp(forceReload);
       return true;
     }
@@ -1643,6 +1873,109 @@
         }
         setGroupedConfigValue(path, value);
       }
+    }
+
+    function normalizeOpenListMode(mode) {
+      const normalized = String(mode || "").trim().toLowerCase();
+      if (normalized === "external") return "external_local";
+      if (normalized === "managed") return "managed_binary";
+      return normalized || "external_local";
+    }
+
+    function isManagedOpenListMode(mode) {
+      return normalizeOpenListMode(mode).startsWith("managed_");
+    }
+
+    function getOpenListConnectionGroupedPath(mode) {
+      const normalized = normalizeOpenListMode(mode);
+      if (normalized === "external_remote") return ["openlist", "connections", "external_remote"];
+      if (normalized === "managed_binary" || normalized === "managed_docker_placeholder") return ["openlist", "connections", "managed_binary"];
+      return ["openlist", "connections", "external_local"];
+    }
+
+    function getOpenListModeLabel(mode) {
+      const normalized = normalizeOpenListMode(mode);
+      const labels = {
+        external_local: currentLang() === "en" ? "External (Local)" : currentLang() === "mix" ? "外部模式（本机） / External (Local)" : "外部模式（本机）",
+        external_remote: currentLang() === "en" ? "External (Remote)" : currentLang() === "mix" ? "外部模式（远程） / External (Remote)" : "外部模式（远程）",
+        managed_binary: currentLang() === "en" ? "Managed (Binary)" : currentLang() === "mix" ? "托管模式（本机二进制） / Managed (Binary)" : "托管模式（本机二进制）",
+        managed_docker_placeholder: currentLang() === "en" ? "Managed (Docker Placeholder)" : currentLang() === "mix" ? "托管模式（Docker 预留） / Managed (Docker Placeholder)" : "托管模式（Docker 预留）",
+      };
+      return labels[normalized] || normalized;
+    }
+
+    function readOpenListSnapshotFromGrouped(mode) {
+      const connectionPath = getOpenListConnectionGroupedPath(mode);
+      const connection = getGroupedConfigValue(connectionPath, {}) || {};
+      const managedRuntime = getGroupedConfigValue(["openlist", "managed_runtime"], {}) || {};
+      const managedInitAdmin = getGroupedConfigValue(["openlist", "managed_init_admin"], {}) || {};
+      return {
+        openlist_url: normalizeOpenListMode(mode) === "external_remote"
+          ? String(connection.url || "")
+          : String(connection.url || "http://127.0.0.1:5244"),
+        openlist_token: String(connection.token || ""),
+        openlist_username: String(connection.username || "admin"),
+        openlist_password: String(connection.password || ""),
+        managed_openlist_bin: String(managedRuntime.bin || ""),
+        managed_openlist_data_dir: String(managedRuntime.data_dir || ".runtime/openlist"),
+        managed_openlist_port: String(managedRuntime.port || 5244),
+        managed_openlist_init_username: String(managedInitAdmin.username || "admin"),
+        managed_openlist_init_password: String(managedInitAdmin.password || ""),
+      };
+    }
+
+    function applyOpenListModeSnapshot(mode) {
+      const snapshot = readOpenListSnapshotFromGrouped(mode);
+      Object.entries(snapshot).forEach(([field, value]) => {
+        const el = document.getElementById(field);
+        if (el) el.value = value;
+      });
+      applyOpenListModeUi();
+    }
+
+    function persistCurrentOpenListModeSnapshot(mode) {
+      const normalized = normalizeOpenListMode(mode);
+      const connectionPath = getOpenListConnectionGroupedPath(normalized);
+      const connectionPayload = {
+        url: String(document.getElementById("openlist_url")?.value || ""),
+        token: String(document.getElementById("openlist_token")?.value || ""),
+        username: String(document.getElementById("openlist_username")?.value || "admin"),
+        password: String(document.getElementById("openlist_password")?.value || ""),
+      };
+      if (normalized !== "external_remote" && !connectionPayload.url) {
+        connectionPayload.url = "http://127.0.0.1:5244";
+      }
+      setGroupedConfigValue(connectionPath, connectionPayload);
+      setGroupedConfigValue(["openlist", "managed_runtime"], {
+        bin: String(document.getElementById("managed_openlist_bin")?.value || ""),
+        data_dir: String(document.getElementById("managed_openlist_data_dir")?.value || ".runtime/openlist"),
+        port: normalizeFormValue("managed_openlist_port", document.getElementById("managed_openlist_port")?.value || 5244),
+      });
+      setGroupedConfigValue(["openlist", "managed_init_admin"], {
+        username: String(document.getElementById("managed_openlist_init_username")?.value || "admin"),
+        password: String(document.getElementById("managed_openlist_init_password")?.value || ""),
+      });
+    }
+
+    function applyOpenListModeUi() {
+      const mode = normalizeOpenListMode(document.getElementById("openlist_mode")?.value || "external_local");
+      const runtimeManaged = isManagedOpenListMode(mode);
+      const urlLabel = document.querySelector('label[data-help-key="openlist_url"]');
+      if (urlLabel) {
+        urlLabel.textContent = runtimeManaged
+          ? (currentLang() === "en" ? "Current OpenList URL" : currentLang() === "mix" ? "当前 OpenList 地址 / Current OpenList URL" : "当前 OpenList 地址")
+          : (currentLang() === "en" ? "OpenList URL" : currentLang() === "mix" ? "OpenList 地址 / OpenList URL" : "OpenList 地址");
+      }
+      document.querySelectorAll("[data-managed-only]").forEach((el) => {
+        el.classList.toggle("hidden", !runtimeManaged);
+      });
+      document.querySelectorAll("[data-external-only]").forEach((el) => {
+        el.classList.toggle("hidden", runtimeManaged);
+      });
+      const installBtn = document.getElementById("install-runtime");
+      if (installBtn) installBtn.classList.toggle("hidden", mode !== "managed_binary");
+      const runtimeBtn = document.getElementById("start-runtime");
+      if (runtimeBtn) runtimeBtn.classList.toggle("hidden", mode === "managed_docker_placeholder");
     }
 
     function getConfigFieldValue(config, field) {
@@ -2113,6 +2446,32 @@
       return I18N[lang]?.[key] || I18N.zh[key] || key;
     }
 
+    function helpText(key) {
+      const lang = currentLang();
+      if (lang === "mix") {
+        const zh = HELP_TEXT.zh[key] || "";
+        const en = HELP_TEXT.en[key] || "";
+        return zh && en ? `${zh} / ${en}` : (zh || en || "");
+      }
+      return HELP_TEXT[lang]?.[key] || HELP_TEXT.zh[key] || HELP_TEXT.en[key] || "";
+    }
+
+    function applyHelpTips() {
+      document.querySelectorAll("[data-help-key]").forEach((el) => {
+        const key = el.getAttribute("data-help-key");
+        if (!key) return;
+        const text = helpText(key).trim();
+        if (text) {
+          el.setAttribute("title", text);
+          if (["BUTTON", "LABEL", "H2", "H3", "SPAN", "DIV"].includes(el.tagName)) {
+            el.style.cursor = "help";
+          }
+        } else {
+          el.removeAttribute("title");
+        }
+      });
+    }
+
     function applyI18n() {
       document.querySelectorAll("[data-i18n]").forEach((el) => {
         const key = el.getAttribute("data-i18n");
@@ -2136,6 +2495,7 @@
         renderProviderOptions(providerDefinitions);
         renderProviderCapturePanel();
       }
+      applyHelpTips();
       renderTargetSpecificControls();
       renderCapabilitySummary();
       renderAboutRegistry();
@@ -3116,6 +3476,7 @@
 
     function getConfigFromForm() {
       const payload = { ...configCache };
+      const currentMode = normalizeOpenListMode(document.getElementById("openlist_mode")?.value || "external_local");
       for (const field of CONFIG_FIELDS) {
         const el = document.getElementById(field);
         if (!el) continue;
@@ -3124,8 +3485,15 @@
       payload.grouped_config = payload.grouped_config && typeof payload.grouped_config === "object" ? payload.grouped_config : {};
       configCache = payload;
       syncConfigFieldsToGrouped(payload);
+      persistCurrentOpenListModeSnapshot(currentMode);
+      setGroupedConfigValue(["openlist", "mode"], currentMode);
+      setGroupedConfigValue(["openlist", "url"], String(document.getElementById("openlist_url")?.value || ""));
+      setGroupedConfigValue(["openlist", "token"], String(document.getElementById("openlist_token")?.value || ""));
+      setGroupedConfigValue(["openlist", "username"], String(document.getElementById("openlist_username")?.value || "admin"));
+      setGroupedConfigValue(["openlist", "password"], String(document.getElementById("openlist_password")?.value || ""));
       setGroupedConfigValue(["ui", "panel_open_states"], getPanelState());
       payload.grouped_config = configCache.grouped_config;
+      payload.openlist_mode = currentMode;
       return payload;
     }
 
@@ -3152,6 +3520,7 @@
           el.value = value ?? "";
         }
       }
+      applyOpenListModeSnapshot(config?.openlist_mode || document.getElementById("openlist_mode")?.value || "external_local");
       document.getElementById("effective_openlist_url").value = config?.effective_openlist_url || "";
       applySavedCoverageFilters();
       const langSelect = document.getElementById("ui_language");
@@ -3181,6 +3550,29 @@
       applyConfigToForm(data);
       applyI18n();
       return data;
+    }
+
+    async function getRuntimeStatus() {
+      return await call("/api/openlist/runtime/status");
+    }
+
+    async function installManagedRuntimeWithPrompt(runtimeStatus = null) {
+      const status = runtimeStatus || await getRuntimeStatus();
+      if (!status?.install_required) return status;
+      const message = currentLang() === "en"
+        ? "No local OpenList runtime was found. Download it now? If you cancel, switch to an external local or remote mode."
+        : currentLang() === "mix"
+          ? "当前未检测到本机 OpenList 运行时，是否现在拉取？如果取消，请改用外部本机或远程模式。 / Download now?"
+          : "当前未检测到本机 OpenList 运行时，是否现在拉取？如果取消，请改用外部本机或远程模式。";
+      const accepted = window.confirm(message);
+      if (!accepted) {
+        setNotice("runtime-action-notice", currentLang() === "en" ? "Runtime installation was declined. Switch to an external mode to continue." : currentLang() === "mix" ? "已拒绝拉取本机运行时，请改用外部模式。 / Runtime install declined." : "已拒绝拉取本机运行时，请改用外部模式。");
+        return status;
+      }
+      const installed = await call("/api/openlist/runtime/install", { method: "POST" });
+      renderRuntime(installed);
+      await loadConfig();
+      return installed;
     }
 
     async function ensureDirectoryBrowserReady(force = false) {
@@ -3256,13 +3648,29 @@
     }
 
     function renderRuntime(runtime) {
+      const runtimeMode = runtime?.mode_label || getOpenListModeLabel(runtime?.mode || document.getElementById("openlist_mode")?.value);
+      const canInstall = Boolean(runtime?.install_required);
+      const yesText = currentLang() === "en" ? "yes" : currentLang() === "mix" ? "是 / yes" : "是";
+      const noText = currentLang() === "en" ? "no" : currentLang() === "mix" ? "否 / no" : "否";
       document.getElementById("runtime-summary").innerHTML = `
-        <div class="badge">${escapeHtml(runtime?.mode || "-")}</div>
+        <div class="badge">${escapeHtml(runtimeMode || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Configured" : currentLang() === "mix" ? "配置地址 / Configured" : "配置地址"}: ${escapeHtml(runtime?.configured_url || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Active" : currentLang() === "mix" ? "实际地址 / Active" : "实际地址"}: ${escapeHtml(runtime?.active_url || "-")}</div>
-        <div class="mono">${currentLang() === "en" ? "Running" : currentLang() === "mix" ? "运行状态 / Running" : "运行状态"}: ${runtime?.running ? "yes" : "no"} ${runtime?.pid ? `(pid ${runtime.pid})` : ""}</div>
+        <div class="mono">${currentLang() === "en" ? "Running" : currentLang() === "mix" ? "运行状态 / Running" : "运行状态"}: ${runtime?.running ? yesText : noText} ${runtime?.pid ? `(pid ${runtime.pid})` : ""}</div>
+        <div class="mono">${currentLang() === "en" ? "Binary" : currentLang() === "mix" ? "可执行文件 / Binary" : "可执行文件"}: ${escapeHtml(runtime?.binary || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Data dir" : currentLang() === "mix" ? "数据目录 / Data dir" : "数据目录"}: ${escapeHtml(runtime?.data_dir || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Docker CLI" : currentLang() === "mix" ? "Docker CLI / Docker CLI" : "Docker CLI"}: ${escapeHtml(runtime?.docker_cli || "-")} ${runtime?.docker_available ? "" : `(${currentLang() === "en" ? "missing" : currentLang() === "mix" ? "未检测到 / missing" : "未检测到"})`}</div>
+        <div class="mono">${currentLang() === "en" ? "Install required" : currentLang() === "mix" ? "需要拉取 / Install required" : "需要拉取"}: ${canInstall ? yesText : noText}</div>
         <div class="mono">${escapeHtml(runtime?.message || "")}</div>
+        ${runtime?.suggested_action ? `<div class="mono">${escapeHtml(runtime.suggested_action)}</div>` : ""}
       `;
+      const noticeEl = document.getElementById("runtime-action-notice");
+      if (noticeEl) {
+        noticeEl.textContent = runtime?.message || (currentLang() === "en" ? "Runtime status is ready." : currentLang() === "mix" ? "运行时状态已更新。 / Runtime status is ready." : "运行时状态已更新。");
+      }
+      const installBtn = document.getElementById("install-runtime");
+      if (installBtn) installBtn.disabled = !canInstall;
+      applyOpenListModeUi();
     }
 
     function renderCapture(capture, targetStateSummary = null) {
@@ -3947,6 +4355,14 @@
         const selected = document.getElementById("mounted_source_select").value || document.getElementById("source_path").value || "/";
         applyRatePresetForMount(selected);
       });
+      document.getElementById("openlist_mode").addEventListener("change", async (event) => {
+        const nextMode = normalizeOpenListMode(event.target.value || "external_local");
+        persistCurrentOpenListModeSnapshot(getGroupedConfigValue(["openlist", "mode"], "external_local"));
+        setGroupedConfigValue(["openlist", "mode"], nextMode);
+        applyOpenListModeSnapshot(nextMode);
+        await saveConfig();
+        await refreshStatus();
+      });
       document.getElementById("use-mounted-source").onclick = withBusy("use-mounted-source", "处理中...", async () => {
         const selected = document.getElementById("mounted_source_select").value || "/";
         setGroupedConfigValue(["ui", "browser", "mounted_source"], selected);
@@ -3956,7 +4372,20 @@
         setNotice("dir-notice", `已切换到挂载源目录: ${selected}`);
       });
 
+      document.getElementById("install-runtime").onclick = withBusy("install-runtime", "拉取中...", async () => {
+        const installed = await installManagedRuntimeWithPrompt(await getRuntimeStatus());
+        if (installed) {
+          renderRuntime(installed);
+          await refreshStatus();
+        }
+      });
       document.getElementById("start-runtime").onclick = withBusy("start-runtime", "启动中...", async () => {
+        const status = await getRuntimeStatus();
+        const maybeInstalled = await installManagedRuntimeWithPrompt(status);
+        if (maybeInstalled?.install_required) {
+          renderRuntime(maybeInstalled);
+          return;
+        }
         const data = await call("/api/openlist/runtime/start", { method: "POST" });
         renderRuntime(data);
         await loadConfig();

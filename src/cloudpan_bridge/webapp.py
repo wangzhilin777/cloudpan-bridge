@@ -167,6 +167,8 @@ def create_app(config_path: Path) -> FastAPI:
         data_dir=config.managed_openlist_data_dir,
         binary_path=config.managed_openlist_bin,
         port=config.managed_openlist_port,
+        init_admin_username=config.managed_openlist_init_username,
+        init_admin_password=config.managed_openlist_init_password,
     )
     auth_cookie_name = "cpb_session"
     auth_sessions: set[str] = set()
@@ -207,18 +209,20 @@ def create_app(config_path: Path) -> FastAPI:
         runtime.data_dir = config.managed_openlist_data_dir
         runtime.binary_path = config.managed_openlist_bin
         runtime.port = config.managed_openlist_port
+        runtime.init_admin_username = str(config.managed_openlist_init_username or "admin").strip() or "admin"
+        runtime.init_admin_password = str(config.managed_openlist_init_password or "")
         runtime.data_dir.mkdir(parents=True, exist_ok=True)
         return runtime
 
     def effective_openlist_url() -> str:
         current_runtime = refresh_runtime()
-        if config.openlist_mode == "managed":
+        if AppConfig.is_managed_openlist_mode(config.openlist_mode):
             return current_runtime.active_url()
         return config.openlist_url.rstrip("/")
 
     def ensure_runtime_ready() -> None:
         current_runtime = refresh_runtime()
-        if config.openlist_mode == "managed":
+        if AppConfig.is_managed_openlist_mode(config.openlist_mode):
             status = current_runtime.start()
             if not status.running:
                 raise RuntimeError(status.message or "Managed OpenList 启动失败")
@@ -704,7 +708,7 @@ def create_app(config_path: Path) -> FastAPI:
             if active_source:
                 logger.info(f"本次同步源目录: {active_source}")
             run_config = AppConfig.load(config_path)
-            if run_config.openlist_mode == "managed":
+            if AppConfig.is_managed_openlist_mode(run_config.openlist_mode):
                 ensure_runtime_ready()
                 run_config.openlist_url = effective_openlist_url()
             run_config.source_path = active_source
@@ -1265,6 +1269,16 @@ def create_app(config_path: Path) -> FastAPI:
     def openlist_login(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         nonlocal config
         payload = payload or {}
+        runtime_mode = AppConfig.normalize_openlist_mode(
+            str(resolve_payload_value(payload, "openlist_mode", ("openlist", "mode"), config.openlist_mode))
+        )
+        connection_path = (
+            ("openlist", "connections", "external_remote")
+            if runtime_mode == "external_remote"
+            else ("openlist", "connections", "managed_binary")
+            if AppConfig.is_managed_openlist_mode(runtime_mode)
+            else ("openlist", "connections", "external_local")
+        )
         client = OpenListClient(
             base_url=str(resolve_payload_value(payload, "openlist_url", ("openlist", "url"), config.openlist_url)),
             username=str(resolve_payload_value(payload, "openlist_username", ("openlist", "username"), config.openlist_username)),
@@ -1277,9 +1291,13 @@ def create_app(config_path: Path) -> FastAPI:
                 ("openlist", "url"): client.base_url,
                 ("openlist", "username"): client.username,
                 ("openlist", "token"): client.token,
+                (*connection_path, "url"): client.base_url,
+                (*connection_path, "username"): client.username,
+                (*connection_path, "token"): client.token,
             }
             if resolve_payload_value(payload, "openlist_password", ("openlist", "password"), ""):
                 updates[("openlist", "password")] = client.password
+                updates[(*connection_path, "password")] = client.password
             save_grouped_config_updates(updates)
             config = AppConfig.load(config_path)
             logger.info("OpenList 登录成功，token 已写回配置")
@@ -1294,10 +1312,28 @@ def create_app(config_path: Path) -> FastAPI:
     def get_openlist_runtime_status() -> dict[str, Any]:
         return refresh_runtime().status().to_dict()
 
+    @app.post("/api/openlist/runtime/install")
+    def install_openlist_runtime() -> dict[str, Any]:
+        nonlocal config
+        current_runtime = refresh_runtime()
+        try:
+            status = current_runtime.install_binary()
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"OpenList runtime 拉取失败: {exc}")
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        updates = {
+            ("openlist", "managed_runtime", "bin"): status.binary,
+        }
+        if save_grouped_config_updates(retain_explicit_grouped_updates(updates)):
+            config = AppConfig.load(config_path)
+        logger.info(f"OpenList runtime 已就绪: {status.binary}")
+        return status.to_dict()
+
     @app.post("/api/openlist/runtime/start")
     def start_openlist_runtime() -> dict[str, Any]:
         status = refresh_runtime().start()
-        if not status.running and config.openlist_mode == "managed":
+        if not status.running and AppConfig.is_managed_openlist_mode(config.openlist_mode):
+            logger.error(f"OpenList runtime 启动失败: {status.message}")
             raise HTTPException(status_code=400, detail=status.message or "Managed OpenList 启动失败")
         if status.running:
             logger.info(f"OpenList runtime 已就绪: {status.active_url}")
@@ -1473,7 +1509,7 @@ def create_app(config_path: Path) -> FastAPI:
         payload = payload or {}
         source_path = str(resolve_payload_value(payload, "source_path", ("sync", "source_path"), config.source_path or "/")).strip()
         run_config = AppConfig.load(config_path)
-        if run_config.openlist_mode == "managed":
+        if AppConfig.is_managed_openlist_mode(run_config.openlist_mode):
             ensure_runtime_ready()
             run_config.openlist_url = effective_openlist_url()
         run_config.source_path = "/" + source_path.lstrip("/")
@@ -1498,7 +1534,7 @@ def create_app(config_path: Path) -> FastAPI:
         payload = payload or {}
         source_path = str(resolve_payload_value(payload, "source_path", ("sync", "source_path"), config.source_path or "/")).strip()
         run_config = AppConfig.load(config_path)
-        if run_config.openlist_mode == "managed":
+        if AppConfig.is_managed_openlist_mode(run_config.openlist_mode):
             ensure_runtime_ready()
             run_config.openlist_url = effective_openlist_url()
         run_config.source_path = "/" + source_path.lstrip("/")

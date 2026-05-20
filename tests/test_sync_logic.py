@@ -12,6 +12,7 @@ from cloudpan_bridge.guangya import GuangyaService
 from cloudpan_bridge.models import DirectImportResult, PendingFileState, QueueItemState, SourceEntry, SyncFileState, SyncPlanItem, SyncState, normalize_posix_path
 from cloudpan_bridge.openlist_admin import OpenListDriverField, OpenListDriverInfo, build_storage_payload
 from cloudpan_bridge.openlist import OpenListClient
+from cloudpan_bridge.openlist_runtime import ManagedOpenListRuntime
 from cloudpan_bridge.provider_capture import (
     build_capture_alias_to_spec_key_map,
     build_capture_supported_driver_aliases,
@@ -36,6 +37,90 @@ from cloudpan_bridge.webapp import (
     compute_rate_limit_cooldown_ms,
     is_rate_limit_error_message,
 )
+
+
+def test_openlist_mode_snapshots_are_loaded_per_profile() -> None:
+    cfg = AppConfig.from_payload(
+        {
+            "openlist": {
+                "mode": "external_remote",
+                "connections": {
+                    "external_local": {
+                        "url": "http://127.0.0.1:5244",
+                        "username": "local-admin",
+                    },
+                    "external_remote": {
+                        "url": "https://demo.example.com",
+                        "token": "remote-token",
+                        "username": "remote-admin",
+                        "password": "remote-pass",
+                    },
+                    "managed_binary": {
+                        "username": "managed-admin",
+                        "password": "managed-pass",
+                    },
+                },
+                "managed_init_admin": {
+                    "username": "bootstrap-admin",
+                    "password": "bootstrap-pass",
+                },
+            }
+        }
+    )
+    assert cfg.openlist_mode == "external_remote"
+    assert cfg.openlist_url == "https://demo.example.com"
+    assert cfg.openlist_token == "remote-token"
+    assert cfg.openlist_username == "remote-admin"
+    assert cfg.external_local_openlist_username == "local-admin"
+    assert cfg.managed_openlist_username == "managed-admin"
+    assert cfg.managed_openlist_init_username == "bootstrap-admin"
+
+
+def test_managed_runtime_status_requires_install_when_binary_missing(tmp_path: Path) -> None:
+    runtime = ManagedOpenListRuntime(
+        mode="managed_binary",
+        configured_url="http://127.0.0.1:5244",
+        data_dir=tmp_path / "runtime",
+        binary_path="",
+        port=5244,
+    )
+    status = runtime.status()
+    assert status.mode == "managed_binary"
+    assert status.install_required is True
+    assert status.binary_exists is False
+    assert "拉取" in status.message
+
+
+def test_managed_docker_placeholder_reports_not_implemented_without_docker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("cloudpan_bridge.openlist_runtime.shutil.which", lambda _name: "")
+    runtime = ManagedOpenListRuntime(
+        mode="managed_docker_placeholder",
+        configured_url="http://127.0.0.1:5244",
+        data_dir=tmp_path / "runtime",
+        binary_path="",
+        port=5244,
+    )
+    status = runtime.status()
+    assert status.mode == "managed_docker_placeholder"
+    assert status.install_required is False
+    assert status.can_start is False
+    assert status.docker_available is False
+    assert "未检测到本机 Docker" in status.message
+
+
+def test_managed_docker_placeholder_reports_detected_docker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("cloudpan_bridge.openlist_runtime.shutil.which", lambda _name: r"C:\Program Files\Docker\docker.exe")
+    runtime = ManagedOpenListRuntime(
+        mode="managed_docker_placeholder",
+        configured_url="http://127.0.0.1:5244",
+        data_dir=tmp_path / "runtime",
+        binary_path="",
+        port=5244,
+    )
+    status = runtime.status()
+    assert status.docker_available is True
+    assert status.docker_cli.endswith("docker.exe")
+    assert "已检测到本机 Docker" in status.message
 
 
 def test_normalize_posix_path() -> None:

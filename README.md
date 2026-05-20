@@ -30,7 +30,9 @@
 ## 当前能力
 
 - 支持任意 OpenList 已支持的挂载驱动作为源端
-- 支持外部 OpenList 与托管 OpenList 两种模式
+- 支持 `外部本机 OpenList`、`外部远程 OpenList` 与 `本机二进制托管 OpenList`
+- 托管模式下如果本机还没有 `openlist/alist` 二进制，页面会先提示是否拉取本机运行时
+- 如果拒绝拉取本机运行时，当前应改用外部本机或外部远程模式
 - 支持在页面里读取 OpenList 驱动列表、驱动字段、挂载列表
 - 支持页面直接创建新的 OpenList 挂载
 - 支持源网盘网页登录抓取骨架
@@ -861,6 +863,40 @@ docker compose restart cloudpan-bridge
 
 也就是说，Docker 版本当前更偏“服务端运行版”，而不是“桌面浏览器抓取版”。
 
+### OpenList 模式说明
+
+当前页面里的 OpenList 模式已经按真实用途拆成：
+
+- `external_local`
+  - 连接你本机已经运行好的 OpenList
+- `external_remote`
+  - 连接远程服务器、NAS 或局域网里的现成 OpenList
+- `managed_binary`
+  - 由 CloudPan Bridge 在本机直接启动 `openlist.exe/alist.exe`
+- `managed_docker_placeholder`
+  - 目前只保留文案与状态位，不会真的自动创建 OpenList 容器
+
+关于 `managed_binary`，当前行为是：
+
+1. 先预检本机是否已有可用的 OpenList 二进制
+2. 如果没有，会先提示是否拉取本机运行时
+3. 如果你拒绝拉取，本轮不会强行继续托管启动，而是提示改用 `external_local` 或 `external_remote`
+
+也就是说，托管模式当前不是“点一下无论如何都能起”，而是：
+
+- 有本机二进制：可以继续托管启动
+- 没有本机二进制：先提示是否拉取
+- 不拉取：只能改用外部模式
+
+如果你要走 Docker 相关链路，当前建议先完成本机 Docker 环境验证：
+
+```powershell
+docker version
+docker info
+```
+
+若这两条都通过，说明本机 Docker 环境至少已可用；但本项目当前并不会自动帮你创建 OpenList 容器。
+
 ### GitHub 自动打包
 
 仓库已补：
@@ -881,19 +917,15 @@ docker compose restart cloudpan-bridge
 - `python -m compileall src tests`
 - `pytest -q`
 - 构建 Python 包
-- 构建 Docker 镜像
 - 上传 Python 包产物
-- 上传 Docker 镜像 tar 产物
 
-在非 PR 场景下，还会自动尝试把镜像推送到：
+当前默认不再自动做这些动作：
 
-- `ghcr.io/<你的仓库路径>`
+- 自动构建 Docker 镜像
+- 自动上传 Docker 镜像 tar 产物
+- 自动推送 `ghcr.io/<你的仓库路径>`
 
-如果后面你要继续做正式 release，可以直接在这个 workflow 基础上再加：
-
-- GitHub Release 附件上传
-- tag 版语义版本号
-- 多架构镜像
+如果后面你要恢复正式 release 流程，可以再单独补回镜像发布 workflow，而不是默认在每次 push 时触发。
 
 ## 状态与续跑
 
