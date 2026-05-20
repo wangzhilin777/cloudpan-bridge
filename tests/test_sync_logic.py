@@ -5723,3 +5723,18 @@ def test_console_auth_login_logout_flow(tmp_path: Path) -> None:
 
     unauthorized_again = client.get("/api/config")
     assert unauthorized_again.status_code == 401
+
+
+def test_index_page_contains_auth_lock_and_workflow_shell(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/")
+    assert response.status_code == 200
+    text = response.text
+    assert 'id="auth-lock-panel"' in text
+    assert 'id="workflow-roadmap"' in text
+    assert 'id="open-auth-login-inline"' in text
+    assert 'id="overview-route-summary"' in text

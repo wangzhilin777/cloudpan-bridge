@@ -27,10 +27,11 @@
       margin: 0 auto;
       padding: 20px;
     }
-    body.auth-locked .app {
-      visibility: hidden;
-      pointer-events: none;
-      user-select: none;
+    body.auth-locked .shell {
+      display: none;
+    }
+    body.auth-locked .auth-lock-panel {
+      display: block;
     }
     .hero {
       display: flex;
@@ -218,6 +219,39 @@
       display: block;
       margin-bottom: 8px;
     }
+    .auth-lock-panel {
+      display: none;
+      margin-bottom: 16px;
+    }
+    .workflow-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .workflow-card {
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      padding: 12px;
+      background: rgba(255,255,255,.72);
+      min-width: 0;
+    }
+    .workflow-card.is-ready {
+      border-style: solid;
+      border-color: rgba(12,122,99,.35);
+      background: rgba(12,122,99,.08);
+    }
+    .workflow-card.is-current {
+      border-style: solid;
+      border-color: rgba(207,106,66,.45);
+      background: rgba(207,106,66,.1);
+    }
+    .workflow-card.is-locked {
+      opacity: .74;
+    }
+    .tab.is-gated {
+      opacity: .55;
+    }
     .notice {
       min-height: 46px;
       white-space: pre-wrap;
@@ -399,7 +433,7 @@
       }
     }
     @media (max-width: 860px) {
-      .panel-grid, .status-grid {
+      .panel-grid, .status-grid, .workflow-grid {
         grid-template-columns: 1fr;
       }
       .col-span-2 {

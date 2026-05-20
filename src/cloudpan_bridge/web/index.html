@@ -30,6 +30,16 @@
       </div>
     </div>
 
+    <div class="auth-lock-panel hidden" id="auth-lock-panel">
+      <div class="panel">
+        <h2>控制台已加锁</h2>
+        <div class="notice" id="auth-lock-summary">如果你启用了控制台管理员账号密码，需要先登录后才能继续加载连接、源端、目标端和同步页面。</div>
+        <div class="actions">
+          <button class="accent" id="open-auth-login-inline">立即登录控制台</button>
+        </div>
+      </div>
+    </div>
+
     <div class="shell">
       <div class="main">
         <div class="tabs" id="tabs">
@@ -66,6 +76,12 @@
           <div class="panel">
             <h2 data-i18n="panel.current_route">当前执行路线</h2>
             <div class="notice" id="overview-route-summary">等待载入当前任务路线...</div>
+            <div class="workflow-grid" id="workflow-roadmap">
+              <div class="workflow-card">
+                <strong>1. 连接 OpenList</strong>
+                <div class="mono">等待载入...</div>
+              </div>
+            </div>
           </div>
         </section>
 

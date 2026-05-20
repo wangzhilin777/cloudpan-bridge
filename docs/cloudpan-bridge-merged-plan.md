@@ -106,6 +106,15 @@
 - [x] 前端能力面板与 About 源 Profile 列表已显示“补指纹能力”状态
 - [x] 相关回归通过：`python -m compileall src tests`、`node --check src/cloudpan_bridge/web/assets/app.js`、`pytest -q tests/test_sync_logic.py -k "prefers_enrichment_mode_when_directory_needs_more_hashes or provider_capability_assess_uses_analysis_summary"`
 
+### 里程碑 13：前端主流程门控与登录壳页收口（起步）
+
+- [x] 新增控制台锁屏壳页，启用控制台管理员时未登录不再直接展示后续连接/源端/目标端/同步界面
+- [x] 补齐前端缺失的控制台登录运行时函数：`updateAuthUi / showAuthDialog / hideAuthDialog / ensureAuthorizedAndBootstrap / startAutoRefresher / stopAutoRefresher`
+- [x] 总览页新增四阶段路线卡：`连接 OpenList -> 选择源目录 -> 配置目标端 -> 执行任务`
+- [x] 标签页已按当前阶段 readiness 做门控，未满足前置条件时会禁用对应页签并给出说明
+- [x] 增加首页壳页测试，固定 `auth-lock-panel / workflow-roadmap` 等关键容器
+- [x] 相关回归通过：`python -m compileall src tests`、`node --check src/cloudpan_bridge/web/assets/app.js`、`pytest -q tests/test_sync_logic.py -x`
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

@@ -103,6 +103,26 @@
       "aliyun": { openlist_page_size: 120, openlist_request_interval_ms: 700, queue_interval_ms: 2500 }
     };
     const { I18N, HELP_TEXT, DRIVER_FIELD_I18N, DRIVER_HELP_PATTERNS, DRIVER_OPTIONS_I18N, PROVIDER_DRIVER_HINTS } = window.CloudPanBridgeData || {};
+    let configCache = {};
+    let providerRegistryPayload = null;
+    let driverGuideRegistry = {};
+    let capabilityAssessmentCache = null;
+    let coverageAuditCache = null;
+    let targetPreflightCache = null;
+    let driverCaptureBlueprint = null;
+    let providerDefinitions = [];
+    let providerSnapshots = {};
+    let storageRecords = [];
+    let sourceAnalyzeCache = null;
+    let latestPendingItems = [];
+    let pendingSelection = new Set();
+    let pendingSelectionTouched = false;
+    let currentDirectoryPath = "/";
+    let currentParentPath = null;
+    let authState = { enabled: false, authenticated: true, username: "" };
+    let appBootstrapped = false;
+    let autoRefreshTimer = null;
+    let panelStatePersistTimer = null;
 
     function escapeHtml(text) {
       return String(text ?? "").replace(/[&<>"']/g, (ch) => ({
@@ -188,6 +208,205 @@
       configCache = { ...(configCache || {}) };
       schedulePanelStatePersist();
       return nextState;
+    }
+
+    function setAuthNotice(message) {
+      const notice = document.getElementById("auth-notice");
+      if (notice) notice.textContent = message || "等待登录。";
+      const inline = document.getElementById("auth-lock-summary");
+      if (inline && message) inline.textContent = message;
+    }
+
+    function showAuthDialog(message = "") {
+      const dialog = document.getElementById("auth-dialog");
+      if (!dialog) return;
+      if (message) setAuthNotice(message);
+      dialog.classList.remove("hidden");
+      document.getElementById("auth-username")?.focus();
+    }
+
+    function hideAuthDialog() {
+      const dialog = document.getElementById("auth-dialog");
+      if (dialog) dialog.classList.add("hidden");
+    }
+
+    function stopAutoRefresher() {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+      }
+    }
+
+    function startAutoRefresher() {
+      stopAutoRefresher();
+      autoRefreshTimer = setInterval(async () => {
+        if (authState.enabled && !authState.authenticated) return;
+        try {
+          await refreshStatus();
+        } catch (_error) {
+        }
+      }, 5000);
+    }
+
+    function computeWorkflowState() {
+      const targetKey = activeTargetKey();
+      const sourcePath = String(document.getElementById("source_path")?.value || configCache?.source_path || "/").trim() || "/";
+      const targetPath = String(document.getElementById("target_path")?.value || configCache?.target_path || "/").trim() || "/";
+      const mountedSource = String(document.getElementById("mounted_source_select")?.value || getGroupedConfigValue(["ui", "browser", "mounted_source"], "") || "").trim();
+      const openlistUrl = String(document.getElementById("effective_openlist_url")?.value || configCache?.effective_openlist_url || configCache?.openlist_url || "").trim();
+      const sourceReady = sourcePath !== "/" && Boolean(sourcePath);
+      const connectionReady = Boolean(openlistUrl) || storageRecords.length > 0 || Boolean(mountedSource);
+      const targetConfigured = Boolean(targetPreflightCache?.configured);
+      const taskReady = connectionReady && sourceReady && targetConfigured && Boolean(targetPath);
+      const guangyaMiaochuanReady = targetKey === "guangya" && targetConfigured;
+      let currentStep = "connect";
+      if (!connectionReady) currentStep = "connect";
+      else if (!sourceReady) currentStep = "source";
+      else if (!targetConfigured) currentStep = "target";
+      else currentStep = "task";
+      return {
+        connectionReady,
+        sourceReady,
+        targetConfigured,
+        taskReady,
+        guangyaMiaochuanReady,
+        currentStep,
+        sourcePath,
+        targetPath,
+        targetKey,
+        openlistUrl,
+      };
+    }
+
+    function renderWorkflowRoadmap() {
+      const root = document.getElementById("workflow-roadmap");
+      if (!root) return;
+      const state = computeWorkflowState();
+      const steps = [
+        {
+          key: "connect",
+          title: currentLang() === "en" ? "1. Connect OpenList" : currentLang() === "mix" ? "1. 连接 OpenList / Connect OpenList" : "1. 连接 OpenList",
+          ready: state.connectionReady,
+          detail: state.connectionReady
+            ? (currentLang() === "en" ? `Ready: ${state.openlistUrl || "OpenList reachable"}` : currentLang() === "mix" ? `已就绪 / Ready: ${state.openlistUrl || "OpenList reachable"}` : `已就绪: ${state.openlistUrl || "可访问"}`)
+            : (currentLang() === "en" ? "Finish OpenList login or runtime startup first." : currentLang() === "mix" ? "先完成 OpenList 登录或托管启动。 / Finish OpenList login first." : "先完成 OpenList 登录或托管启动。"),
+        },
+        {
+          key: "source",
+          title: currentLang() === "en" ? "2. Pick Source" : currentLang() === "mix" ? "2. 选择源目录 / Pick Source" : "2. 选择源目录",
+          ready: state.sourceReady,
+          detail: state.sourceReady
+            ? (currentLang() === "en" ? `Ready: ${state.sourcePath}` : currentLang() === "mix" ? `已选源目录 / Ready: ${state.sourcePath}` : `已选源目录: ${state.sourcePath}`)
+            : (currentLang() === "en" ? "Open the source browser and write a concrete source_path." : currentLang() === "mix" ? "去“源端”页选择具体目录并写回 source_path。 / Pick a concrete directory first." : "去“源端”页选择具体目录并写回 source_path。"),
+        },
+        {
+          key: "target",
+          title: currentLang() === "en" ? "3. Configure Target" : currentLang() === "mix" ? "3. 配置目标端 / Configure Target" : "3. 配置目标端",
+          ready: state.targetConfigured,
+          detail: state.targetConfigured
+            ? (currentLang() === "en" ? `Ready: ${state.targetKey}` : currentLang() === "mix" ? `已就绪 / Ready: ${state.targetKey}` : `已就绪: ${state.targetKey}`)
+            : (currentLang() === "en" ? "Complete target credentials until preflight becomes configured." : currentLang() === "mix" ? "补齐目标端凭证，直到预检显示 configured。 / Finish target credentials first." : "补齐目标端凭证，直到预检显示 configured。"),
+        },
+        {
+          key: "task",
+          title: currentLang() === "en" ? "4. Run Task" : currentLang() === "mix" ? "4. 执行任务 / Run Task" : "4. 执行任务",
+          ready: state.taskReady,
+          detail: state.taskReady
+            ? (currentLang() === "en" ? `Ready: ${state.sourcePath} -> ${state.targetKey}:${state.targetPath}` : currentLang() === "mix" ? `可执行 / Ready: ${state.sourcePath} -> ${state.targetKey}:${state.targetPath}` : `可执行: ${state.sourcePath} -> ${state.targetKey}:${state.targetPath}`)
+            : (currentLang() === "en" ? "After source and target are ready, go to Sync to run analysis or execution." : currentLang() === "mix" ? "源端和目标端都就绪后，再去“同步”执行分析或正式同步。 / Run Sync after prerequisites." : "源端和目标端都就绪后，再去“同步”执行分析或正式同步。"),
+        },
+      ];
+      root.innerHTML = steps.map((step) => {
+        const cls = [
+          "workflow-card",
+          step.ready ? "is-ready" : "",
+          state.currentStep === step.key ? "is-current" : "",
+          !step.ready && state.currentStep !== step.key ? "is-locked" : "",
+        ].filter(Boolean).join(" ");
+        return `<div class="${cls}"><strong>${escapeHtml(step.title)}</strong><div class="mono">${escapeHtml(step.detail)}</div></div>`;
+      }).join("");
+    }
+
+    function applyWorkflowGates() {
+      const locked = Boolean(authState.enabled && !authState.authenticated);
+      const state = computeWorkflowState();
+      const tabRules = {
+        overview: true,
+        mounts: true,
+        source: state.connectionReady,
+        config: state.connectionReady,
+        sync: state.connectionReady && state.sourceReady,
+        pending: state.connectionReady && state.targetConfigured,
+        miaochuan: state.connectionReady && state.targetConfigured && state.guangyaMiaochuanReady,
+        about: true,
+      };
+      document.querySelectorAll(".tab").forEach((tab) => {
+        const tabId = tab.dataset.tab;
+        if (!tabId) return;
+        const enabled = !locked && Boolean(tabRules[tabId]);
+        tab.disabled = !enabled;
+        tab.classList.toggle("is-gated", !enabled);
+        if (!enabled) {
+          if (locked) tab.title = currentLang() === "en" ? "Login to the console first." : currentLang() === "mix" ? "请先登录控制台。 / Login to the console first." : "请先登录控制台。";
+          else if (tabId === "source") tab.title = currentLang() === "en" ? "Complete OpenList connection first." : currentLang() === "mix" ? "请先完成 OpenList 连接。 / Complete OpenList connection first." : "请先完成 OpenList 连接。";
+          else if (tabId === "sync") tab.title = currentLang() === "en" ? "Pick a concrete source directory first." : currentLang() === "mix" ? "请先选定具体源目录。 / Pick a concrete source directory first." : "请先选定具体源目录。";
+          else if (tabId === "pending" || tabId === "miaochuan") tab.title = currentLang() === "en" ? "Complete target configuration first." : currentLang() === "mix" ? "请先完成目标端配置。 / Complete target configuration first." : "请先完成目标端配置。";
+        } else {
+          tab.removeAttribute("title");
+        }
+      });
+      if (!locked) {
+        const active = document.querySelector(".tab.active");
+        const activeId = active?.dataset?.tab || "overview";
+        if (!tabRules[activeId]) activateTab("overview");
+      }
+      renderWorkflowRoadmap();
+    }
+
+    function updateAuthUi(state = {}) {
+      authState = {
+        enabled: Boolean(state.enabled),
+        authenticated: Boolean(state.authenticated),
+        username: String(state.username || ""),
+      };
+      document.body.classList.toggle("auth-locked", authState.enabled && !authState.authenticated);
+      document.getElementById("auth-lock-panel")?.classList.toggle("hidden", !(authState.enabled && !authState.authenticated));
+      document.getElementById("open-auth-login")?.classList.toggle("hidden", !authState.enabled || authState.authenticated);
+      document.getElementById("open-auth-login-inline")?.classList.toggle("hidden", !authState.enabled || authState.authenticated);
+      document.getElementById("logout-auth")?.classList.toggle("hidden", !authState.enabled || !authState.authenticated);
+      const badge = document.getElementById("auth-status-badge");
+      if (badge) {
+        badge.textContent = !authState.enabled
+          ? (currentLang() === "en" ? "Console auth disabled" : currentLang() === "mix" ? "控制台未加锁 / Console auth disabled" : "控制台未加锁")
+          : authState.authenticated
+            ? (currentLang() === "en" ? `Logged in as ${authState.username || "admin"}` : currentLang() === "mix" ? `已登录 / ${authState.username || "admin"}` : `已登录: ${authState.username || "admin"}`)
+            : (currentLang() === "en" ? "Login required" : currentLang() === "mix" ? "需要登录 / Login required" : "需要登录");
+      }
+      applyWorkflowGates();
+    }
+
+    async function ensureAuthorizedAndBootstrap(force = false) {
+      const status = await fetch("/api/auth/status", { credentials: "same-origin" }).then((response) => response.json());
+      updateAuthUi(status || {});
+      if (authState.enabled && !authState.authenticated) {
+        appBootstrapped = false;
+        stopAutoRefresher();
+        showAuthDialog(currentLang() === "en" ? "Console login is required before loading the rest of the workspace." : currentLang() === "mix" ? "需要先登录控制台后再继续加载其它页面。 / Console login required." : "需要先登录控制台后再继续加载其它页面。");
+        return false;
+      }
+      hideAuthDialog();
+      if (!appBootstrapped || force) {
+        await loadConfig();
+        await loadProviderRegistry();
+        await refreshStorages();
+        await ensureDirectoryBrowserReady(true);
+        await refreshStatus();
+        startAutoRefresher();
+        appBootstrapped = true;
+      } else {
+        applyWorkflowGates();
+      }
+      return true;
     }
 
     function activateTab(tabId) {
@@ -411,6 +630,7 @@
       if (!root) return;
       try {
         const payload = await call(`/api/target/preflight?target=${encodeURIComponent(activeTargetKey())}`);
+        targetPreflightCache = payload || null;
         const implemented = payload?.implemented ? "true" : "false";
         const selectable = payload?.selectable ? "true" : "false";
         const configured = payload?.configured ? "true" : "false";
@@ -424,12 +644,14 @@
           <div>${escapeHtml(payload?.message || "")}</div>
         `;
       } catch (error) {
+        targetPreflightCache = null;
         root.textContent = currentLang() === "en"
           ? `Target preflight failed: ${error.message}`
           : currentLang() === "mix"
             ? `目标端预检失败 / Target preflight failed: ${error.message}`
             : `目标端预检失败: ${error.message}`;
       }
+      applyWorkflowGates();
     }
 
     function downloadTextFile(filename, text, mimeType = "text/plain;charset=utf-8") {
@@ -1863,6 +2085,7 @@
       if (!list.length) {
         root.textContent = currentLang() === "en" ? "No mounts" : currentLang() === "mix" ? "暂无挂载 / No mounts" : "暂无挂载";
         renderCapabilitySummary();
+        applyWorkflowGates();
         return;
       }
       root.innerHTML = list.map((item) => {
@@ -1878,6 +2101,7 @@
         `;
       }).join("");
       renderCapabilitySummary();
+      applyWorkflowGates();
     }
 
     async function loadDrivers() {
@@ -2073,6 +2297,7 @@
       renderOverviewRouteSummary(syncState, runtimeState);
       renderSourceDriverSummary();
       renderTaskModeSummary();
+      applyWorkflowGates();
     }
 
     async function refreshStatus() {
@@ -2218,6 +2443,10 @@
         setAuthNotice("请输入控制台账号密码。");
         showAuthDialog();
       };
+      document.getElementById("open-auth-login-inline").onclick = () => {
+        setAuthNotice("请输入控制台账号密码。");
+        showAuthDialog();
+      };
       document.getElementById("submit-auth-login").onclick = withBusy("submit-auth-login", "登录中...", async () => {
         await call("/api/auth/login", {
           method: "POST",
@@ -2232,6 +2461,11 @@
       });
       document.getElementById("auth-password").addEventListener("keydown", (event) => {
         if (event.key === "Enter") document.getElementById("submit-auth-login")?.click();
+      });
+      document.getElementById("auth-dialog").addEventListener("click", (event) => {
+        if (event.target?.id !== "auth-dialog") return;
+        if (authState.enabled && !authState.authenticated) return;
+        hideAuthDialog();
       });
       document.getElementById("logout-auth").onclick = withBusy("logout-auth", "退出中...", async () => {
         await call("/api/auth/logout", { method: "POST" });
