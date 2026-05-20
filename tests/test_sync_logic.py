@@ -1483,6 +1483,83 @@ def test_execute_source_bridge_skips_api_pending_reason_when_fast_hash_already_p
     assert report["fast_upload_ready_after_bridge"] is True
 
 
+def test_execute_source_bridge_reads_api_capture_cache_by_path_for_aliyundriveopen(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "aliyundriveopen": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                                "file_hashes_by_path": {
+                                    "/src/demo.bin": {
+                                        "sha1": "a" * 40,
+                                        "md5": "b" * 32,
+                                        "crc64": "c" * 16,
+                                    }
+                                },
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    entry = SourceEntry(path="/src/demo.bin", md5="", size=10, provider="AliyunDriveOpen")
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "aliyundriveopen")
+    enriched, report = execute_source_bridge(entry, runtime)
+    assert enriched.sha1 == "A" * 40
+    assert enriched.md5 == "B" * 32
+    assert enriched.crc64 == "C" * 16
+    assert report["bridge_execution_state"] == "api_capture_cache_normalized"
+    assert report["provider_stage"] == "api_capture_cache"
+    assert report["pending_reason"] == ""
+    assert report["fast_upload_ready_after_bridge"] is True
+
+
+def test_execute_source_bridge_reads_api_capture_cache_list_for_onedrive(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "onedrive": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                                "entries": [
+                                    {
+                                        "path": "/src/a.docx",
+                                        "sha1": "a" * 40,
+                                        "content_hash": "sha1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                    }
+                                ],
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    entry = SourceEntry(path="/src/a.docx", md5="", size=10, provider="OneDrive")
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "onedrive")
+    enriched, report = execute_source_bridge(entry, runtime)
+    assert enriched.sha1 == "A" * 40
+    assert enriched.content_hash == "SHA1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    assert report["bridge_execution_state"] == "api_capture_cache_normalized"
+    assert report["provider_stage"] == "api_capture_cache"
+    assert report["bridge_missing_expected_hashes"] == ["md5"]
+    assert report["pending_reason"] == "provider_api_bridge_not_executed_yet"
+
+
 def test_execute_source_bridge_marks_non_fast_candidates_for_quark(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text(

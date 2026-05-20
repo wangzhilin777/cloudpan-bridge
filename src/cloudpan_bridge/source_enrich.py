@@ -84,6 +84,8 @@ def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dic
     return {
         "provider_key": normalized,
         "supported": supported,
+        "capture_snapshot": capture_snapshot,
+        "captured_fields": captured,
         "preferred_hashes": list(rule.get("preferred_hashes") or []),
         "capture_required": capture_required,
         "capture_ready": capture_ready,

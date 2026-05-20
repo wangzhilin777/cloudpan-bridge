@@ -42,6 +42,12 @@
   - `[{name:\"gcid\",hash:\"...\"}]`
   - 字符串化 JSON 的同类 `hashes` 数组
 - 已新增对应回归，确保 `Quark / Thunder` 这类主流 provider 的嵌套哈希载荷可进入统一 enrich 流水线
+- API 型 bridge 已支持从 `provider_captures` 里的文件级哈希缓存补指纹
+- 当前已覆盖的缓存结构包括：
+  - `file_hashes_by_path / fingerprints_by_path`
+  - `file_hashes_by_id / fingerprints_by_id`
+  - `entries / items / file_hashes` 列表中的按 `path / source_id` 匹配条目
+- 这让 `AliyunDriveOpen / OneDrive / Thunder` 这类 API 型 provider 不再只能停留在“纯占位准备态”，而是可以先消费已抓到的文件级指纹快照
 
 ## 摘要
 

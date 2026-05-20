@@ -76,6 +76,79 @@ def _build_hash_payload_from_item(value: Any) -> dict[str, Any] | None:
     return None
 
 
+def _normalize_entry_path(value: Any) -> str:
+    text = str(value or "").strip().replace("\\", "/")
+    if not text:
+        return ""
+    if not text.startswith("/"):
+        text = f"/{text}"
+    while "//" in text:
+        text = text.replace("//", "/")
+    return text.rstrip("/") or "/"
+
+
+def _capture_payload_matches_entry(payload: dict[str, Any], entry: SourceEntry) -> bool:
+    normalized_entry_path = _normalize_entry_path(entry.path)
+    payload_paths = [
+        _normalize_entry_path(payload.get("path")),
+        _normalize_entry_path(payload.get("file_path")),
+        _normalize_entry_path(payload.get("source_path")),
+        _normalize_entry_path(payload.get("full_path")),
+    ]
+    if normalized_entry_path and normalized_entry_path in {path for path in payload_paths if path}:
+        return True
+    source_id = str(entry.source_id or "").strip()
+    payload_ids = [str(payload.get(key) or "").strip() for key in ("source_id", "file_id", "id", "fid", "res_id") if str(payload.get(key) or "").strip()]
+    if source_id and source_id in payload_ids:
+        return True
+    return False
+
+
+def _collect_capture_entry_payloads(entry: SourceEntry, runtime: dict[str, Any]) -> list[dict[str, Any]]:
+    captured = dict(runtime.get("captured_fields") or {})
+    if not captured:
+        return []
+    payloads: list[dict[str, Any]] = []
+    normalized_entry_path = _normalize_entry_path(entry.path)
+    if normalized_entry_path:
+        for key in ("file_hashes_by_path", "fingerprints_by_path", "hash_cache_by_path", "entry_hashes_by_path"):
+            mapping = captured.get(key)
+            if isinstance(mapping, dict):
+                direct = mapping.get(normalized_entry_path)
+                if isinstance(direct, dict):
+                    payloads.append({str(inner_key): inner_value for inner_key, inner_value in direct.items()})
+                alt = mapping.get(normalized_entry_path.lstrip("/"))
+                if isinstance(alt, dict):
+                    payloads.append({str(inner_key): inner_value for inner_key, inner_value in alt.items()})
+    source_id = str(entry.source_id or "").strip()
+    if source_id:
+        for key in ("file_hashes_by_id", "fingerprints_by_id", "hash_cache_by_id", "entry_hashes_by_id"):
+            mapping = captured.get(key)
+            if isinstance(mapping, dict):
+                direct = mapping.get(source_id)
+                if isinstance(direct, dict):
+                    payloads.append({str(inner_key): inner_value for inner_key, inner_value in direct.items()})
+    for key in ("file_hashes", "fingerprints", "hash_cache", "entries", "items"):
+        collection = captured.get(key)
+        if isinstance(collection, list):
+            for item in collection:
+                if not isinstance(item, dict):
+                    continue
+                normalized = {str(inner_key): inner_value for inner_key, inner_value in item.items()}
+                if _capture_payload_matches_entry(normalized, entry):
+                    payloads.append(normalized)
+        elif isinstance(collection, dict):
+            nested_entries = collection.get("items") or collection.get("entries") or collection.get("files")
+            if isinstance(nested_entries, list):
+                for item in nested_entries:
+                    if not isinstance(item, dict):
+                        continue
+                    normalized = {str(inner_key): inner_value for inner_key, inner_value in item.items()}
+                    if _capture_payload_matches_entry(normalized, entry):
+                        payloads.append(normalized)
+    return _dedupe_payloads(payloads)
+
+
 def _collect_nested_payloads(value: Any, *, depth: int = 0) -> list[dict[str, Any]]:
     if depth > 3:
         return []
@@ -132,7 +205,7 @@ def _dedupe_payloads(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return unique
 
 
-def _collect_raw_sources(entry: SourceEntry) -> list[dict[str, Any]]:
+def _collect_raw_sources(entry: SourceEntry, extra_payloads: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     payloads = [
         dict(entry.raw_hash_info or {}),
         dict(entry.provider_specific or {}),
@@ -150,15 +223,16 @@ def _collect_raw_sources(entry: SourceEntry) -> list[dict[str, Any]]:
             "content_hash": entry.content_hash,
         },
     ]
+    payloads.extend(list(extra_payloads or []))
     nested_payloads: list[dict[str, Any]] = []
     for payload in payloads:
         nested_payloads.extend(_collect_nested_payloads(payload))
     return _dedupe_payloads([*payloads, *nested_payloads])
 
 
-def _pick_hash_value(entry: SourceEntry, logical_key: str, aliases_map: dict[str, list[str]]) -> str:
+def _pick_hash_value(entry: SourceEntry, logical_key: str, aliases_map: dict[str, list[str]], extra_payloads: list[dict[str, Any]] | None = None) -> str:
     aliases = list(aliases_map.get(logical_key) or [logical_key])
-    for payload in _collect_raw_sources(entry):
+    for payload in _collect_raw_sources(entry, extra_payloads):
         for alias in aliases:
             value = payload.get(alias)
             if not str(value or "").strip():
@@ -212,24 +286,24 @@ def _extract_tagged_hash(value: Any, logical_key: str, length: int) -> str:
     return ""
 
 
-def _merge_entry_from_aliases(entry: SourceEntry, aliases_map: dict[str, list[str]]) -> SourceEntry:
+def _merge_entry_from_aliases(entry: SourceEntry, aliases_map: dict[str, list[str]], extra_payloads: list[dict[str, Any]] | None = None) -> SourceEntry:
     return SourceEntry(
         path=entry.path,
-        md5=entry.md5 or _pick_hash_value(entry, "md5", aliases_map),
+        md5=entry.md5 or _pick_hash_value(entry, "md5", aliases_map, extra_payloads),
         size=entry.size,
         last_op_time=entry.last_op_time,
         source_id=entry.source_id,
         provider=entry.provider,
         hash_type=entry.hash_type,
-        gcid=entry.gcid or _pick_hash_value(entry, "gcid", aliases_map),
-        etag=entry.etag or _pick_hash_value(entry, "md5", aliases_map),
-        sha1=entry.sha1 or _pick_hash_value(entry, "sha1", aliases_map),
-        sha256=entry.sha256 or _pick_hash_value(entry, "sha256", aliases_map),
-        crc64=entry.crc64 or _pick_hash_value(entry, "crc64", aliases_map),
-        pre_hash=entry.pre_hash or _pick_hash_value(entry, "pre_hash", aliases_map),
-        slice_md5=entry.slice_md5 or _pick_hash_value(entry, "slice_md5", aliases_map),
-        pickcode=entry.pickcode or _pick_hash_value(entry, "pickcode", aliases_map),
-        content_hash=entry.content_hash or _pick_hash_value(entry, "content_hash", aliases_map),
+        gcid=entry.gcid or _pick_hash_value(entry, "gcid", aliases_map, extra_payloads),
+        etag=entry.etag or _pick_hash_value(entry, "md5", aliases_map, extra_payloads),
+        sha1=entry.sha1 or _pick_hash_value(entry, "sha1", aliases_map, extra_payloads),
+        sha256=entry.sha256 or _pick_hash_value(entry, "sha256", aliases_map, extra_payloads),
+        crc64=entry.crc64 or _pick_hash_value(entry, "crc64", aliases_map, extra_payloads),
+        pre_hash=entry.pre_hash or _pick_hash_value(entry, "pre_hash", aliases_map, extra_payloads),
+        slice_md5=entry.slice_md5 or _pick_hash_value(entry, "slice_md5", aliases_map, extra_payloads),
+        pickcode=entry.pickcode or _pick_hash_value(entry, "pickcode", aliases_map, extra_payloads),
+        content_hash=entry.content_hash or _pick_hash_value(entry, "content_hash", aliases_map, extra_payloads),
         extra_hashes=dict(entry.extra_hashes or {}),
         provider_specific=dict(entry.provider_specific or {}),
         raw_hash_info=dict(entry.raw_hash_info or {}),
@@ -332,7 +406,8 @@ def _build_report(
 
 def _normalize_session_snapshot(entry: SourceEntry, runtime: dict[str, Any], *, executor_name: str) -> tuple[SourceEntry, dict[str, Any]]:
     aliases_map = dict(runtime.get("hash_aliases") or {})
-    merged = _merge_entry_from_aliases(entry, aliases_map)
+    capture_payloads = _collect_capture_entry_payloads(entry, runtime)
+    merged = _merge_entry_from_aliases(entry, aliases_map, capture_payloads)
     candidate_hashes = _candidate_hashes(merged)
     pending_reason = ""
     if not (merged.md5 or merged.gcid) and candidate_hashes:
@@ -353,9 +428,17 @@ def _normalize_session_snapshot(entry: SourceEntry, runtime: dict[str, Any], *, 
 
 def _normalize_api_placeholder(entry: SourceEntry, runtime: dict[str, Any], *, executor_name: str) -> tuple[SourceEntry, dict[str, Any]]:
     aliases_map = dict(runtime.get("hash_aliases") or {})
-    merged = _merge_entry_from_aliases(entry, aliases_map)
+    capture_payloads = _collect_capture_entry_payloads(entry, runtime)
+    merged = _merge_entry_from_aliases(entry, aliases_map, capture_payloads)
     candidate_hashes = _candidate_hashes(merged)
     pending_reason = ""
+    execution_state = "api_bridge_prepared_but_not_executed"
+    provider_stage = "api_placeholder"
+    message = "已命中 provider API bridge 准备态，当前版本先归并现有元数据，真实 API enrich 仍待后续接入。"
+    if capture_payloads:
+        execution_state = "api_capture_cache_normalized"
+        provider_stage = "api_capture_cache"
+        message = "已从 provider capture 快照缓存中归并文件级哈希，真实在线 provider API enrich 仍待后续接入。"
     if not (merged.md5 or merged.gcid):
         pending_reason = "provider_api_bridge_not_executed_yet"
     report = _build_report(
@@ -363,10 +446,10 @@ def _normalize_api_placeholder(entry: SourceEntry, runtime: dict[str, Any], *, e
         merged,
         runtime,
         executor_name=executor_name,
-        execution_state="api_bridge_prepared_but_not_executed",
-        provider_stage="api_placeholder",
+        execution_state=execution_state,
+        provider_stage=provider_stage,
         pending_reason=pending_reason,
-        message="已命中 provider API bridge 准备态，当前版本先归并现有元数据，真实 API enrich 仍待后续接入。",
+        message=message,
     )
     _attach_bridge_metadata(merged, report)
     return merged, report
