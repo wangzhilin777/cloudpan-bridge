@@ -208,6 +208,13 @@
 - [x] 执行前、执行中、运行概览现在都能看到一致的 `requested_provider_preference / selected_source_mode / selected_provider_key`
 - [ ] 后续仍需让真正的直连 source provider 实现消费这套结构，而不是当前统一映射回 OpenList provider
 
+### 里程碑 26：拆出 Task Runtime 组装模块（起步）
+
+- [x] 新增 `task_runtime.py`，承接 source mapping / source runtime / current task snapshot 的统一组装
+- [x] `webapp.py` 已改为调用模块化 helper，不再把 task snapshot 逻辑硬塞在控制器文件中
+- [x] 相关编译与回归已覆盖 `provider_registry / current task / source provider factory` 主路径
+- [ ] 后续继续把 `webapp.py` 里更多 runtime 拼装与 registry 归并逻辑拆出，进一步控制主文件体积
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

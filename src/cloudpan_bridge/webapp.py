@@ -41,6 +41,10 @@ from .provider_registry import (
     render_driver_coverage_scaffold_markdown,
 )
 from .source_adapter import build_source_provider_context, build_source_runtime_status
+from .task_runtime import (
+    build_current_task_snapshot as build_task_runtime_snapshot,
+    resolve_source_mapping_context as resolve_task_source_mapping_context,
+)
 from .fast_upload_decision import assess_directory_fast_upload
 from .target_adapter import build_target_preflight_capability, supported_target_keys
 from .syncer import (
@@ -358,7 +362,7 @@ def create_app(config_path: Path) -> FastAPI:
         source_path = str(resolve_payload_value(raw, "source_path", ("sync", "source_path"), default="")).strip()
         mount_path = str(resolve_payload_value(raw, "mount_path", ("ui", "browser", "mounted_source"), default="")).strip()
         requested_driver = str(resolve_payload_value(raw, "driver", default="")).strip()
-        return build_source_provider_context(
+        return resolve_task_source_mapping_context(
             runtime_config,
             source_path=source_path,
             mount_path=mount_path,
@@ -371,36 +375,17 @@ def create_app(config_path: Path) -> FastAPI:
         payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         raw = dict(payload or {})
-        source_path = normalize_posix_path(str(raw.get("source_path") or runtime_config.source_path or "/"))
-        source_root_for_target = normalize_posix_path(
-            str(raw.get("source_root_for_target") or source_path or runtime_config.source_path or "/")
-        )
-        target_key = str(raw.get("target_key") or runtime_config.target_key or "guangya").strip().lower() or "guangya"
-        target_path = normalize_posix_path(str(raw.get("target_path") or runtime_config.target_path or "/"))
-        mapping_context = resolve_source_mapping_context(
-            {
-                "source_path": source_path,
-                "mount_path": raw.get("mount_path") or payload_nested_get(load_grouped_config_payload(), ("ui", "browser", "mounted_source"), ""),
-                "driver": str(raw.get("driver") or ""),
-            },
+        return build_task_runtime_snapshot(
+            mode,
             runtime_config,
-        )
-        source_runtime_context = build_source_runtime_status(
-            runtime_config,
-            source_path=source_path,
-            mount_path=str(mapping_context.get("mount_path") or ""),
+            source_path=str(raw.get("source_path") or runtime_config.source_path or "/"),
+            source_root_for_target=str(raw.get("source_root_for_target") or ""),
+            target_key=str(raw.get("target_key") or runtime_config.target_key or "guangya"),
+            target_path=str(raw.get("target_path") or runtime_config.target_path or "/"),
+            selected_paths=list(raw.get("selected_paths") or []),
+            mount_path=str(raw.get("mount_path") or payload_nested_get(load_grouped_config_payload(), ("ui", "browser", "mounted_source"), "")),
             requested_driver=str(raw.get("driver") or ""),
         )
-        return {
-            "mode": mode,
-            "source_path": source_path,
-            "source_root_for_target": source_root_for_target,
-            "target_key": target_key,
-            "target_path": target_path,
-            "selected_paths_count": len(list(raw.get("selected_paths") or [])),
-            "source_mapping_context": mapping_context,
-            "source_runtime_context": source_runtime_context,
-        }
 
     def normalize_provider_capture_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
         raw = dict(payload or {})
