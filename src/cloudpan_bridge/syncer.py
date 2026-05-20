@@ -8,7 +8,14 @@ from typing import Callable
 
 from .config import AppConfig
 from .models import PendingFileState, QueueItemState, SourceEntry, SyncFileState, SyncPlanItem, SyncState, normalize_posix_path
-from .source_adapter import SourceProvider, create_source_provider
+from .source_adapter import (
+    SourceProvider,
+    create_source_provider,
+    source_download_stream,
+    source_ensure_auth,
+    source_get_file_fingerprints,
+    source_walk_tree,
+)
 from .target_adapter import TargetAdapter, create_target_adapter, target_delete_if_enabled, target_upload_stream
 
 LogFn = Callable[[str], None]
@@ -234,32 +241,16 @@ class SyncRunner:
         return create_target_adapter(self.config, state, self.config.target_key)
 
     def _ensure_source_auth(self) -> None:
-        if hasattr(self.source, "ensure_auth"):
-            self.source.ensure_auth()  # type: ignore[call-arg]
-            return
-        if hasattr(self.source, "ensure_login"):
-            self.source.ensure_login()  # type: ignore[call-arg]
-            return
-        raise RuntimeError("当前源端 provider 缺少 ensure_auth/ensure_login 接口。")
+        source_ensure_auth(self.source)
 
     def _walk_source_tree(self, source_root: str) -> list[SourceEntry]:
-        if hasattr(self.source, "walk_tree"):
-            return self.source.walk_tree(source_root)  # type: ignore[call-arg]
-        if hasattr(self.source, "export_tree"):
-            return self.source.export_tree(source_root)  # type: ignore[call-arg]
-        raise RuntimeError("当前源端 provider 缺少 walk_tree/export_tree 接口。")
+        return source_walk_tree(self.source, source_root)
 
     def _download_source_file(self, source_path: str) -> Path:
-        if hasattr(self.source, "download_stream"):
-            return self.source.download_stream(source_path, self.config.temp_dir)  # type: ignore[call-arg]
-        if hasattr(self.source, "download_file"):
-            return self.source.download_file(source_path, self.config.temp_dir)  # type: ignore[call-arg]
-        raise RuntimeError("当前源端 provider 缺少 download_stream/download_file 接口。")
+        return source_download_stream(self.source, source_path, self.config.temp_dir)
 
     def _get_source_fingerprints(self, source_path: str) -> list[SourceEntry]:
-        if hasattr(self.source, "get_file_fingerprints"):
-            return list(self.source.get_file_fingerprints(source_path) or [])  # type: ignore[call-arg]
-        return []
+        return source_get_file_fingerprints(self.source, source_path)
 
     @staticmethod
     def _merge_source_entry(base: SourceEntry, refreshed: SourceEntry) -> SourceEntry:

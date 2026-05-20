@@ -129,6 +129,14 @@
 - [x] 新增真实适配器回归，确认 `LocalFsTargetAdapter` 这类正式目标端实例可以直接调用统一方法名
 - [x] 相关回归通过：`python -m compileall src tests`、`pytest -q tests/test_sync_logic.py -k "target_adapter_compat_mixin_exposes_unified_methods_on_real_adapter or target_adapter_upload_stream_helper_falls_back_to_legacy_upload_method or target_adapter_delete_helper_prefers_new_delete_if_enabled_method"`、`pytest -q tests/test_sync_logic.py -x`
 
+### 里程碑 16：Source Provider 统一方法名下沉到抽象层（起步）
+
+- [x] `source_adapter.py` 新增统一 helper：`source_ensure_auth / source_walk_tree / source_download_stream / source_get_file_fingerprints`
+- [x] 新增 `SourceProviderCompatMixin`，把 `ensure_auth / walk_tree / download_stream` 兼容实现下沉到源端类层
+- [x] `SyncRunner` 已改为优先走统一 source helper，不再直接散落 `hasattr` 分支
+- [x] 新增 source provider helper / compat mixin 回归，确认 legacy source 与真实 mixin provider 都能走统一入口
+- [ ] 后续继续把更多直连源 provider 纳入该抽象，而不是只停留在 OpenList 首个实现
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

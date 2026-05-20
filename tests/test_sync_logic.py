@@ -24,6 +24,13 @@ from cloudpan_bridge.provider_capture import (
     resolve_capture_spec_for_driver,
 )
 from cloudpan_bridge.source_adapter import OpenListSourceProvider, create_source_provider
+from cloudpan_bridge.source_adapter import (
+    SourceProviderCompatMixin,
+    source_download_stream,
+    source_ensure_auth,
+    source_get_file_fingerprints,
+    source_walk_tree,
+)
 from cloudpan_bridge.syncer import (
     SyncRunner,
     build_plan,
@@ -984,6 +991,79 @@ def test_target_adapter_compat_mixin_exposes_unified_methods_on_real_adapter(tmp
     uploaded = adapter.upload_stream(local_file, target_parent, "demo.txt")
     assert uploaded["path"].endswith("demo.txt")
     assert adapter.delete_if_enabled(target_parent, "demo.txt") is True
+
+
+def test_source_provider_helpers_fall_back_to_legacy_methods(tmp_path: Path) -> None:
+    local_file = tmp_path / "legacy.txt"
+    local_file.write_text("legacy", encoding="utf-8")
+    seen: dict[str, object] = {}
+
+    class LegacySource:
+        def ensure_login(self) -> None:
+            seen["ensure"] = True
+
+        def export_tree(self, source_root: str) -> list[SourceEntry]:
+            seen["walk"] = source_root
+            return [SourceEntry(path=f"{source_root}/a.bin", md5="abc", size=1, last_op_time="1")]
+
+        def download_file(self, source_path: str, temp_dir: Path) -> Path:
+            seen["download"] = (source_path, temp_dir)
+            return local_file
+
+    source_ensure_auth(LegacySource())  # type: ignore[arg-type]
+    walked = source_walk_tree(LegacySource(), "/demo")  # type: ignore[arg-type]
+    downloaded = source_download_stream(LegacySource(), "/demo/a.bin", tmp_path)  # type: ignore[arg-type]
+    fingerprints = source_get_file_fingerprints(LegacySource(), "/demo/a.bin")  # type: ignore[arg-type]
+
+    assert seen["ensure"] is True
+    assert seen["walk"] == "/demo"
+    assert seen["download"] == ("/demo/a.bin", tmp_path)
+    assert walked[0].path == "/demo/a.bin"
+    assert downloaded == local_file
+    assert fingerprints == []
+
+
+def test_source_provider_compat_mixin_exposes_unified_methods_on_real_provider(tmp_path: Path) -> None:
+    fake_download = tmp_path / "downloaded.bin"
+    fake_download.write_bytes(b"demo")
+
+    class DemoSourceProvider(SourceProviderCompatMixin):
+        def ensure_login(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+        def list_roots(self) -> list[str]:
+            return ["/"]
+
+        def list_dir(self, path: str) -> dict[str, object]:
+            return {"path": path, "directories": []}
+
+        def export_tree(self, source_root: str) -> list[SourceEntry]:
+            return [SourceEntry(path=f"{source_root}/a.bin", md5="abc", size=1, last_op_time="1")]
+
+        def walk_leaf_dirs(self, root_path: str):
+            yield root_path
+
+        def download_file(self, source_path: str, temp_dir: Path) -> Path:
+            return fake_download
+
+        def get_auth_state(self) -> dict[str, str]:
+            return {"token": "demo"}
+
+        def get_provider_key(self) -> str:
+            return "demo"
+
+    provider = DemoSourceProvider()
+    provider.ensure_auth()
+    walked = provider.walk_tree("/demo")
+    downloaded = provider.download_stream("/demo/a.bin", tmp_path)
+    fingerprints = provider.get_file_fingerprints("/demo/a.bin")
+
+    assert walked[0].path == "/demo/a.bin"
+    assert downloaded == fake_download
+    assert fingerprints == []
 
 
 def test_sync_runner_builds_guangya_target_adapter(tmp_path) -> None:
