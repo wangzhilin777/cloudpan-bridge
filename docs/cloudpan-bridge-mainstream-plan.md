@@ -16,6 +16,7 @@
 - [x] 把会话桥接 `bridge_ready` 与 API pending 路由语义拆开，避免运行态继续把已可归并的 provider 标成 pending
 - [x] 拆出 `app.drivercapture.js`、`app.pending.js`，把驱动抓取面板与待补传目录树从 `app.js` 剥离
 - [x] 继续拆出 `app.registry.js`、`app.status.js`、`app.capability.js`，把关于页审计、运行概览和能力动作逻辑继续从 `app.js` 剥离
+- [x] 再拆出 `app.runtimeview.js`，把同步状态、运行时状态、目标端抓取状态从 `app.js` 剥离，并把 `app.js` 压回 100 KB 以内
 - [x] 支持从 `content_hash / etag` 里解析可识别的 `md5 / sha1` 候选，提升主流 provider 的补指纹命中率
 - [x] 收紧 API placeholder bridge 的 `pending_reason`，避免文件本身已具备快传哈希时仍被误记成 API pending
 - [ ] 深化首批主流源端的真实直连补指纹桥接实现
