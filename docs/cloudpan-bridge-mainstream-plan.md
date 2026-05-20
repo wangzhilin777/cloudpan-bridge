@@ -85,6 +85,10 @@
   - 会区分桥接后理论可补到的目标端快传哈希
   - 会区分抓取缓存里已经可直接喂给目标端的快传哈希
   - 也会明确显示源端常见哈希里哪些当前目标端根本不认，避免多目标端切换时只剩笼统 recommended flow
+- enrich 提取器现在补了一层统一键名归一化：
+  - 常见的 `camelCase / PascalCase / 连字符` 哈希键名会先归一化再进入统一提取流程
+  - 已覆盖的真实变体包括 `contentMd5 / gcidHash / sha1Hash / crc64Hash / pickCode` 等
+  - 这让 `189Cloud / Thunder / OneDrive / AliyunDriveOpen` 一类常见返回体不必每个 provider 单独再写一轮键名兼容
 
 ## 摘要
 

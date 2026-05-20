@@ -39,12 +39,17 @@ HASH_LABEL_ALIASES = {
     "content_md5": "md5",
     "md5_hash": "md5",
     "md5hash": "md5",
+    "md5_sum": "md5",
+    "md5sum": "md5",
     "file_gcid": "gcid",
+    "gcid_hash": "gcid",
+    "gcidhash": "gcid",
     "content_hash": "content_hash",
     "contenthash": "content_hash",
     "content_hash_name": "content_hash_name",
     "contenthashname": "content_hash_name",
     "prehash": "pre_hash",
+    "pre_hash_value": "pre_hash",
     "slice-md5": "slice_md5",
     "slicehash": "slice_md5",
     "sha-1": "sha1",
@@ -55,6 +60,7 @@ HASH_LABEL_ALIASES = {
     "sha256hash": "sha256",
     "crc64_hash": "crc64",
     "crc64hash": "crc64",
+    "pick_code": "pickcode",
 }
 
 HASH_ITEM_LABEL_KEYS = ("algorithm", "alg", "name", "type", "hash_type", "kind", "label", "key")
@@ -81,8 +87,19 @@ def _iter_collection_entries(value: Any) -> list[dict[str, Any]]:
     return entries
 
 
+def _canonicalize_hash_key_name(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    snake = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", text)
+    snake = snake.replace("-", "_").replace(" ", "_").lower()
+    while "__" in snake:
+        snake = snake.replace("__", "_")
+    return snake.strip("_")
+
+
 def _normalize_hash_label(value: Any) -> str:
-    text = str(value or "").strip().lower().replace(" ", "_")
+    text = _canonicalize_hash_key_name(value)
     if not text:
         return ""
     normalized = HASH_LABEL_ALIASES.get(text, text)
@@ -91,10 +108,19 @@ def _normalize_hash_label(value: Any) -> str:
     return ""
 
 
+def _normalize_payload_aliases(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized_payload = {str(key): item for key, item in payload.items()}
+    for key, value in list(payload.items()):
+        normalized_key = _normalize_hash_label(key)
+        if normalized_key and normalized_key not in normalized_payload and str(value or "").strip():
+            normalized_payload[normalized_key] = value
+    return normalized_payload
+
+
 def _build_hash_payload_from_item(value: Any) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
-    normalized = {str(key): item for key, item in value.items()}
+    normalized = _normalize_payload_aliases({str(key): item for key, item in value.items()})
     for label_key in HASH_ITEM_LABEL_KEYS:
         label = _normalize_hash_label(normalized.get(label_key))
         if not label:
@@ -150,10 +176,10 @@ def _collect_capture_entry_payloads(entry: SourceEntry, runtime: dict[str, Any])
             if isinstance(mapping, dict):
                 direct = mapping.get(normalized_entry_path)
                 if isinstance(direct, dict):
-                    payloads.append({str(inner_key): inner_value for inner_key, inner_value in direct.items()})
+                    payloads.append(_normalize_payload_aliases({str(inner_key): inner_value for inner_key, inner_value in direct.items()}))
                 alt = mapping.get(normalized_entry_path.lstrip("/"))
                 if isinstance(alt, dict):
-                    payloads.append({str(inner_key): inner_value for inner_key, inner_value in alt.items()})
+                    payloads.append(_normalize_payload_aliases({str(inner_key): inner_value for inner_key, inner_value in alt.items()}))
     source_id = str(entry.source_id or "").strip()
     if source_id:
         for key in ("file_hashes_by_id", "fingerprints_by_id", "hash_cache_by_id", "entry_hashes_by_id"):
@@ -161,11 +187,11 @@ def _collect_capture_entry_payloads(entry: SourceEntry, runtime: dict[str, Any])
             if isinstance(mapping, dict):
                 direct = mapping.get(source_id)
                 if isinstance(direct, dict):
-                    payloads.append({str(inner_key): inner_value for inner_key, inner_value in direct.items()})
+                    payloads.append(_normalize_payload_aliases({str(inner_key): inner_value for inner_key, inner_value in direct.items()}))
     for key in ("file_hashes", "fingerprints", "hash_cache", "entries", "items"):
         collection = captured.get(key)
         for item in _iter_collection_entries(collection):
-            normalized = {str(inner_key): inner_value for inner_key, inner_value in item.items()}
+            normalized = _normalize_payload_aliases({str(inner_key): inner_value for inner_key, inner_value in item.items()})
             if _capture_payload_matches_entry(normalized, entry):
                 payloads.append(normalized)
     return _dedupe_payloads(payloads)
@@ -176,7 +202,7 @@ def _collect_nested_payloads(value: Any, *, depth: int = 0) -> list[dict[str, An
         return []
     payloads: list[dict[str, Any]] = []
     if isinstance(value, dict):
-        normalized = {str(key): item for key, item in value.items()}
+        normalized = _normalize_payload_aliases({str(key): item for key, item in value.items()})
         payloads.append(normalized)
         derived_payload = _build_hash_payload_from_item(normalized)
         if derived_payload:
@@ -229,9 +255,9 @@ def _dedupe_payloads(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _collect_raw_sources(entry: SourceEntry, extra_payloads: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     payloads = [
-        dict(entry.raw_hash_info or {}),
-        dict(entry.provider_specific or {}),
-        dict(entry.extra_hashes or {}),
+        _normalize_payload_aliases(dict(entry.raw_hash_info or {})),
+        _normalize_payload_aliases(dict(entry.provider_specific or {})),
+        _normalize_payload_aliases(dict(entry.extra_hashes or {})),
         {
             "md5": entry.md5,
             "etag": entry.etag,

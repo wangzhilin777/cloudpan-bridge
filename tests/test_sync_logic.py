@@ -1188,6 +1188,38 @@ def test_source_enrichment_reads_nested_content_hash_from_provider_specific(tmp_
     assert "sha1" in report["candidate_hashes"]
 
 
+def test_source_enrichment_accepts_camel_case_md5_alias_for_189cloud(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/189cloud-camel.bin",
+        md5="",
+        size=10,
+        provider="189Cloud",
+        raw_hash_info={"contentMd5": "abcdef0123456789abcdef0123456789"},
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.md5 == "ABCDEF0123456789ABCDEF0123456789"
+    assert report["candidate_hashes"][0] == "md5"
+    assert report["fast_upload_ready_after_bridge"] is True
+
+
+def test_source_enrichment_accepts_camel_case_gcid_alias_for_thunder(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/thunder-camel.bin",
+        md5="",
+        size=10,
+        provider="Thunder",
+        raw_hash_info={"gcidHash": "abcdef0123456789abcdef0123456789abcdef01"},
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.gcid == "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+    assert "gcid" in report["candidate_hashes"]
+    assert report["fast_upload_ready_after_bridge"] is True
+
+
 def test_source_enrichment_reads_stringified_nested_hash_info_payloads(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text("{}", encoding="utf-8")
