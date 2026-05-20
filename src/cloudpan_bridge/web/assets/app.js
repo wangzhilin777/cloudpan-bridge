@@ -108,6 +108,7 @@
     const workflowView = window.CloudPanBridgeWorkflow || {};
     const capabilityView = window.CloudPanBridgeCapabilityView || {};
     const driverCaptureView = window.CloudPanBridgeDriverCapture || {};
+    const sourceOpsView = window.CloudPanBridgeSourceOps || {};
     const pendingView = window.CloudPanBridgePendingUi || {};
     const registryView = window.CloudPanBridgeRegistryView || {};
     const statusView = window.CloudPanBridgeStatusView || {};
@@ -132,6 +133,8 @@
     let currentParentPath = null;
     let currentDriverGuide = null;
     let currentProviderGuide = null;
+    let driversCache = [];
+    let currentDriverInfo = null;
 
     function workflowContext() {
       return {
@@ -236,6 +239,41 @@
       return {
         escapeHtml,
         getOpenListModeLabel,
+      };
+    }
+
+    function sourceOpsContext() {
+      return {
+        currentLang,
+        escapeHtml,
+        formatBytes,
+        call,
+        refreshStatus,
+        browseDirectory,
+        renderSourceDriverSummary,
+        renderCapabilitySummary,
+        applyWorkflowGates,
+        applyProviderSelectionFromDriver,
+        renderDriverGuide,
+        renderProviderCapturePanel,
+        getGroupedConfigValue,
+        setGroupedConfigValue,
+        scheduleUiPrefsPersist,
+        driverFieldLabel,
+        driverFieldHelp,
+        driverFieldOptions,
+        getCurrentDirectoryPath: () => currentDirectoryPath,
+        getCurrentParentPath: () => currentParentPath,
+        setCurrentDirectory: (path, parentPath) => {
+          currentDirectoryPath = path;
+          currentParentPath = parentPath;
+        },
+        setStorageRecords: (items) => {
+          storageRecords = items;
+        },
+        setCurrentDriverInfo: (info) => {
+          currentDriverInfo = info;
+        },
       };
     }
 
@@ -1094,33 +1132,7 @@
     }
 
     function renderDirectoryBrowser(data) {
-      currentDirectoryPath = data?.path || "/";
-      currentParentPath = data?.parent_path || null;
-      document.getElementById("dir-current").textContent = `当前浏览: ${currentDirectoryPath}`;
-      setGroupedConfigValue(["ui", "browser", "current_path"], currentDirectoryPath || "/");
-      setGroupedConfigValue(["ui", "browser", "current_parent_path"], currentParentPath || "");
-      scheduleUiPrefsPersist();
-      renderSourceDriverSummary();
-      const root = document.getElementById("dir-browser-list");
-      const dirs = Array.isArray(data?.directories) ? data.directories : [];
-      if (!dirs.length) {
-        root.innerHTML = `<div class="subtle">这个目录下没有子目录，可以直接把它设为同步源目录。</div>`;
-        return;
-      }
-      root.innerHTML = dirs.map((item) => `
-        <div class="row-item">
-          <div>
-            <div>${escapeHtml(item.name || "")}</div>
-            <div class="mono">${escapeHtml(item.path || "")}</div>
-          </div>
-          <button class="secondary" data-open-dir="${escapeHtml(item.path || "/")}">进入</button>
-        </div>
-      `).join("");
-      root.querySelectorAll("[data-open-dir]").forEach((button) => {
-        button.addEventListener("click", async () => {
-          await browseDirectory(button.getAttribute("data-open-dir") || "/");
-        });
-      });
+      sourceOpsView.renderDirectoryBrowser?.(sourceOpsContext(), data);
     }
 
     function renderSourceAnalyze(data) {
@@ -1128,117 +1140,19 @@
     }
 
     function renderMiaochuanDiagnosis(data) {
-      const root = document.getElementById("miaochuan-diagnosis");
-      if (!data) {
-        root.textContent = currentLang() === "en"
-          ? "No diagnosis result"
-          : currentLang() === "mix"
-            ? "暂无诊断结果 / No diagnosis result"
-            : "暂无诊断结果";
-        return;
-      }
-      const providerCounts = Object.entries(data.provider_counts || {})
-        .map(([key, value]) => `${key}: ${value}`)
-        .join(" | ") || "-";
-      const sample = Array.isArray(data.sample) ? data.sample : [];
-      root.innerHTML = `
-        <div class="row-item">
-          <div>
-            <div>${currentLang() === "en" ? "Flash Upload JSON Diagnosis" : currentLang() === "mix" ? "秒传 JSON 诊断 / Flash Upload JSON Diagnosis" : "秒传 JSON 诊断"}</div>
-            <div class="mono">${currentLang() === "en" ? "Total files" : currentLang() === "mix" ? "文件总数 / Total files" : "文件总数"}: ${data.total ?? 0}</div>
-            <div class="mono">${currentLang() === "en" ? "Total size" : currentLang() === "mix" ? "总大小 / Total size" : "总大小"}: ${formatBytes(data.total_size || 0)}</div>
-            <div class="mono">MD5: ${data.md5_count ?? 0} | GCID: ${data.gcid_count ?? 0}</div>
-            <div class="mono">provider: ${escapeHtml(providerCounts)}</div>
-          </div>
-        </div>
-        ${sample.map((item) => `
-          <div class="row-item">
-            <div>
-              <div>${escapeHtml(item.path || "-")}</div>
-              <div class="mono">provider=${escapeHtml(item.provider || "unknown")} | hashType=${escapeHtml(item.hashType || "-")} | size=${formatBytes(item.size || 0)}</div>
-              <div class="mono">md5=${escapeHtml(item.etag || "-")} | gcid=${escapeHtml(item.gcid || "-")}</div>
-            </div>
-          </div>
-        `).join("")}
-        ${sample.length === 0 ? `<div class="subtle">${currentLang() === "en" ? "No sample rows available." : currentLang() === "mix" ? "没有可展示的样本行。 / No sample rows available." : "没有可展示的样本行。"}</div>` : ""}
-      `;
+      sourceOpsView.renderMiaochuanDiagnosis?.(sourceOpsContext(), data);
     }
 
     function populateMountedSources(items) {
-      const select = document.getElementById("mounted_source_select");
-      const list = Array.isArray(items) ? items : [];
-      if (!list.length) {
-        select.innerHTML = `<option value="">${currentLang() === "en" ? "No mounts" : currentLang() === "mix" ? "暂无挂载 / No mounts" : "暂无挂载"}</option>`;
-        return;
-      }
-      const sourcePath = String(document.getElementById("source_path").value || "").trim();
-      const mountedSource = String(getGroupedConfigValue(["ui", "browser", "mounted_source"], "") || "").trim();
-      select.innerHTML = list.map((item) => {
-        const mountPath = item.mount_path || item.mountPath || item.path || "/";
-        const driver = item.driver || item.driver_name || item.driverName || "-";
-        const selected = mountedSource
-          ? (mountedSource === String(mountPath) ? "selected" : "")
-          : (sourcePath.startsWith(String(mountPath)) ? "selected" : "");
-        return `<option value="${escapeHtml(mountPath)}" ${selected}>${escapeHtml(mountPath)} | ${escapeHtml(driver)}</option>`;
-      }).join("");
+      sourceOpsView.populateMountedSources?.(sourceOpsContext(), items);
     }
 
     function renderQueue(items) {
-      const root = document.getElementById("queue-list");
-      const list = Array.isArray(items) ? items : [];
-      if (!list.length) {
-        root.textContent = currentLang() === "en" ? "No queued directories" : currentLang() === "mix" ? "暂无目录队列 / No queued directories" : "暂无目录队列";
-        return;
-      }
-      root.innerHTML = list.map((item) => `
-        <div class="row-item">
-          <div>
-            <div>${escapeHtml(item.source_path)}</div>
-            <div class="mono">${currentLang() === "en" ? "Status" : currentLang() === "mix" ? "状态 / Status" : "状态"}: ${escapeHtml(item.last_status || "idle")} ${item.last_run_at ? `| ${currentLang() === "en" ? "Last run" : currentLang() === "mix" ? "上次 / Last run" : "上次"}: ${escapeHtml(item.last_run_at)}` : ""}</div>
-          </div>
-          <button class="secondary" data-remove-queue="${escapeHtml(item.source_path)}">${currentLang() === "en" ? "Remove" : currentLang() === "mix" ? "移除 / Remove" : "移除"}</button>
-        </div>
-      `).join("");
-      root.querySelectorAll("[data-remove-queue]").forEach((button) => {
-        button.addEventListener("click", async () => {
-          await call("/api/queue/remove", {
-            method: "POST",
-            body: JSON.stringify({ source_path: button.getAttribute("data-remove-queue") || "" }),
-          });
-          await refreshStatus();
-        });
-      });
+      sourceOpsView.renderQueue?.(sourceOpsContext(), items);
     }
 
     function renderStorages(payload) {
-      const root = document.getElementById("storage-list");
-      const content = payload?.data?.content || payload?.data || [];
-      const list = Array.isArray(content) ? content : [];
-      storageRecords = list;
-      populateMountedSources(list);
-      const selectedMount = document.getElementById("mounted_source_select")?.value || "";
-      const selectedStorage = list.find((item) => String(item.mount_path || item.mountPath || item.path || "/") === String(selectedMount));
-      if (selectedStorage) applyProviderSelectionFromDriver(selectedStorage.driver || selectedStorage.driver_name || selectedStorage.driverName || "");
-      if (!list.length) {
-        root.textContent = currentLang() === "en" ? "No mounts" : currentLang() === "mix" ? "暂无挂载 / No mounts" : "暂无挂载";
-        renderCapabilitySummary();
-        applyWorkflowGates();
-        return;
-      }
-      root.innerHTML = list.map((item) => {
-        const mountPath = item.mount_path || item.mountPath || item.path || "/";
-        const driver = item.driver || item.driver_name || item.driverName || "-";
-        return `
-          <div class="row-item">
-            <div>
-              <div>${escapeHtml(mountPath)}</div>
-              <div class="mono">driver: ${escapeHtml(driver)} | ${currentLang() === "en" ? "status" : currentLang() === "mix" ? "状态 / status" : "状态"}: ${escapeHtml(String(item.status ?? "-"))}</div>
-            </div>
-          </div>
-        `;
-      }).join("");
-      renderCapabilitySummary();
-      applyWorkflowGates();
+      sourceOpsView.renderStorages?.(sourceOpsContext(), payload);
     }
 
     async function loadDrivers() {
@@ -1257,41 +1171,7 @@
     }
 
     function renderDriverFields(info) {
-      currentDriverInfo = info;
-      const fields = [...(info?.common || []), ...(info?.additional || [])];
-      const root = document.getElementById("driver-fields");
-      document.getElementById("driver-notice").textContent = currentLang() === "en"
-        ? `${info?.name || "-"}: ${fields.length} fields generated from OpenList driver metadata.`
-        : currentLang() === "mix"
-          ? `${info?.name || "-"}：共 ${fields.length} 个字段 / ${fields.length} fields generated from OpenList driver metadata.`
-          : `${info?.name || "-"}：共 ${fields.length} 个字段，已按 OpenList 驱动描述动态生成。`;
-      root.innerHTML = fields.map((field) => {
-        const type = String(field.type || "string").toLowerCase();
-        const id = `driver-field-${field.name}`;
-        if (type === "bool") {
-          return `
-            <div>
-              <label>${escapeHtml(driverFieldLabel(field.name))} ${field.required ? (currentLang() === "en" ? "(Required)" : currentLang() === "mix" ? "(必填 / Required)" : "(必填)") : ""}</label>
-              <select id="${escapeHtml(id)}" data-driver-field="${escapeHtml(field.name)}">
-                <option value="">${currentLang() === "en" ? "Default" : currentLang() === "mix" ? "默认 / Default" : "默认"}</option>
-                <option value="true" ${String(field.default) === "True" || String(field.default) === "true" ? "selected" : ""}>${currentLang() === "en" ? "true" : currentLang() === "mix" ? "是 / true" : "是"}</option>
-                <option value="false" ${String(field.default) === "False" || String(field.default) === "false" ? "selected" : ""}>${currentLang() === "en" ? "false" : currentLang() === "mix" ? "否 / false" : "否"}</option>
-              </select>
-              <div class="mono">${escapeHtml(driverFieldHelp(field.help || ""))}</div>
-            </div>
-          `;
-        }
-        return `
-          <div>
-            <label>${escapeHtml(driverFieldLabel(field.name))} ${field.required ? (currentLang() === "en" ? "(Required)" : currentLang() === "mix" ? "(必填 / Required)" : "(必填)") : ""}</label>
-            <input id="${escapeHtml(id)}" data-driver-field="${escapeHtml(field.name)}" value="${escapeHtml(field.default || "")}">
-            <div class="mono">${escapeHtml(driverFieldHelp(field.help || "") || driverFieldOptions(field.options || "") || String(field.options || ""))}</div>
-          </div>
-        `;
-      }).join("");
-      renderDriverGuide(info?.name || "");
-      renderProviderCapturePanel();
-      renderCapabilitySummary();
+      sourceOpsView.renderDriverFields?.(sourceOpsContext(), info);
     }
 
     async function loadDriverInfo(driver) {
