@@ -28,6 +28,8 @@ def _entry_bridge_metadata(entry: SourceEntry) -> dict[str, Any]:
         "execution_state": str(provider_specific.get("__bridge_execution_state") or "").strip(),
         "provider_stage": str(provider_specific.get("__bridge_provider_stage") or "").strip(),
         "transport_hint": str(provider_specific.get("__bridge_transport_hint") or "").strip(),
+        "maturity_level": str(provider_specific.get("__bridge_maturity_level") or "").strip(),
+        "maturity_honesty": str(provider_specific.get("__bridge_maturity_honesty") or "").strip(),
     }
 
 
@@ -109,6 +111,8 @@ def plan_transfer_mode(
         "bridge_execution_state": str(bridge_meta.get("execution_state") or ""),
         "bridge_provider_stage": str(bridge_meta.get("provider_stage") or ""),
         "bridge_transport_hint": str(bridge_meta.get("transport_hint") or ""),
+        "bridge_maturity_level": str(bridge_meta.get("maturity_level") or ""),
+        "bridge_maturity_honesty": str(bridge_meta.get("maturity_honesty") or ""),
         "supports_fast_upload": bool(capability.get("supports_fast_upload") or capability.get("fast_upload_hashes") or capability.get("fastUploadHashes")),
         "fallback_modes": fallback_modes,
         "auto_download_threshold_mb": max(0, int(auto_download_threshold_mb or 0)),
@@ -130,6 +134,8 @@ def summarize_transfer_plan(
     bridge_execution_state_counts: dict[str, int] = {}
     bridge_provider_stage_counts: dict[str, int] = {}
     bridge_transport_hint_counts: dict[str, int] = {}
+    bridge_maturity_level_counts: dict[str, int] = {}
+    bridge_maturity_honesty_counts: dict[str, int] = {}
     for entry in entries:
         plan = plan_transfer_mode(
             entry,
@@ -158,6 +164,12 @@ def summarize_transfer_plan(
         bridge_transport_hint = str(plan.get("bridge_transport_hint") or "").strip()
         if bridge_transport_hint:
             bridge_transport_hint_counts[bridge_transport_hint] = bridge_transport_hint_counts.get(bridge_transport_hint, 0) + 1
+        bridge_maturity_level = str(plan.get("bridge_maturity_level") or "").strip()
+        if bridge_maturity_level:
+            bridge_maturity_level_counts[bridge_maturity_level] = bridge_maturity_level_counts.get(bridge_maturity_level, 0) + 1
+        bridge_maturity_honesty = str(plan.get("bridge_maturity_honesty") or "").strip()
+        if bridge_maturity_honesty:
+            bridge_maturity_honesty_counts[bridge_maturity_honesty] = bridge_maturity_honesty_counts.get(bridge_maturity_honesty, 0) + 1
     return {
         "total": len(entries),
         "mode_counts": counts,
@@ -168,6 +180,8 @@ def summarize_transfer_plan(
         "bridge_execution_state_counts": bridge_execution_state_counts,
         "bridge_provider_stage_counts": bridge_provider_stage_counts,
         "bridge_transport_hint_counts": bridge_transport_hint_counts,
+        "bridge_maturity_level_counts": bridge_maturity_level_counts,
+        "bridge_maturity_honesty_counts": bridge_maturity_honesty_counts,
         "auto_download_threshold_mb": max(0, int(auto_download_threshold_mb or 0)),
         "allow_full_fallback": bool(allow_full_fallback),
     }

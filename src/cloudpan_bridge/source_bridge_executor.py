@@ -132,6 +132,12 @@ def _attach_bridge_metadata(entry: SourceEntry, report: dict[str, Any]) -> None:
     transport_hint = str(report.get("bridge_transport_hint") or "").strip()
     if transport_hint:
         provider_specific["__bridge_transport_hint"] = transport_hint
+    maturity_level = str(report.get("bridge_maturity_level") or "").strip()
+    if maturity_level:
+        provider_specific["__bridge_maturity_level"] = maturity_level
+    maturity_honesty = str(report.get("bridge_maturity_honesty") or "").strip()
+    if maturity_honesty:
+        provider_specific["__bridge_maturity_honesty"] = maturity_honesty
     entry.provider_specific = provider_specific
 
 
@@ -173,6 +179,7 @@ def _build_report(
     bridge_runtime = dict(runtime.get("bridge_runtime") or {})
     preparation = dict(bridge_runtime.get("preparation") or {})
     merged_presence = _fingerprint_presence(merged)
+    bridge_maturity = dict(runtime.get("bridge_maturity_summary") or {})
     return {
         "changed": bool(added_hashes),
         "added_hashes": added_hashes,
@@ -180,6 +187,8 @@ def _build_report(
         "bridge_executor": executor_name,
         "provider_stage": provider_stage,
         "bridge_transport_hint": str(preparation.get("transport_hint") or "-"),
+        "bridge_maturity_level": str(bridge_maturity.get("level") or ""),
+        "bridge_maturity_honesty": str(bridge_maturity.get("honesty") or ""),
         "bridge_selected_group": list(preparation.get("selected_group") or []),
         "bridge_hook_registered": bool(bridge_runtime.get("hook_registered")),
         "candidate_hashes": _candidate_hashes(merged),
@@ -282,6 +291,8 @@ def execute_source_bridge(entry: SourceEntry, runtime: dict[str, Any]) -> tuple[
             "bridge_executor": "",
             "provider_stage": "none",
             "bridge_transport_hint": "-",
+            "bridge_maturity_level": "",
+            "bridge_maturity_honesty": "",
             "bridge_selected_group": [],
             "bridge_hook_registered": False,
             "candidate_hashes": _candidate_hashes(entry),

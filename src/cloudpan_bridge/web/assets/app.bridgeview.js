@@ -92,6 +92,18 @@
     return pickText(ctx, pair[0], pair[1]);
   }
 
+  function bridgeHonestyText(ctx, key) {
+    const mapping = {
+      capture_ready_normalization_only: ["已具备归并能力，但仍只到补指纹层", "Normalization is ready, but still limited to enrichment only"],
+      api_prepared_not_executed: ["API 准备态已满足，但真实 provider enrich 未执行", "API preparation is satisfied, but real provider enrich is not executed"],
+      waiting_capture: ["仍在等待关键登录态", "Still waiting for required capture fields"],
+      openlist_only: ["当前只能依赖 OpenList 元数据", "Currently limited to OpenList metadata only"],
+      manual_review: ["需要人工复核", "Needs manual review"],
+    };
+    const pair = mapping[String(key || "").trim()] || [key || "-", key || "-"];
+    return pickText(ctx, pair[0], pair[1]);
+  }
+
   function formatCountMap(ctx, counts, formatter) {
     return Object.entries(counts || {}).map(([key, value]) => `${formatter(ctx, key)}: ${value}`).join(" | ") || "-";
   }
@@ -105,6 +117,7 @@
     bridgeTransportHintText,
     bridgeExpectationText,
     bridgeMaturityText,
+    bridgeHonestyText,
     formatCountMap,
   };
 })();
