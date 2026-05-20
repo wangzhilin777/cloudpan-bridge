@@ -25,6 +25,7 @@ from cloudpan_bridge.provider_capture import (
     resolve_capture_spec_for_driver,
 )
 from cloudpan_bridge.source_adapter import OpenListSourceProvider, create_source_provider
+from cloudpan_bridge.source_bridge_executor import execute_source_bridge
 from cloudpan_bridge.source_bridge_registry import prepare_source_bridge
 from cloudpan_bridge.source_enrich_bridge import build_bridge_runtime
 from cloudpan_bridge.source_enrich import build_source_enrichment_runtime, enrich_entry
@@ -962,6 +963,8 @@ def test_source_enrichment_allows_baidu_etag_as_md5(tmp_path: Path) -> None:
     enriched, report = enrich_entry(entry, AppConfig.load(path))
     assert enriched.md5 == "ABCDEF0123456789ABCDEF0123456789"
     assert report["changed"] is True
+    assert report["bridge_execution_state"] == "session_snapshot_normalized"
+    assert report["bridge_executor"] == "prepare_baidu_session_bridge"
 
 
 def test_source_enrichment_runtime_reports_bridge_status_for_aliyundriveopen(tmp_path: Path) -> None:
@@ -1013,6 +1016,35 @@ def test_prepare_source_bridge_reports_transport_hint_for_quark() -> None:
     assert prepared["transport_hint"] == "cookie_snapshot"
     assert prepared["selected_field_names"] == ["cookie_header"]
     assert "md5" in prepared["fingerprint_expectation"]
+
+
+def test_execute_source_bridge_marks_api_bridge_placeholder_for_onedrive(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "onedrive": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    entry = SourceEntry(path="/src/a.docx", md5="", size=10, provider="OneDrive", raw_hash_info={"sha1": "a" * 40})
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "onedrive")
+    enriched, report = execute_source_bridge(entry, runtime)
+    assert enriched.sha1 == "A" * 40
+    assert report["bridge_execution_state"] == "api_bridge_prepared_but_not_executed"
+    assert report["bridge_executor"] == "prepare_onedrive_api_bridge"
+    assert report["bridge_transport_hint"] == "refresh_token_or_authorization"
 
 
 def test_transfer_planner_prefers_fast_upload_when_target_hash_matches() -> None:
