@@ -14,9 +14,56 @@ HEX_LENGTHS: dict[str, int] = {
     "sha256": 64,
 }
 
+NESTED_HASH_CONTAINER_KEYS = {
+    "hash_info",
+    "hashinfo",
+    "hashes",
+    "file_hashes",
+    "filehashes",
+    "digest",
+    "digests",
+    "content",
+    "content_info",
+    "contentinfo",
+    "meta",
+    "metadata",
+}
+
+
+def _collect_nested_payloads(value: Any, *, depth: int = 0) -> list[dict[str, Any]]:
+    if depth > 3:
+        return []
+    payloads: list[dict[str, Any]] = []
+    if isinstance(value, dict):
+        normalized = {str(key): item for key, item in value.items()}
+        payloads.append(normalized)
+        for key, item in normalized.items():
+            key_lower = str(key).strip().lower()
+            if isinstance(item, dict) and (key_lower in NESTED_HASH_CONTAINER_KEYS or depth == 0):
+                payloads.extend(_collect_nested_payloads(item, depth=depth + 1))
+            elif isinstance(item, list) and key_lower in NESTED_HASH_CONTAINER_KEYS:
+                for child in item:
+                    payloads.extend(_collect_nested_payloads(child, depth=depth + 1))
+    elif isinstance(value, list):
+        for item in value:
+            payloads.extend(_collect_nested_payloads(item, depth=depth + 1))
+    return payloads
+
+
+def _dedupe_payloads(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[tuple[tuple[str, str], ...]] = set()
+    unique: list[dict[str, Any]] = []
+    for payload in payloads:
+        signature = tuple(sorted((str(key), str(value)) for key, value in payload.items()))
+        if signature in seen:
+            continue
+        seen.add(signature)
+        unique.append(payload)
+    return unique
+
 
 def _collect_raw_sources(entry: SourceEntry) -> list[dict[str, Any]]:
-    return [
+    payloads = [
         dict(entry.raw_hash_info or {}),
         dict(entry.provider_specific or {}),
         dict(entry.extra_hashes or {}),
@@ -33,6 +80,10 @@ def _collect_raw_sources(entry: SourceEntry) -> list[dict[str, Any]]:
             "content_hash": entry.content_hash,
         },
     ]
+    nested_payloads: list[dict[str, Any]] = []
+    for payload in payloads:
+        nested_payloads.extend(_collect_nested_payloads(payload))
+    return _dedupe_payloads([*payloads, *nested_payloads])
 
 
 def _pick_hash_value(entry: SourceEntry, logical_key: str, aliases_map: dict[str, list[str]]) -> str:

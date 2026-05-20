@@ -1147,6 +1147,52 @@ def test_source_enrichment_derives_md5_from_tagged_content_hash(tmp_path: Path) 
     assert report["changed"] is True
 
 
+def test_source_enrichment_reads_nested_hash_info_payloads(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/nested-thunder.bin",
+        md5="",
+        size=10,
+        provider="Thunder",
+        raw_hash_info={
+            "metadata": {
+                "hash_info": {
+                    "file_gcid": "G" * 40,
+                    "md5": "abcdef0123456789abcdef0123456789",
+                }
+            }
+        },
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.gcid == "G" * 40
+    assert enriched.md5 == "ABCDEF0123456789ABCDEF0123456789"
+    assert report["candidate_hashes"][:2] == ["md5", "gcid"]
+    assert report["fast_upload_ready_after_bridge"] is True
+
+
+def test_source_enrichment_reads_nested_content_hash_from_provider_specific(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/nested-onedrive.bin",
+        md5="",
+        size=10,
+        provider="OneDrive",
+        provider_specific={
+            "metadata": "{\"content_hash\":\"sha1:abcdef0123456789abcdef0123456789abcdef01\"}"
+        },
+        raw_hash_info={
+            "metadata": {
+                "content_hash": "sha1:abcdef0123456789abcdef0123456789abcdef01",
+            }
+        },
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.sha1 == "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+    assert "sha1" in report["candidate_hashes"]
+
+
 def test_source_enrichment_runtime_reports_bridge_status_for_aliyundriveopen(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text(
