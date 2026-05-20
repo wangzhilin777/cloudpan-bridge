@@ -67,6 +67,11 @@
 - `source_target_route` 也新增了这条诚实分支：
   - `api_capture_cache_candidate`
   - 表示“当前应先消费抓取缓存，再决定是否真的要走在线 provider API enrich”
+- 页面摘要现在也会直接显示这些抓取缓存信号：
+  - 缓存条目数
+  - `path / source_id / collection_scan` 哪种查找方式可用
+  - 缓存里当前有哪些哈希类型
+  - 路由里哪些目标端快传哈希已经可以优先从缓存尝试
 
 ## 摘要
 
