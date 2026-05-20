@@ -21,6 +21,16 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
         "preferred_hashes": ["md5"],
         "capture_required": True,
         "capture_fields": ["cookie_header", "session_key", "access_token", "refresh_token"],
+        "bridge": {
+            "mode": "session_snapshot",
+            "implemented": False,
+            "required_groups": [
+                ["cookie_header"],
+                ["session_key"],
+                ["access_token", "refresh_token"],
+            ],
+            "hook_name": "prepare_189cloud_session_bridge",
+        },
         "hash_aliases": {
             "md5": ["md5", "file_md5", "content_md5", "etag"],
         },
@@ -31,6 +41,15 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
         "preferred_hashes": ["md5"],
         "capture_required": True,
         "capture_fields": ["cookie_header", "access_token", "refresh_token"],
+        "bridge": {
+            "mode": "session_snapshot",
+            "implemented": False,
+            "required_groups": [
+                ["cookie_header"],
+                ["access_token", "refresh_token"],
+            ],
+            "hook_name": "prepare_quark_session_bridge",
+        },
         "hash_aliases": {
             "md5": ["md5", "file_md5", "content_md5", "etag"],
             "sha1": ["sha1", "content_sha1"],
@@ -45,6 +64,15 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
         "preferred_hashes": ["md5"],
         "capture_required": True,
         "capture_fields": ["cookie_header", "access_token", "refresh_token"],
+        "bridge": {
+            "mode": "session_snapshot",
+            "implemented": False,
+            "required_groups": [
+                ["cookie_header"],
+                ["access_token", "refresh_token"],
+            ],
+            "hook_name": "prepare_123pan_session_bridge",
+        },
         "hash_aliases": {
             "md5": ["md5", "file_md5", "content_md5", "etag"],
             "sha1": ["sha1", "content_sha1"],
@@ -56,6 +84,15 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
         "preferred_hashes": ["md5"],
         "capture_required": True,
         "capture_fields": ["cookie_header", "bdstoken", "access_token", "refresh_token"],
+        "bridge": {
+            "mode": "session_snapshot",
+            "implemented": False,
+            "required_groups": [
+                ["cookie_header", "bdstoken"],
+                ["access_token", "refresh_token", "bdstoken"],
+            ],
+            "hook_name": "prepare_baidu_session_bridge",
+        },
         "hash_aliases": {
             "md5": ["md5", "file_md5", "content_md5", "etag"],
             "slice_md5": ["slice_md5", "slicemd5"],
@@ -67,6 +104,15 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
         "preferred_hashes": ["gcid", "md5"],
         "capture_required": True,
         "capture_fields": ["authorization", "device_id", "x-device-id", "access_token", "refresh_token"],
+        "bridge": {
+            "mode": "provider_api",
+            "implemented": False,
+            "required_groups": [
+                ["authorization", "device_id"],
+                ["access_token", "device_id"],
+            ],
+            "hook_name": "prepare_thunder_api_bridge",
+        },
         "hash_aliases": {
             "gcid": ["gcid", "file_gcid"],
             "md5": ["md5", "file_md5", "content_md5", "etag"],
@@ -81,6 +127,15 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
         "preferred_hashes": ["sha1", "md5"],
         "capture_required": True,
         "capture_fields": ["refresh_token", "access_token", "authorization"],
+        "bridge": {
+            "mode": "provider_api",
+            "implemented": False,
+            "required_groups": [
+                ["refresh_token"],
+                ["authorization"],
+            ],
+            "hook_name": "prepare_aliyundriveopen_api_bridge",
+        },
         "hash_aliases": {
             "sha1": ["sha1", "content_sha1"],
             "md5": ["md5", "file_md5", "content_md5"],
@@ -94,6 +149,15 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
         "preferred_hashes": ["sha1", "md5"],
         "capture_required": True,
         "capture_fields": ["refresh_token", "access_token", "authorization"],
+        "bridge": {
+            "mode": "provider_api",
+            "implemented": False,
+            "required_groups": [
+                ["refresh_token"],
+                ["authorization"],
+            ],
+            "hook_name": "prepare_onedrive_api_bridge",
+        },
         "hash_aliases": {
             "sha1": ["sha1", "content_sha1"],
             "md5": ["md5", "file_md5", "content_md5"],

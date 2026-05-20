@@ -25,6 +25,7 @@ from cloudpan_bridge.provider_capture import (
     resolve_capture_spec_for_driver,
 )
 from cloudpan_bridge.source_adapter import OpenListSourceProvider, create_source_provider
+from cloudpan_bridge.source_enrich_bridge import build_bridge_runtime
 from cloudpan_bridge.source_enrich import build_source_enrichment_runtime, enrich_entry
 from cloudpan_bridge.source_adapter import (
     build_source_provider_resolution,
@@ -908,6 +909,8 @@ def test_source_enrichment_runtime_reports_mainstream_provider_capture_state(tmp
     assert runtime["supported"] is True
     assert runtime["capture_ready"] is True
     assert "gcid" in runtime["preferred_hashes"]
+    assert runtime["bridge_runtime"]["status"] == "bridge_ready_but_api_pending"
+    assert runtime["bridge_runtime"]["matched_groups"] == [["authorization", "device_id"]]
 
 
 def test_source_enrichment_promotes_hashes_from_existing_raw_fields(tmp_path: Path) -> None:
@@ -978,9 +981,24 @@ def test_source_enrichment_runtime_reports_bridge_status_for_aliyundriveopen(tmp
     )
     runtime = build_source_enrichment_runtime(AppConfig.load(path), "AliyunDriveOpen")
     assert runtime["capture_ready"] is True
-    assert runtime["bridge_status"] == "direct_bridge_pending"
+    assert runtime["bridge_status"] == "bridge_ready_but_api_pending"
     assert runtime["strategy_level"] == "provider_normalization"
     assert "etag" not in runtime["hash_aliases"]["md5"]
+    assert runtime["bridge_runtime"]["next_action"] == "prepare_aliyundriveopen_api_bridge"
+
+
+def test_bridge_runtime_reports_missing_keys_for_baidu_capture() -> None:
+    runtime = build_bridge_runtime("baidu", {"cookie_header": "sid=1"})
+    assert runtime["ready"] is False
+    assert runtime["status"] == "bridge_capture_missing"
+    assert "bdstoken" in runtime["missing_keys"]
+
+
+def test_bridge_runtime_accepts_refresh_token_for_onedrive() -> None:
+    runtime = build_bridge_runtime("onedrive", {"refresh_token": "demo-refresh"})
+    assert runtime["ready"] is True
+    assert runtime["status"] == "bridge_ready_but_api_pending"
+    assert runtime["matched_groups"] == [["refresh_token"]]
 
 
 def test_transfer_planner_prefers_fast_upload_when_target_hash_matches() -> None:

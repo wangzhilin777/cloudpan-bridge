@@ -37,6 +37,7 @@
     const assessedLevel = assessment?.assessedLevel || capability.level;
     const sourceMappingContext = assessment?.sourceMappingContext || providerRegistryPayload?.current_source_context || {};
     const sourceEnrichment = assessment?.sourceEnrichment || capability?.sourceEnrichment || {};
+    const bridgeRuntime = sourceEnrichment.bridge_runtime || {};
     const rationale = assessment?.rationale || {};
     const strategy = assessment?.strategy || {};
     const likelyHashes = Array.isArray(sourceProfile.likelyHashes) ? sourceProfile.likelyHashes : [];
@@ -97,6 +98,7 @@
       <div class="mono">${currentLang() === "en" ? "Likely hashes" : currentLang() === "mix" ? "常见哈希 / Likely hashes" : "常见哈希"}: ${escapeHtml(likelyHashes.join(", ") || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Fingerprint enrichment" : currentLang() === "mix" ? "补指纹能力 / Fingerprint enrichment" : "补指纹能力"}: ${supportsFingerprintEnrichment ? (currentLang() === "en" ? "declared" : currentLang() === "mix" ? "已声明 / declared" : "已声明") : (currentLang() === "en" ? "unknown" : currentLang() === "mix" ? "未知 / unknown" : "未知")}</div>
       <div class="mono">${currentLang() === "en" ? "Enrichment runtime" : currentLang() === "mix" ? "补指纹运行态 / Enrichment runtime" : "补指纹运行态"}: supported=${escapeHtml(String(!!sourceEnrichment.supported))} | capture_ready=${escapeHtml(String(!!sourceEnrichment.capture_ready))} | preferred=${escapeHtml((sourceEnrichment.preferred_hashes || []).join(", ") || "-")}</div>
+      <div class="mono">${currentLang() === "en" ? "Bridge runtime" : currentLang() === "mix" ? "桥接运行态 / Bridge runtime" : "桥接运行态"}: status=${escapeHtml(bridgeRuntime.status || "-")} | next=${escapeHtml(bridgeRuntime.next_action || "-")} | missing=${escapeHtml((bridgeRuntime.missing_keys || []).join(", ") || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Recommended rate profile" : currentLang() === "mix" ? "推荐频率 / Recommended rate profile" : "推荐频率"}: ${escapeHtml(sourceProfile.recommendedRateProfile || "-")}</div>
       <div class="mono">${escapeHtml(analysisLine)}</div>
       <div class="mono">${currentLang() === "en" ? "Transfer preview" : currentLang() === "mix" ? "传输预览 / Transfer preview" : "传输预览"}: ${escapeHtml(transferPreviewText)}</div>
@@ -116,6 +118,7 @@
     const summary = data?.summary || {};
     const decision = data?.fastUploadDecision || {};
     const enrichment = data?.sourceEnrichment || {};
+    const bridgeRuntime = enrichment.bridge_runtime || {};
     const transferPreview = data?.transferPlanPreview || {};
     const entries = Array.isArray(data?.entries) ? data.entries : [];
     if (!data) {
@@ -149,6 +152,7 @@
           <div class="mono">${currentLang() === "en" ? "MD5 ready" : currentLang() === "mix" ? "具备 MD5 / MD5 ready" : "具备 MD5"}: ${summary.md5_ready ?? 0} | GCID: ${summary.gcid_ready ?? 0} | ${currentLang() === "en" ? "Missing MD5" : currentLang() === "mix" ? "缺少 MD5 / Missing MD5" : "缺少 MD5"}: ${summary.missing_md5 ?? 0}</div>
           <div class="mono">${currentLang() === "en" ? "Fast upload decision" : currentLang() === "mix" ? "秒传决策 / Fast upload decision" : "秒传决策"}: ${escapeHtml(decision.level || "-")} | ${escapeHtml(decision.bucket || "-")}</div>
           <div class="mono">${currentLang() === "en" ? "Enrichment runtime" : currentLang() === "mix" ? "补指纹运行态 / Enrichment runtime" : "补指纹运行态"}: supported=${escapeHtml(String(!!enrichment.supported))} | capture_ready=${escapeHtml(String(!!enrichment.capture_ready))} | preferred=${escapeHtml((enrichment.preferred_hashes || []).join(", ") || "-")}</div>
+          <div class="mono">${currentLang() === "en" ? "Bridge runtime" : currentLang() === "mix" ? "桥接运行态 / Bridge runtime" : "桥接运行态"}: status=${escapeHtml(bridgeRuntime.status || "-")} | next=${escapeHtml(bridgeRuntime.next_action || "-")} | missing=${escapeHtml((bridgeRuntime.missing_keys || []).join(", ") || "-")}</div>
           <div class="mono">${currentLang() === "en" ? "Transfer preview" : currentLang() === "mix" ? "传输预览 / Transfer preview" : "传输预览"}: ${escapeHtml(Object.entries(transferPreview.mode_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-")}</div>
           <div class="mono">provider: ${escapeHtml(providerCounts)}</div>
           <div class="mono">hash: ${escapeHtml(hashCounts)}</div>
@@ -191,6 +195,7 @@
     const rateMode = String(document.getElementById("rate_limit_mode")?.value || configCache?.rate_limit_mode || "safe").trim() || "safe";
     const sourceRuntime = window.__cpbStatusCache?.source_runtime || {};
     const sourceEnrichment = window.__cpbStatusCache?.sourceEnrichment || {};
+    const bridgeRuntime = sourceEnrichment.bridge_runtime || {};
     root.innerHTML = `
       <div class="mono">driver=${escapeHtml(context.driver || "-")} | mount=${escapeHtml(selectedMount || "-")} | rate=${escapeHtml(rateMode)}</div>
       <div class="mono">mounted_driver=${escapeHtml(context.mountedDriver || "-")} | override=${escapeHtml(context.overrideProfile || "-")}</div>
@@ -198,6 +203,7 @@
       <div class="mono">runtime_mount=${escapeHtml(runtimeContext.mount_path || "-")} | runtime_effective=${escapeHtml(runtimeContext.effective_driver || "-")}</div>
       <div class="mono">route_pref=${escapeHtml(sourceRuntime.requested_provider_preference || "-")} | route_selected=${escapeHtml(sourceRuntime.selected_source_mode || "-")} | route_provider=${escapeHtml(sourceRuntime.selected_provider_key || "-")}</div>
       <div class="mono">enrich_supported=${escapeHtml(String(!!sourceEnrichment.supported))} | capture_ready=${escapeHtml(String(!!sourceEnrichment.capture_ready))} | bridge=${escapeHtml(sourceEnrichment.bridge_status || "-")} | preferred=${escapeHtml((sourceEnrichment.preferred_hashes || []).join(", ") || "-")}</div>
+      <div class="mono">bridge_next=${escapeHtml(bridgeRuntime.next_action || "-")} | missing=${escapeHtml((bridgeRuntime.missing_keys || []).join(", ") || "-")}</div>
       <div class="mono">source_path=${escapeHtml(sourcePath)} | browsing=${escapeHtml(browsingPath)}</div>
       ${sourceRuntime.selection_reason ? `<div>${escapeHtml(sourceRuntime.selection_reason)}</div>` : ""}
       ${sourceRuntime.fallback_reason ? `<div>${escapeHtml(sourceRuntime.fallback_reason)}</div>` : ""}

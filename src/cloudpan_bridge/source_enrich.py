@@ -4,6 +4,7 @@ from typing import Any, Callable
 
 from .config import AppConfig
 from .models import SourceEntry, normalize_fingerprint_value
+from .source_enrich_bridge import build_bridge_runtime
 from .source_enrich_rules import GENERIC_HASH_ALIASES, MAINSTREAM_SOURCE_PROVIDERS, build_provider_rule
 
 LogFn = Callable[[str], None]
@@ -22,7 +23,8 @@ def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dic
     capture_fields = list(rule.get("capture_fields") or [])
     present_capture_fields = [field for field in capture_fields if str(captured.get(field) or "").strip()]
     capture_required = bool(rule.get("capture_required"))
-    capture_ready = bool(present_capture_fields) if capture_required else True
+    bridge_runtime = build_bridge_runtime(normalized, captured)
+    capture_ready = bool(bridge_runtime.get("ready")) if capture_required else True
     return {
         "provider_key": normalized,
         "supported": supported,
@@ -34,7 +36,8 @@ def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dic
         "capture_status": str(capture_snapshot.get("status") or ("captured" if present_capture_fields else "idle")),
         "hash_aliases": dict(rule.get("hash_aliases") or {}),
         "strategy_level": str(rule.get("strategy_level") or ("provider_normalization" if supported else "openlist_only")),
-        "bridge_status": str(rule.get("bridge_status") or ("capture_guided_normalization" if supported else "not_supported")),
+        "bridge_status": str(bridge_runtime.get("status") or (rule.get("bridge_status") or ("capture_guided_normalization" if supported else "not_supported"))),
+        "bridge_runtime": bridge_runtime,
         "runtime_mode": "openlist_first_provider_snapshot_enrichment" if supported else "openlist_only",
     }
 
