@@ -37,14 +37,24 @@ NESTED_HASH_CONTAINER_KEYS = {
 HASH_LABEL_ALIASES = {
     "file_md5": "md5",
     "content_md5": "md5",
+    "md5_hash": "md5",
+    "md5hash": "md5",
     "file_gcid": "gcid",
     "content_hash": "content_hash",
     "contenthash": "content_hash",
+    "content_hash_name": "content_hash_name",
+    "contenthashname": "content_hash_name",
     "prehash": "pre_hash",
     "slice-md5": "slice_md5",
     "slicehash": "slice_md5",
     "sha-1": "sha1",
+    "sha1_hash": "sha1",
+    "sha1hash": "sha1",
     "sha-256": "sha256",
+    "sha256_hash": "sha256",
+    "sha256hash": "sha256",
+    "crc64_hash": "crc64",
+    "crc64hash": "crc64",
 }
 
 HASH_ITEM_LABEL_KEYS = ("algorithm", "alg", "name", "type", "hash_type", "kind", "label", "key")
@@ -246,6 +256,9 @@ def _pick_hash_value(entry: SourceEntry, logical_key: str, aliases_map: dict[str
 
 
 def _derive_hash_value(payload: dict[str, Any], logical_key: str) -> str:
+    derived_from_named_content = _derive_hash_value_from_named_content(payload, logical_key)
+    if derived_from_named_content:
+        return derived_from_named_content
     length = HEX_LENGTHS.get(logical_key)
     if not length:
         return ""
@@ -284,6 +297,33 @@ def _extract_tagged_hash(value: Any, logical_key: str, length: int) -> str:
     if direct_match:
         return normalize_fingerprint_value(direct_match.group(1))
     return ""
+
+
+def _derive_hash_value_from_named_content(payload: dict[str, Any], logical_key: str) -> str:
+    length = HEX_LENGTHS.get(logical_key)
+    if not length:
+        return ""
+    content_hash_name = str(
+        payload.get("content_hash_name")
+        or payload.get("contenthashname")
+        or payload.get("contentHashName")
+        or ""
+    ).strip().lower().replace("-", "_")
+    content_hash_value = str(
+        payload.get("content_hash")
+        or payload.get("contenthash")
+        or payload.get("contentHash")
+        or ""
+    ).strip()
+    if not content_hash_name or not content_hash_value:
+        return ""
+    if content_hash_name != logical_key:
+        return ""
+    direct_pattern = rf"(?i)^[a-f0-9]{{{length}}}$"
+    if not re.fullmatch(direct_pattern, content_hash_value):
+        return ""
+    uppercase = logical_key not in {"pickcode", "content_hash"}
+    return normalize_fingerprint_value(content_hash_value, uppercase=uppercase)
 
 
 def _merge_entry_from_aliases(entry: SourceEntry, aliases_map: dict[str, list[str]], extra_payloads: list[dict[str, Any]] | None = None) -> SourceEntry:

@@ -1284,6 +1284,50 @@ def test_source_enrichment_reads_stringified_algorithm_list_hash_payloads(tmp_pa
     assert "md5" in report["candidate_hashes"]
 
 
+def test_source_enrichment_derives_sha1_from_named_content_hash_for_aliyundriveopen(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/aliyun.bin",
+        md5="",
+        size=10,
+        provider="AliyunDriveOpen",
+        raw_hash_info={
+            "content_hash_name": "sha1",
+            "content_hash": "abcdef0123456789abcdef0123456789abcdef01",
+            "crc64Hash": "abcdef0123456789",
+        },
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.sha1 == "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+    assert enriched.crc64 == "ABCDEF0123456789"
+    assert "sha1" in report["candidate_hashes"]
+    assert "crc64" in report["candidate_hashes"]
+
+
+def test_source_enrichment_reads_onedrive_graph_hash_field_names(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/onedrive.docx",
+        md5="",
+        size=10,
+        provider="OneDrive",
+        raw_hash_info={
+            "file": {
+                "hashes": {
+                    "sha1Hash": "abcdef0123456789abcdef0123456789abcdef01",
+                }
+            },
+            "contentHash": "sha1:abcdef0123456789abcdef0123456789abcdef01",
+        },
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.sha1 == "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+    assert enriched.content_hash == "SHA1:ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+    assert report["candidate_hashes"] == ["sha1", "content_hash"]
+
+
 def test_source_enrichment_runtime_reports_bridge_status_for_aliyundriveopen(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text(

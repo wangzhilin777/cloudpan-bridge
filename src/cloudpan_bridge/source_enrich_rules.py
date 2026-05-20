@@ -4,15 +4,15 @@ from typing import Any
 
 
 GENERIC_HASH_ALIASES: dict[str, list[str]] = {
-    "md5": ["md5", "file_md5", "content_md5"],
+    "md5": ["md5", "file_md5", "content_md5", "md5Hash", "md5_hash"],
     "gcid": ["gcid", "file_gcid"],
-    "sha1": ["sha1", "content_sha1"],
-    "sha256": ["sha256", "content_sha256"],
-    "crc64": ["crc64"],
+    "sha1": ["sha1", "content_sha1", "sha1Hash", "sha1_hash"],
+    "sha256": ["sha256", "content_sha256", "sha256Hash", "sha256_hash"],
+    "crc64": ["crc64", "crc64Hash", "crc64_hash"],
     "pre_hash": ["pre_hash", "prehash"],
     "slice_md5": ["slice_md5", "slicemd5"],
     "pickcode": ["pickcode"],
-    "content_hash": ["content_hash", "contenthash"],
+    "content_hash": ["content_hash", "contenthash", "contentHash"],
 }
 
 
@@ -268,7 +268,13 @@ def build_provider_rule(provider_key: str) -> dict[str, Any]:
         for logical_key, values in GENERIC_HASH_ALIASES.items()
     }
     for logical_key, values in dict(rule.get("hash_aliases") or {}).items():
-        aliases[str(logical_key)] = list(values)
+        key = str(logical_key)
+        merged_values: list[str] = []
+        for item in [*(aliases.get(key) or []), *list(values)]:
+            normalized_item = str(item or "").strip()
+            if normalized_item and normalized_item not in merged_values:
+                merged_values.append(normalized_item)
+        aliases[key] = merged_values
     rule["provider_key"] = normalized
     rule["hash_aliases"] = aliases
     return rule

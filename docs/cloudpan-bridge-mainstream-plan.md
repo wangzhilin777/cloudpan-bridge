@@ -72,6 +72,10 @@
   - `path / source_id / collection_scan` 哪种查找方式可用
   - 缓存里当前有哪些哈希类型
   - 路由里哪些目标端快传哈希已经可以优先从缓存尝试
+- 已补主流 provider 的更多真实字段兼容，避免只认理想字段名：
+  - `AliyunDriveOpen` 现在支持 `content_hash_name + content_hash` 组合推导 `sha1`
+  - `OneDrive` 现在支持 `sha1Hash / contentHash` 这类 Graph 风格字段
+  - provider 专用别名不再覆盖通用别名，而是按去重合并，避免新补的驼峰字段再次失效
 
 ## 摘要
 
