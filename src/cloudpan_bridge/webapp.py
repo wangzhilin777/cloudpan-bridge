@@ -40,7 +40,7 @@ from .provider_registry import (
     render_driver_coverage_audit_markdown,
     render_driver_coverage_scaffold_markdown,
 )
-from .source_adapter import build_source_provider_context, build_source_runtime_status
+from .source_adapter import build_source_provider_context, build_source_runtime_status, build_source_target_route_summary
 from .source_enrich import build_source_enrichment_runtime, enrich_batch
 from .task_runtime import (
     build_current_task_snapshot as build_task_runtime_snapshot,
@@ -1528,6 +1528,7 @@ def create_app(config_path: Path) -> FastAPI:
             source_path=str(config.source_path or "/"),
             mount_path=str(source_context.get("mount_path") or ""),
             requested_driver="",
+            target_capability=dict(build_target_preflight(config.target_key).get("adapter_capability") or {}),
         )
         current_source_capability = (
             build_driver_target_capability(source_context["effective_driver"], target=config.target_key)
@@ -1611,6 +1612,12 @@ def create_app(config_path: Path) -> FastAPI:
         capability = build_driver_target_capability(context["effective_driver"] or driver, target=effective_target)
         capability["sourceMappingContext"] = context
         capability["sourceEnrichment"] = build_source_enrichment_runtime(config, context["provider_key"] or context["effective_driver"] or driver)
+        capability["sourceTargetRoute"] = build_source_target_route_summary(
+            capability["sourceMappingContext"],
+            capability["sourceEnrichment"],
+            target_key=effective_target,
+            target_capability=dict(build_target_preflight(effective_target).get("adapter_capability") or {}),
+        )
         return capability
 
     @app.post("/api/provider/coverage_audit")
@@ -1675,6 +1682,12 @@ def create_app(config_path: Path) -> FastAPI:
             live_driver_fields_map=build_live_driver_fields_map([driver]),
         )
         result["sourceEnrichment"] = build_source_enrichment_runtime(config, str(result["sourceMappingContext"].get("provider_key") or driver))
+        result["sourceTargetRoute"] = build_source_target_route_summary(
+            result["sourceMappingContext"],
+            result["sourceEnrichment"],
+            target_key=target,
+            target_capability=dict(build_target_preflight(target).get("adapter_capability") or {}),
+        )
         return result
 
     @app.get("/api/openlist/storages")
@@ -1739,7 +1752,11 @@ def create_app(config_path: Path) -> FastAPI:
         summary = summarize_source_entries(enriched_entries)
         preflight = build_target_preflight(target_key)
         fast_upload_decision = assess_directory_fast_upload(summary, target_capability=dict(preflight.get("adapter_capability") or {}))
-        source_runtime = build_source_runtime_status(run_config, source_path=run_config.source_path)
+        source_runtime = build_source_runtime_status(
+            run_config,
+            source_path=run_config.source_path,
+            target_capability=dict(preflight.get("adapter_capability") or {}),
+        )
         source_enrichment = build_source_enrichment_runtime(run_config, str(source_runtime.get("provider_key") or ""))
         transfer_preview = summarize_transfer_plan(
             enriched_entries,
@@ -1764,6 +1781,7 @@ def create_app(config_path: Path) -> FastAPI:
             "target_key": target_key,
             "fastUploadDecision": fast_upload_decision,
             "sourceEnrichment": source_enrichment,
+            "sourceTargetRoute": dict(source_runtime.get("source_target_route") or {}),
             "sourceEnrichmentBatch": enrich_batch_report,
             "transferPlanPreview": transfer_preview,
             "plan_total": len(plan),
@@ -1792,13 +1810,18 @@ def create_app(config_path: Path) -> FastAPI:
         miaochuan_payload = build_source_miaochuan_payload(enriched_entries, run_config.source_path)
         summary = summarize_source_entries(enriched_entries)
         preflight = build_target_preflight(target_key)
-        source_runtime = build_source_runtime_status(run_config, source_path=run_config.source_path)
+        source_runtime = build_source_runtime_status(
+            run_config,
+            source_path=run_config.source_path,
+            target_capability=dict(preflight.get("adapter_capability") or {}),
+        )
         return {
             "source_path": run_config.source_path,
             "summary": summary,
             "target_key": target_key,
             "fastUploadDecision": assess_directory_fast_upload(summary, target_capability=dict(preflight.get("adapter_capability") or {})),
             "sourceEnrichment": build_source_enrichment_runtime(run_config, str(source_runtime.get("provider_key") or "")),
+            "sourceTargetRoute": dict(source_runtime.get("source_target_route") or {}),
             "sourceEnrichmentBatch": enrich_batch_report,
             "transferPlanPreview": summarize_transfer_plan(
                 enriched_entries,

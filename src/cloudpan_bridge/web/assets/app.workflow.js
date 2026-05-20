@@ -46,6 +46,7 @@
     const bridgeFallbackPolicy = bridgePreparation.fallback_policy || {};
     const rationale = assessment?.rationale || {};
     const strategy = assessment?.strategy || {};
+    const sourceTargetRoute = assessment?.sourceTargetRoute || sourceAnalyzeCache?.sourceTargetRoute || {};
     const likelyHashes = Array.isArray(sourceProfile.likelyHashes) ? sourceProfile.likelyHashes : [];
     const analysisSummary = sourceAnalyzeCache?.summary || {};
     const analysisLine = sourceAnalyzeCache
@@ -144,6 +145,9 @@
       <div class="mono">${currentLang() === "en" ? "Missing expected hashes" : currentLang() === "mix" ? "仍缺预期哈希 / Missing expected hashes" : "仍缺预期哈希"}: ${escapeHtml(transferExpectedGapText)}</div>
       <div class="mono">${currentLang() === "en" ? "Target fast-hash gaps" : currentLang() === "mix" ? "目标端快传缺口 / Target fast-hash gaps" : "目标端快传缺口"}: ${escapeHtml(transferTargetFastGapText)}</div>
       <div class="mono">${currentLang() === "en" ? "Recoverable fast-hash gaps" : currentLang() === "mix" ? "可补齐快传缺口 / Recoverable fast-hash gaps" : "可补齐快传缺口"}: ${escapeHtml(transferRecoverableFastGapText)}</div>
+      <div class="mono">${currentLang() === "en" ? "Source->target route" : currentLang() === "mix" ? "源到目标路线 / Source->target route" : "源到目标路线"}: ${escapeHtml(sourceTargetRoute.decision_bucket || "-")} | ${currentLang() === "en" ? "focus" : currentLang() === "mix" ? "关注点 / focus" : "关注点"}=${escapeHtml(sourceTargetRoute.next_focus || "-")}</div>
+      <div class="mono">${currentLang() === "en" ? "Route fast hashes" : currentLang() === "mix" ? "路线快传哈希 / Route fast hashes" : "路线快传哈希"}: native=${escapeHtml((sourceTargetRoute.native_fast_candidate_hashes || []).join(", ") || "-")} | bridge=${escapeHtml((sourceTargetRoute.bridge_recoverable_fast_hashes || []).join(", ") || "-")}</div>
+      <div class="mono">${currentLang() === "en" ? "Route summary" : currentLang() === "mix" ? "路线摘要 / Route summary" : "路线摘要"}: ${escapeHtml(sourceTargetRoute.summary || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Suggested path" : currentLang() === "mix" ? "建议路径 / Suggested path" : "建议路径"}: ${escapeHtml(recommendedFlow || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Runtime rationale" : currentLang() === "mix" ? "动态理由 / Runtime rationale" : "动态理由"}: ${escapeHtml(rationaleText || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Throttle hint" : currentLang() === "mix" ? "节奏建议 / Throttle hint" : "节奏建议"}: ${escapeHtml(throttleHintText || "-")}</div>
@@ -164,6 +168,7 @@
     const bridgeRuntime = enrichment.bridge_runtime || {};
     const bridgePreparation = enrichment.bridge_preparation_summary || bridgeRuntime.preparation || {};
     const bridgeMaturity = enrichment.bridge_maturity_summary || {};
+    const sourceTargetRoute = data?.sourceTargetRoute || {};
     const bridgeThrottle = bridgePreparation.throttle_defaults || {};
     const bridgeFallbackPolicy = bridgePreparation.fallback_policy || {};
     const transferPreview = data?.transferPlanPreview || {};
@@ -227,6 +232,8 @@
           <div class="mono">${currentLang() === "en" ? "Missing expected hashes" : currentLang() === "mix" ? "仍缺预期哈希 / Missing expected hashes" : "仍缺预期哈希"}: ${escapeHtml(previewExpectedGapText)}</div>
           <div class="mono">${currentLang() === "en" ? "Target fast-hash gaps" : currentLang() === "mix" ? "目标端快传缺口 / Target fast-hash gaps" : "目标端快传缺口"}: ${escapeHtml(previewTargetFastGapText)}</div>
           <div class="mono">${currentLang() === "en" ? "Recoverable fast-hash gaps" : currentLang() === "mix" ? "可补齐快传缺口 / Recoverable fast-hash gaps" : "可补齐快传缺口"}: ${escapeHtml(previewRecoverableFastGapText)}</div>
+          <div class="mono">${currentLang() === "en" ? "Source->target route" : currentLang() === "mix" ? "源到目标路线 / Source->target route" : "源到目标路线"}: ${escapeHtml(sourceTargetRoute.decision_bucket || "-")} | ${currentLang() === "en" ? "focus" : currentLang() === "mix" ? "关注点 / focus" : "关注点"}=${escapeHtml(sourceTargetRoute.next_focus || "-")}</div>
+          <div class="mono">${currentLang() === "en" ? "Route summary" : currentLang() === "mix" ? "路线摘要 / Route summary" : "路线摘要"}: ${escapeHtml(sourceTargetRoute.summary || "-")}</div>
           <div class="mono">provider: ${escapeHtml(providerCounts)}</div>
           <div class="mono">hash: ${escapeHtml(hashCounts)}</div>
           <div class="mono">${escapeHtml((currentLang() === "en" ? decision?.rationale?.en : currentLang() === "mix" ? `${decision?.rationale?.zh || ""} / ${decision?.rationale?.en || ""}`.trim() : decision?.rationale?.zh) || "-")}</div>
@@ -278,6 +285,7 @@
     const bridgeRuntime = sourceEnrichment.bridge_runtime || {};
     const bridgePreparation = sourceEnrichment.bridge_preparation_summary || bridgeRuntime.preparation || {};
     const bridgeMaturity = sourceEnrichment.bridge_maturity_summary || {};
+    const sourceTargetRoute = sourceRuntime.source_target_route || {};
     const bridgeThrottle = bridgePreparation.throttle_defaults || {};
     const bridgeFallbackPolicy = bridgePreparation.fallback_policy || {};
     root.innerHTML = `
@@ -293,6 +301,7 @@
       <div class="mono">bridge_throttle=mode:${escapeHtml(String(bridgeThrottle.rate_mode || "-"))} page:${escapeHtml(String(bridgeThrottle.page_size ?? "-"))} req:${escapeHtml(String(bridgeThrottle.request_interval_ms ?? "-"))}ms dir:${escapeHtml(String(bridgeThrottle.directory_interval_ms ?? "-"))}ms small_batch:${escapeHtml(String(!!bridgeThrottle.small_batch_only))}</div>
       <div class="mono">bridge_fallback=auto:${escapeHtml(String(!!bridgeFallbackPolicy.allow_auto_download))} selected_only:${escapeHtml(String(!!bridgeFallbackPolicy.download_selected_only))} pending_first:${escapeHtml(String(!!bridgeFallbackPolicy.pending_only_when_hash_missing))}</div>
       <div class="mono">bridge_next=${escapeHtml(bridgeRuntime.next_action || "-")} | missing=${escapeHtml((bridgeRuntime.missing_keys || []).join(", ") || "-")}</div>
+      <div class="mono">route_bucket=${escapeHtml(sourceTargetRoute.decision_bucket || "-")} | route_focus=${escapeHtml(sourceTargetRoute.next_focus || "-")} | route_native=${escapeHtml((sourceTargetRoute.native_fast_candidate_hashes || []).join(", ") || "-")} | route_bridge=${escapeHtml((sourceTargetRoute.bridge_recoverable_fast_hashes || []).join(", ") || "-")}</div>
       <div class="mono">source_path=${escapeHtml(sourcePath)} | browsing=${escapeHtml(browsingPath)}</div>
       ${sourceRuntime.selection_reason ? `<div>${escapeHtml(sourceRuntime.selection_reason)}</div>` : ""}
       ${sourceRuntime.fallback_reason ? `<div>${escapeHtml(sourceRuntime.fallback_reason)}</div>` : ""}
@@ -325,6 +334,7 @@
       ? translateDriverText(capabilityAssessmentCache.rationale.zh || "", capabilityAssessmentCache.rationale.en || "")
       : "";
     const sourceRuntime = window.__cpbStatusCache?.source_runtime || {};
+    const sourceTargetRoute = sourceAnalyzeCache?.sourceTargetRoute || sourceRuntime.source_target_route || {};
     const statusTargetPreflight = window.__cpbStatusCache?.target_preflight || {};
     const statusTargetCapability = statusTargetPreflight?.adapter_capability || {};
     const transferPreviewText = sourceAnalyzeCache?.transferPlanPreview
@@ -343,6 +353,7 @@
       <div class="mono">source=${escapeHtml(sourcePath)} -> target=${escapeHtml(targetKey)}:${escapeHtml(targetPath)}</div>
       <div class="mono">recommended=${escapeHtml(recommendedMode)} | level=${escapeHtml(assessedLevel)} | auto_small_mb=${escapeHtml(autoThreshold)}</div>
       <div class="mono">source_route_pref=${escapeHtml(sourcePreference)} | selected=${escapeHtml(sourceRuntime.selected_source_mode || "-")} | provider=${escapeHtml(sourceRuntime.selected_provider_key || "-")}</div>
+      <div class="mono">source_target_route=${escapeHtml(sourceTargetRoute.decision_bucket || "-")} | focus=${escapeHtml(sourceTargetRoute.next_focus || "-")} | native=${escapeHtml((sourceTargetRoute.native_fast_candidate_hashes || []).join(", ") || "-")} | bridge=${escapeHtml((sourceTargetRoute.bridge_recoverable_fast_hashes || []).join(", ") || "-")}</div>
       <div class="mono">target_fast_upload=${escapeHtml(String(!!statusTargetCapability.supports_fast_upload))} | hashes=${escapeHtml((statusTargetCapability.fast_upload_hashes || []).join(", ") || "-")} | fallback=${escapeHtml((statusTargetCapability.fallback_modes || []).join(", ") || "-")}</div>
       <div class="mono">transfer_preview=${escapeHtml(transferPreviewText)}</div>
       <div class="mono">transfer_reason=${escapeHtml(previewReasonText)}</div>

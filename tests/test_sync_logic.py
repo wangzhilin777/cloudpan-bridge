@@ -798,6 +798,8 @@ def test_build_source_runtime_status_exposes_provider_runtime_shape(tmp_path: Pa
     assert runtime["source_enrichment"]["capture_ready"] is False
     assert runtime["bridge_preparation"]["hook_registered"] is True
     assert runtime["bridge_preparation"]["execution_state"] == "missing_capture"
+    assert runtime["source_target_route"]["decision_bucket"] == "capture_gap_before_fast"
+    assert runtime["source_target_route"]["bridge_recoverable_fast_hashes"] == ["md5"]
 
 
 def test_source_provider_resolution_prefers_direct_candidate_but_falls_back_honestly(tmp_path: Path) -> None:
@@ -845,6 +847,8 @@ def test_source_provider_resolution_prefers_direct_candidate_but_falls_back_hone
     assert resolution["bridge_preparation"]["selected_field_names"] == ["cookie_header"]
     assert resolution["selected_source_mode"] == "direct_provider_bridge_ready"
     assert resolution["selected_provider_key"] == "quark"
+    assert resolution["source_target_route"]["decision_bucket"] == "session_bridge_fast_candidate"
+    assert resolution["source_target_route"]["next_focus"] == "validate_fast_hash_hit_rate"
     assert "回退 OpenList" in resolution["fallback_reason"]
 
 
@@ -885,6 +889,7 @@ def test_create_source_provider_runtime_context_includes_resolution(tmp_path: Pa
     runtime = provider.get_runtime_context()
     assert runtime["selected_source_mode"] == "direct_provider_bridge_ready"
     assert runtime["selected_provider_key"] == "quark"
+    assert runtime["source_target_route"]["decision_bucket"] == "session_bridge_fast_candidate"
     assert runtime["execution_provider_class"] == "OpenListSourceProvider"
     assert "回退 OpenList" in runtime["fallback_reason"]
     provider.close()
@@ -4538,6 +4543,7 @@ def test_status_restores_provider_captures_from_config(tmp_path: Path) -> None:
     assert "access_token" in body["active_target_state"]["fields"]
     assert body["target_preflight"]["target_key"] == "guangya"
     assert body["target_preflight"]["adapter_capability"]["supports_fast_upload"] is True
+    assert body["source_runtime"]["source_target_route"]["decision_bucket"] == "openlist_upload_path"
 
 
 def test_provider_driver_blueprint_endpoint_returns_dynamic_capture_spec(tmp_path: Path) -> None:
@@ -5759,6 +5765,8 @@ def test_provider_capability_assess_endpoint_uses_analysis_summary(tmp_path: Pat
     assert payload["strategy"]["recommendedMode"] == "direct_metadata_first"
     assert payload["strategy"]["shouldAnalyzeFirst"] is False
     assert payload["strategy"]["preferPendingTree"] is False
+    assert payload["sourceTargetRoute"]["decision_bucket"] == "capture_gap_before_fast"
+    assert payload["sourceTargetRoute"]["bridge_recoverable_fast_hashes"] == ["md5"]
 
 
 def test_provider_capability_assess_accepts_grouped_target_and_filters(tmp_path: Path) -> None:
@@ -5838,6 +5846,8 @@ def test_provider_capability_assess_prefers_enrichment_mode_when_directory_needs
     assert payload["sourceProfile"]["supportsFingerprintEnrichment"] is True
     assert payload["fastUploadDecision"]["level"] == "fast_upload_after_enrichment"
     assert payload["strategy"]["recommendedMode"] == "enrich_then_direct"
+    assert payload["sourceTargetRoute"]["decision_bucket"] == "capture_gap_before_fast"
+    assert payload["sourceTargetRoute"]["bridge_recoverable_fast_hashes"] == ["md5", "gcid"]
     assert any(item["key"] == "provider_refresh_supported" for item in payload["strategy"]["suggestedActions"])
 
 
@@ -6427,6 +6437,7 @@ def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
     assert payload["transferPlanPreview"]["bridge_missing_expected_hash_counts"]["md5"] == 1
     assert payload["transferPlanPreview"]["bridge_missing_expected_hash_counts"]["sha1"] == 1
     assert payload["transferPlanPreview"]["missing_target_fast_hash_counts"]["md5"] == 1
+    assert payload["sourceTargetRoute"]["decision_bucket"] == "openlist_upload_path"
     assert payload["entries"][0]["transferPlan"]["mode"] == "fast_upload"
     assert payload["entries"][0]["transferPlan"]["reason_code"] == "fast_hash_ready"
     assert payload["entries"][0]["transferPlan"]["next_action_hint"] == "direct_fast_upload_ready"
@@ -6461,6 +6472,7 @@ def test_source_miaochuan_preview_endpoint_returns_payload(tmp_path: Path) -> No
     assert payload["target_key"] == "guangya"
     assert payload["fastUploadDecision"]["level"] == "native_fast_upload"
     assert payload["sourceEnrichmentBatch"]["candidate_hash_counts"]["gcid"] == 1
+    assert payload["sourceTargetRoute"]["decision_bucket"] == "openlist_upload_path"
     assert payload["payload"]["totalFilesCount"] == 2
     assert payload["payload"]["files"][0]["path"] == "/a.bin"
     assert "\"gcid\": \"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\"" in payload["payload_text"]

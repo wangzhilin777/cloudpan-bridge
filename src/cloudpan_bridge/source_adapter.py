@@ -6,6 +6,7 @@ from typing import Any, Iterable, Protocol
 from .config import AppConfig
 from .models import SourceEntry, SyncState
 from .openlist import OpenListClient
+from .provider_registry_data import TARGET_PROFILES
 from .provider_registry import build_source_mapping_context
 from .source_enrich import build_source_enrichment_runtime
 
@@ -74,6 +75,7 @@ def build_source_provider_context(
 def build_source_provider_resolution(
     config: AppConfig,
     context: dict[str, Any],
+    target_capability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     preference = str(config.source_provider_preference or "auto").strip().lower() or "auto"
     if preference not in {"auto", "openlist_only", "direct_preferred"}:
@@ -142,6 +144,20 @@ def build_source_provider_resolution(
             selected_provider_key = provider_key or "openlist"
             fallback_reason = "当前 source provider 有直连候选，但关键登录态字段仍不完整，先保守走 OpenList。"
             selection_reason = "自动模式已识别出主流 provider 候选，但当前仍缺少 bridge capture。"
+    source_target_route = build_source_target_route_summary(
+        context,
+        source_enrichment,
+        target_key=str(config.target_key or "guangya"),
+        resolution={
+            "selected_source_mode": selected_source_mode,
+            "selected_provider_key": selected_provider_key,
+            "direct_provider_candidate": direct_candidate,
+            "direct_provider_ready": direct_provider_ready,
+            "direct_provider_api_pending": direct_provider_api_pending,
+            "direct_provider_capture_missing": direct_provider_capture_missing,
+        },
+        target_capability=target_capability,
+    )
     return {
         "requested_provider_preference": preference,
         "selected_source_mode": selected_source_mode,
@@ -154,6 +170,92 @@ def build_source_provider_resolution(
         "bridge_preparation": bridge_preparation,
         "fallback_reason": fallback_reason,
         "selection_reason": selection_reason,
+        "source_target_route": source_target_route,
+    }
+
+
+def _normalize_hash_list(values: list[Any] | None = None) -> list[str]:
+    return [str(item or "").strip().lower() for item in list(values or []) if str(item or "").strip()]
+
+
+def build_source_target_route_summary(
+    context: dict[str, Any],
+    source_enrichment: dict[str, Any],
+    *,
+    target_key: str,
+    resolution: dict[str, Any] | None = None,
+    target_capability: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    normalized_target = str(target_key or "guangya").strip().lower() or "guangya"
+    target_profile = dict(TARGET_PROFILES.get(normalized_target, {}) or {})
+    capability = {**target_profile, **dict(target_capability or {})}
+    target_fast_hashes = _normalize_hash_list(capability.get("fast_upload_hashes") or capability.get("fastUploadHashes"))
+    target_fallback_modes = _normalize_hash_list(capability.get("fallback_modes") or capability.get("fallbackModes"))
+    bridge_preparation = dict(source_enrichment.get("bridge_preparation_summary") or {})
+    bridge_status = str(source_enrichment.get("bridge_status") or "")
+    preferred_hashes = _normalize_hash_list(source_enrichment.get("preferred_hashes") or bridge_preparation.get("preferred_hashes"))
+    expected_hashes = _normalize_hash_list(bridge_preparation.get("fingerprint_expectation"))
+    native_fast_candidate_hashes = [key for key in target_fast_hashes if key in preferred_hashes]
+    bridge_recoverable_fast_hashes = [key for key in target_fast_hashes if key in expected_hashes]
+    resolution = dict(resolution or {})
+    direct_candidate = bool(resolution.get("direct_provider_candidate")) or bool(source_enrichment.get("supported"))
+    direct_ready = bool(resolution.get("direct_provider_ready")) or bridge_status in {"bridge_ready", "bridge_ready_but_normalization_only"}
+    api_pending = bool(resolution.get("direct_provider_api_pending")) or bridge_status == "bridge_ready_but_api_pending"
+    capture_missing = bool(resolution.get("direct_provider_capture_missing")) or bridge_status == "bridge_capture_missing"
+    decision_bucket = "openlist_upload_path"
+    next_focus = "openlist_first"
+    summary = "当前默认通过 OpenList 源端执行，再按目标端能力决定快传或普通上传。"
+    if not target_fast_hashes:
+        decision_bucket = "target_upload_only"
+        next_focus = "target_fallback_upload"
+        summary = "当前目标端没有元数据秒传能力，这个源端组合会稳定落到普通上传/覆盖或补传路径。"
+    elif direct_ready and bridge_recoverable_fast_hashes:
+        decision_bucket = "session_bridge_fast_candidate"
+        next_focus = "validate_fast_hash_hit_rate"
+        summary = (
+            "当前源端会话桥接已 ready，且理论上能补到目标端所需的快传哈希；"
+            f"优先关注 {', '.join(bridge_recoverable_fast_hashes)} 的命中率。"
+        )
+    elif api_pending and bridge_recoverable_fast_hashes:
+        decision_bucket = "api_bridge_fast_candidate"
+        next_focus = "provider_api_enrich"
+        summary = (
+            "当前源端已进入 API bridge 准备态，但真实 enrich 还没落地；"
+            f"理论上最值得补齐的是 {', '.join(bridge_recoverable_fast_hashes)}。"
+        )
+    elif capture_missing and bridge_recoverable_fast_hashes:
+        decision_bucket = "capture_gap_before_fast"
+        next_focus = "collect_provider_capture"
+        summary = (
+            "当前源端理论上可以补到目标端快传哈希，但还缺关键登录态；"
+            f"优先补齐 capture 后再验证 {', '.join(bridge_recoverable_fast_hashes)}。"
+        )
+    elif direct_candidate and native_fast_candidate_hashes:
+        decision_bucket = "native_hash_candidate"
+        next_focus = "inspect_openlist_hash_coverage"
+        summary = (
+            "当前源端档案本身就偏向目标端认可的快传哈希，先检查 OpenList 当前目录是否已经暴露"
+            f" {', '.join(native_fast_candidate_hashes)}。"
+        )
+    elif direct_candidate:
+        decision_bucket = "provider_candidate_but_fallback_first"
+        next_focus = "pending_tree_or_stream_upload"
+        summary = "当前源端虽然已有主流 provider 候选，但和目标端快传哈希重叠不强，建议优先保守补传。"
+    return {
+        "source_driver": str(context.get("effective_driver") or context.get("driver") or ""),
+        "source_provider_key": str(source_enrichment.get("provider_key") or context.get("provider_key") or ""),
+        "target_key": normalized_target,
+        "target_fast_hashes": target_fast_hashes,
+        "target_fallback_modes": target_fallback_modes,
+        "preferred_hashes": preferred_hashes,
+        "expected_hashes": expected_hashes,
+        "native_fast_candidate_hashes": native_fast_candidate_hashes,
+        "bridge_recoverable_fast_hashes": bridge_recoverable_fast_hashes,
+        "decision_bucket": decision_bucket,
+        "next_focus": next_focus,
+        "summary": summary,
+        "selected_source_mode": str(resolution.get("selected_source_mode") or ""),
+        "selected_provider_key": str(resolution.get("selected_provider_key") or ""),
     }
 
 
@@ -163,6 +265,7 @@ def build_source_runtime_status(
     source_path: str = "",
     mount_path: str = "",
     requested_driver: str = "",
+    target_capability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     context = build_source_provider_context(
         config,
@@ -170,7 +273,7 @@ def build_source_runtime_status(
         mount_path=mount_path,
         requested_driver=requested_driver,
     )
-    resolution = build_source_provider_resolution(config, context)
+    resolution = build_source_provider_resolution(config, context, target_capability=target_capability)
     return {
         **context,
         **resolution,
