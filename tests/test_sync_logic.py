@@ -1207,6 +1207,42 @@ def test_source_enrichment_reads_stringified_nested_hash_info_payloads(tmp_path:
     assert "slice_md5" in report["candidate_hashes"]
 
 
+def test_source_enrichment_derives_gcid_from_tagged_digest_string(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/gcid-digest.bin",
+        md5="",
+        size=10,
+        provider="Thunder",
+        raw_hash_info={
+            "digest": "gcid=abcdef0123456789abcdef0123456789abcdef01; md5=abcdef0123456789abcdef0123456789"
+        },
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.gcid == "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+    assert enriched.md5 == "ABCDEF0123456789ABCDEF0123456789"
+    assert "gcid" in report["candidate_hashes"]
+
+
+def test_source_enrichment_derives_slice_md5_from_tagged_hash_string(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/slice-md5-hash.bin",
+        md5="",
+        size=10,
+        provider="Quark",
+        raw_hash_info={
+            "hash": "slice_md5=abcdef0123456789abcdef0123456789&sha1=abcdef0123456789abcdef0123456789abcdef01"
+        },
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.slice_md5 == "ABCDEF0123456789ABCDEF0123456789"
+    assert enriched.sha1 == "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+    assert "slice_md5" in report["candidate_hashes"]
+
+
 def test_source_enrichment_runtime_reports_bridge_status_for_aliyundriveopen(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text(

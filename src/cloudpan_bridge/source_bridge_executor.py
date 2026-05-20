@@ -11,8 +11,12 @@ BridgeExecuteFn = Callable[[SourceEntry, dict[str, Any]], tuple[SourceEntry, dic
 
 HEX_LENGTHS: dict[str, int] = {
     "md5": 32,
+    "gcid": 40,
     "sha1": 40,
     "sha256": 64,
+    "crc64": 16,
+    "pre_hash": 32,
+    "slice_md5": 32,
 }
 
 NESTED_HASH_CONTAINER_KEYS = {
