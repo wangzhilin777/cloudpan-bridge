@@ -102,6 +102,10 @@
 - `file_hashes_by_path / ...by_id` 这类缓存 map 的值也继续向真实抓包靠拢：
   - 现在不仅支持平铺 dict，还支持值本身是 JSON 字符串、算法列表，或再包一层 `data / hash_info`
   - 这让 `AliyunDriveOpen / OneDrive / Thunder` 一类抓取缓存，即使值不是仓库内部理想的扁平对象，也能继续被 summary 与 enrich 主链消费
+- 抓取缓存的 path / collection 容器也继续补了两类真实变体：
+  - `...by_path` 的 key 现在会做标准化匹配，兼容反斜杠路径、缺失前导 `/` 的 path key
+  - `entries / items` 这类 collection 如果是“动态 id -> dict”的对象，而不是数组，也会被视作有效条目集合
+  - 这样 `AliyunDriveOpen / OneDrive / Thunder / Baidu` 一类更杂的抓包快照，也更容易进入统一补指纹流水线
 - 统一体积分级阈值这轮也已落到实处：
   - 当前生产源码里最大的 Python / JS 文件是 `webapp.py`，约 `94.2 KB`
   - 前端主入口 `app.js` 约 `88.8 KB`

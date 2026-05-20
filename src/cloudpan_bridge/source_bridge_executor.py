@@ -99,6 +99,10 @@ def _iter_collection_entries(value: Any) -> list[dict[str, Any]]:
             if isinstance(item, dict):
                 entries.append(item)
     elif isinstance(value, dict):
+        nested_keys = ("items", "entries", "files", "list", "records", "children", "value", "data", "result", "payload")
+        if value and not any(key in value for key in nested_keys) and all(isinstance(item, dict) for item in value.values()):
+            for item in value.values():
+                entries.append({str(inner_key): inner_value for inner_key, inner_value in item.items()})
         for nested_key in ("items", "entries", "files", "list", "records", "children", "value"):
             nested_entries = value.get(nested_key)
             if isinstance(nested_entries, list):
@@ -230,6 +234,20 @@ def _iter_capture_named_values(captured: dict[str, Any], aliases: tuple[str, ...
     return values
 
 
+def _lookup_capture_mapping_item(mapping: dict[str, Any], key: str, *, normalize_path: bool = False) -> Any:
+    if key in mapping:
+        return mapping.get(key)
+    if not key:
+        return None
+    normalized_target = _normalize_entry_path(key) if normalize_path else str(key).strip()
+    for candidate_key, value in mapping.items():
+        candidate_text = str(candidate_key or "")
+        normalized_candidate = _normalize_entry_path(candidate_text) if normalize_path else candidate_text.strip()
+        if normalized_candidate == normalized_target:
+            return value
+    return None
+
+
 def _collect_capture_entry_payloads(entry: SourceEntry, runtime: dict[str, Any]) -> list[dict[str, Any]]:
     captured = dict(runtime.get("captured_fields") or {})
     if not captured:
@@ -239,15 +257,15 @@ def _collect_capture_entry_payloads(entry: SourceEntry, runtime: dict[str, Any])
     if normalized_entry_path:
         for mapping in _iter_capture_named_values(captured, CAPTURE_PATH_CONTAINER_KEYS):
             if isinstance(mapping, dict):
-                direct = mapping.get(normalized_entry_path)
+                direct = _lookup_capture_mapping_item(mapping, normalized_entry_path, normalize_path=True)
                 payloads.extend(_collect_nested_payloads(direct))
-                alt = mapping.get(normalized_entry_path.lstrip("/"))
+                alt = _lookup_capture_mapping_item(mapping, normalized_entry_path.lstrip("/"), normalize_path=True)
                 payloads.extend(_collect_nested_payloads(alt))
     source_id = str(entry.source_id or "").strip()
     if source_id:
         for mapping in _iter_capture_named_values(captured, CAPTURE_ID_CONTAINER_KEYS):
             if isinstance(mapping, dict):
-                direct = mapping.get(source_id)
+                direct = _lookup_capture_mapping_item(mapping, source_id)
                 payloads.extend(_collect_nested_payloads(direct))
     for collection in _iter_capture_named_values(captured, CAPTURE_COLLECTION_KEYS):
         for item in _iter_collection_entries(collection):

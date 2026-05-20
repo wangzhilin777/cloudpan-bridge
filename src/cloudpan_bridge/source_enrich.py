@@ -38,6 +38,10 @@ def _iter_capture_collection_entries(value: Any) -> list[dict[str, Any]]:
             if isinstance(item, dict):
                 entries.append(item)
     elif isinstance(value, dict):
+        nested_keys = (*CAPTURE_CACHE_NESTED_COLLECTION_KEYS, "data", "result", "payload")
+        if value and not any(key in value for key in nested_keys) and all(isinstance(item, dict) for item in value.values()):
+            for item in value.values():
+                entries.append(item)
         for nested_key in CAPTURE_CACHE_NESTED_COLLECTION_KEYS:
             nested_entries = value.get(nested_key)
             if isinstance(nested_entries, list):

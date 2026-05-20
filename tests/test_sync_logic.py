@@ -1622,6 +1622,39 @@ def test_source_enrichment_runtime_reads_nested_json_string_values_inside_captur
     assert summary["hash_fields"] == ["crc64", "md5", "sha1"]
 
 
+def test_source_enrichment_runtime_counts_dict_style_capture_collections(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "thunder": {
+                            "status": "captured",
+                            "captured": {
+                                "authorization": "Bearer demo",
+                                "device_id": "dev-1",
+                                "entries": {
+                                    "node-a": {"gcidHash": "a" * 40},
+                                    "node-b": {"md5Sum": "b" * 32},
+                                },
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "thunder")
+    summary = runtime["capture_cache_summary"]
+    assert summary["available"] is True
+    assert summary["collection_entry_count"] == 2
+    assert summary["lookup_modes"] == ["collection_scan"]
+    assert summary["hash_fields"] == ["gcid", "md5"]
+
+
 def test_bridge_runtime_reports_missing_keys_for_baidu_capture() -> None:
     runtime = build_bridge_runtime("baidu", {"cookie_header": "sid=1"})
     assert runtime["ready"] is False
@@ -1832,6 +1865,39 @@ def test_execute_source_bridge_reads_nested_json_string_capture_map_values_for_a
     assert enriched.crc64 == "C" * 16
     assert report["bridge_execution_state"] == "api_capture_cache_normalized"
     assert report["fast_upload_ready_after_bridge"] is True
+
+
+def test_execute_source_bridge_matches_normalized_path_keys_inside_capture_maps(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "aliyundriveopen": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                                "file_hashes_by_path": {
+                                    "src\\demo.bin": {
+                                        "sha1": "a" * 40,
+                                        "md5": "b" * 32,
+                                    }
+                                },
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "aliyundriveopen")
+    enriched, report = execute_source_bridge(SourceEntry(path="/src/demo.bin", md5="", size=10, provider="AliyunDriveOpen"), runtime)
+    assert enriched.sha1 == "A" * 40
+    assert enriched.md5 == "B" * 32
+    assert report["bridge_execution_state"] == "api_capture_cache_normalized"
 
 
 def test_execute_source_bridge_reads_api_capture_cache_list_for_onedrive(tmp_path: Path) -> None:
