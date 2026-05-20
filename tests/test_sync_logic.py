@@ -922,6 +922,63 @@ def test_source_enrichment_promotes_hashes_from_existing_raw_fields(tmp_path: Pa
     assert report["changed"] is True
 
 
+def test_source_enrichment_keeps_onedrive_etag_outside_md5(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/onedrive.docx",
+        md5="",
+        size=10,
+        provider="OneDrive",
+        raw_hash_info={"etag": "not-md5-etag-value"},
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.md5 == ""
+    assert report["changed"] is False
+
+
+def test_source_enrichment_allows_baidu_etag_as_md5(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/baidu.bin",
+        md5="",
+        size=10,
+        provider="Baidu",
+        raw_hash_info={"etag": "abcdef0123456789abcdef0123456789"},
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.md5 == "ABCDEF0123456789ABCDEF0123456789"
+    assert report["changed"] is True
+
+
+def test_source_enrichment_runtime_reports_bridge_status_for_aliyundriveopen(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "aliyundriveopen": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "refresh-demo",
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "AliyunDriveOpen")
+    assert runtime["capture_ready"] is True
+    assert runtime["bridge_status"] == "direct_bridge_pending"
+    assert runtime["strategy_level"] == "provider_normalization"
+    assert "etag" not in runtime["hash_aliases"]["md5"]
+
+
 def test_transfer_planner_prefers_fast_upload_when_target_hash_matches() -> None:
     entry = SourceEntry(path="/src/a.txt", md5="abc", size=10)
     plan = plan_transfer_mode(

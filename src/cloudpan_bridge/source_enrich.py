@@ -4,60 +4,9 @@ from typing import Any, Callable
 
 from .config import AppConfig
 from .models import SourceEntry, normalize_fingerprint_value
+from .source_enrich_rules import GENERIC_HASH_ALIASES, MAINSTREAM_SOURCE_PROVIDERS, build_provider_rule
 
 LogFn = Callable[[str], None]
-
-
-MAINSTREAM_SOURCE_PROVIDERS = {
-    "189cloud": {
-        "preferred_hashes": ["md5"],
-        "capture_required": True,
-        "capture_fields": ["cookie_header", "session_key", "access_token", "refresh_token"],
-    },
-    "quark": {
-        "preferred_hashes": ["md5"],
-        "capture_required": True,
-        "capture_fields": ["cookie_header", "access_token", "refresh_token"],
-    },
-    "123pan": {
-        "preferred_hashes": ["md5"],
-        "capture_required": True,
-        "capture_fields": ["cookie_header", "access_token", "refresh_token"],
-    },
-    "baidu": {
-        "preferred_hashes": ["md5"],
-        "capture_required": True,
-        "capture_fields": ["cookie_header", "bdstoken", "access_token", "refresh_token"],
-    },
-    "thunder": {
-        "preferred_hashes": ["gcid", "md5"],
-        "capture_required": True,
-        "capture_fields": ["authorization", "device_id", "x-device-id", "access_token", "refresh_token"],
-    },
-    "aliyundriveopen": {
-        "preferred_hashes": ["sha1", "md5"],
-        "capture_required": True,
-        "capture_fields": ["refresh_token", "access_token", "authorization"],
-    },
-    "onedrive": {
-        "preferred_hashes": ["sha1", "md5"],
-        "capture_required": True,
-        "capture_fields": ["refresh_token", "access_token", "authorization"],
-    },
-}
-
-
-HASH_ALIASES = {
-    "md5": ["md5", "etag", "file_md5", "content_md5"],
-    "gcid": ["gcid", "file_gcid"],
-    "sha1": ["sha1", "content_sha1"],
-    "sha256": ["sha256", "content_sha256"],
-    "crc64": ["crc64"],
-    "pre_hash": ["pre_hash", "prehash"],
-    "slice_md5": ["slice_md5", "slicemd5"],
-    "pickcode": ["pickcode"],
-    "content_hash": ["content_hash", "contenthash"],
-}
 
 
 def supports_enrichment(provider_key: str) -> bool:
@@ -66,7 +15,7 @@ def supports_enrichment(provider_key: str) -> bool:
 
 def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dict[str, Any]:
     normalized = str(provider_key or "").strip().lower()
-    rule = dict(MAINSTREAM_SOURCE_PROVIDERS.get(normalized) or {})
+    rule = build_provider_rule(normalized)
     capture_snapshot = dict((config.provider_captures or {}).get(normalized) or {})
     captured = dict(capture_snapshot.get("captured") or {})
     capture_fields = list(rule.get("capture_fields") or [])
@@ -82,6 +31,9 @@ def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dic
         "capture_fields": capture_fields,
         "capture_fields_present": present_capture_fields,
         "capture_status": str(capture_snapshot.get("status") or ("captured" if present_capture_fields else "idle")),
+        "hash_aliases": dict(rule.get("hash_aliases") or {}),
+        "strategy_level": str(rule.get("strategy_level") or ("provider_normalization" if rule else "openlist_only")),
+        "bridge_status": str(rule.get("bridge_status") or ("capture_guided_normalization" if rule else "not_supported")),
         "runtime_mode": "openlist_first_provider_snapshot_enrichment" if rule else "openlist_only",
     }
 
@@ -106,8 +58,9 @@ def _collect_raw_sources(entry: SourceEntry) -> list[dict[str, Any]]:
     ]
 
 
-def _pick_hash_value(entry: SourceEntry, logical_key: str) -> str:
-    aliases = list(HASH_ALIASES.get(logical_key) or [logical_key])
+def _pick_hash_value(entry: SourceEntry, logical_key: str, aliases_map: dict[str, list[str]] | None = None) -> str:
+    alias_source = aliases_map or GENERIC_HASH_ALIASES
+    aliases = list(alias_source.get(logical_key) or [logical_key])
     for payload in _collect_raw_sources(entry):
         for alias in aliases:
             value = payload.get(alias)
@@ -122,25 +75,26 @@ def enrich_entry(entry: SourceEntry, config: AppConfig, log: LogFn | None = None
     runtime = build_source_enrichment_runtime(config, entry.provider)
     if not runtime.get("supported"):
         return entry, {**runtime, "changed": False, "added_hashes": [], "message": "当前 provider 还没有专用 enrich 实现。"}
+    aliases_map = dict(runtime.get("hash_aliases") or {})
 
     added_hashes: list[str] = []
     merged = SourceEntry(
         path=entry.path,
-        md5=entry.md5 or _pick_hash_value(entry, "md5"),
+        md5=entry.md5 or _pick_hash_value(entry, "md5", aliases_map),
         size=entry.size,
         last_op_time=entry.last_op_time,
         source_id=entry.source_id,
         provider=entry.provider,
         hash_type=entry.hash_type,
-        gcid=entry.gcid or _pick_hash_value(entry, "gcid"),
-        etag=entry.etag or _pick_hash_value(entry, "md5"),
-        sha1=entry.sha1 or _pick_hash_value(entry, "sha1"),
-        sha256=entry.sha256 or _pick_hash_value(entry, "sha256"),
-        crc64=entry.crc64 or _pick_hash_value(entry, "crc64"),
-        pre_hash=entry.pre_hash or _pick_hash_value(entry, "pre_hash"),
-        slice_md5=entry.slice_md5 or _pick_hash_value(entry, "slice_md5"),
-        pickcode=entry.pickcode or _pick_hash_value(entry, "pickcode"),
-        content_hash=entry.content_hash or _pick_hash_value(entry, "content_hash"),
+        gcid=entry.gcid or _pick_hash_value(entry, "gcid", aliases_map),
+        etag=entry.etag or _pick_hash_value(entry, "md5", aliases_map),
+        sha1=entry.sha1 or _pick_hash_value(entry, "sha1", aliases_map),
+        sha256=entry.sha256 or _pick_hash_value(entry, "sha256", aliases_map),
+        crc64=entry.crc64 or _pick_hash_value(entry, "crc64", aliases_map),
+        pre_hash=entry.pre_hash or _pick_hash_value(entry, "pre_hash", aliases_map),
+        slice_md5=entry.slice_md5 or _pick_hash_value(entry, "slice_md5", aliases_map),
+        pickcode=entry.pickcode or _pick_hash_value(entry, "pickcode", aliases_map),
+        content_hash=entry.content_hash or _pick_hash_value(entry, "content_hash", aliases_map),
         extra_hashes=dict(entry.extra_hashes or {}),
         provider_specific=dict(entry.provider_specific or {}),
         raw_hash_info=dict(entry.raw_hash_info or {}),
@@ -149,7 +103,7 @@ def enrich_entry(entry: SourceEntry, config: AppConfig, log: LogFn | None = None
         if not getattr(entry, field) and getattr(merged, field):
             added_hashes.append(field)
     changed = bool(added_hashes)
-    message = "已从现有元数据归并出补充指纹。" if changed else "当前 provider 没有额外可归并的指纹。"
+    message = "已按 provider 规则归并出补充指纹。" if changed else "当前 provider 没有额外可归并的指纹。"
     if changed and log:
         log(f"[直连补指纹] {entry.path}: 新增 {', '.join(added_hashes)}")
     return merged, {
