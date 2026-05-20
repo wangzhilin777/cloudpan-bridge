@@ -12,6 +12,10 @@
 - [x] 把 `source_enrich` 主执行路径切到 bridge executor，统一 session snapshot / API pending 两类执行语义
 - [x] 为 bridge executor 补充 provider 级候选哈希、pending 原因与执行状态报告
 - [x] 让 `source analyze / miaochuan preview` 基于 enrich 后视图输出 bridge batch 摘要
+- [x] 让 `transfer_planner` 读取 bridge 候选哈希与挂起原因，并把原因汇总到传输预览
+- [x] 把会话桥接 `bridge_ready` 与 API pending 路由语义拆开，避免运行态继续把已可归并的 provider 标成 pending
+- [x] 拆出 `app.drivercapture.js`、`app.pending.js`，把驱动抓取面板与待补传目录树从 `app.js` 剥离
+- [x] 支持从 `content_hash / etag` 里解析可识别的 `md5 / sha1` 候选，提升主流 provider 的补指纹命中率
 - [ ] 深化首批主流源端的真实直连补指纹桥接实现
 - [ ] 继续拆分前端与过大的 Python/JS 文件，尽量压到单文件 100 KB 以内
 - [ ] 完成更多主流 provider 的互传能力验证与 UI 诚实提示收口
