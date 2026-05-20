@@ -70,6 +70,50 @@ def build_source_provider_context(
     )
 
 
+def build_source_provider_resolution(
+    config: AppConfig,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    preference = str(config.source_provider_preference or "auto").strip().lower() or "auto"
+    if preference not in {"auto", "openlist_only", "direct_preferred"}:
+        preference = "auto"
+    provider_key = str(context.get("provider_key") or "")
+    direct_candidate = bool(context.get("provider_key") not in {"", "generic_openlist_driver", "openlist"})
+    provider_snapshot = dict((config.provider_captures or {}).get(provider_key) or {})
+    captured = dict(provider_snapshot.get("captured") or {})
+    direct_provider_ready = bool(direct_candidate and captured)
+    selected_source_mode = "openlist_mount"
+    selected_provider_key = "openlist"
+    fallback_reason = ""
+    selection_reason = "默认使用 OpenList 挂载源执行。"
+    if preference == "openlist_only":
+        selection_reason = "已显式指定只使用 OpenList 挂载源。"
+    elif preference == "direct_preferred":
+        if direct_provider_ready:
+            selected_source_mode = "direct_provider_bridge_pending"
+            selected_provider_key = provider_key or "openlist"
+            fallback_reason = "当前已识别到直连 provider 候选与抓取信息，但真实直连 source provider 仍待后续实现，暂回退 OpenList 执行。"
+            selection_reason = "已优先尝试直连 source provider 路径，但当前版本仍会保守回退到 OpenList。"
+        elif direct_candidate:
+            fallback_reason = "当前已识别到直连 provider 候选，但缺少可用抓取信息，暂回退 OpenList 执行。"
+            selection_reason = "已配置为优先直连 source provider，但当前尚未满足直连执行条件。"
+    elif preference == "auto":
+        if direct_provider_ready:
+            selected_source_mode = "openlist_with_direct_candidate"
+            selected_provider_key = provider_key or "openlist"
+            fallback_reason = "当前 source provider 具备直连候选与抓取信息，但尚未接入真实直连实现，先保守走 OpenList。"
+            selection_reason = "自动模式已检测到可用直连候选，后续可继续提升到真实直连执行。"
+    return {
+        "requested_provider_preference": preference,
+        "selected_source_mode": selected_source_mode,
+        "selected_provider_key": selected_provider_key,
+        "direct_provider_candidate": direct_candidate,
+        "direct_provider_ready": direct_provider_ready,
+        "fallback_reason": fallback_reason,
+        "selection_reason": selection_reason,
+    }
+
+
 def build_source_runtime_status(
     config: AppConfig,
     *,
@@ -83,8 +127,10 @@ def build_source_runtime_status(
         mount_path=mount_path,
         requested_driver=requested_driver,
     )
+    resolution = build_source_provider_resolution(config, context)
     return {
         **context,
+        **resolution,
         "provider_class": "OpenListSourceProvider",
         "provider_factory": "create_source_provider",
         "auth_state": {
@@ -92,7 +138,6 @@ def build_source_runtime_status(
             "username": str(config.openlist_username or ""),
             "has_token": bool(str(config.openlist_token or "").strip()),
         },
-        "direct_provider_candidate": bool(context.get("provider_key") not in {"", "generic_openlist_driver", "openlist"}),
     }
 
 

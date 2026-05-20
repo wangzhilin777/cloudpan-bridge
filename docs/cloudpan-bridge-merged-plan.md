@@ -184,6 +184,14 @@
 - [x] 相关回归覆盖了 runtime status 结构与 `/api/status` 输出
 - [ ] 后续仍需把这个运行态真正接到“选择直连 source provider 还是 OpenList provider”的执行分流上
 
+### 里程碑 23：Source Provider 偏好分流第一层落地（起步）
+
+- [x] 配置已支持 `source_provider_preference = auto / openlist_only / direct_preferred`
+- [x] `source_adapter.py` 新增统一 resolution 逻辑，会根据偏好、provider 映射与抓取状态计算选路结果
+- [x] 当前即使没有真实直连 source provider 实现，也会诚实输出 `selected_source_mode / selected_provider_key / fallback_reason`
+- [x] 相关回归覆盖了 preference round-trip 与 `direct_preferred` 的真实回退链路
+- [ ] 后续仍需把 `direct_provider_bridge_pending` 真正落成可执行的直连 source provider，而不是只停留在诚实分流与回退
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

@@ -110,6 +110,7 @@ class AppConfig:
     rate_limit_mode: str = "safe"
     provider_captures: dict[str, Any] | None = None
     mount_provider_mapping: dict[str, str] | None = None
+    source_provider_preference: str = "auto"
     ui_language: str = "zh"
     coverage_filters: dict[str, Any] | None = None
     browser_state: dict[str, Any] | None = None
@@ -248,6 +249,7 @@ class AppConfig:
             rate_limit_mode=str(_pick(payload.get("rate_limit_mode"), sync.get("rate_limit_mode"), default="safe")),
             provider_captures=dict(_pick(payload.get("provider_captures"), payload.get("source_session", {}).get("provider_captures"), default={}) or {}),
             mount_provider_mapping=dict(_pick(payload.get("mount_provider_mapping"), payload.get("source_session", {}).get("mount_provider_mapping"), default={}) or {}),
+            source_provider_preference=str(_pick(payload.get("source_provider_preference"), payload.get("source_session", {}).get("provider_preference"), default="auto")) or "auto",
             ui_language=str(_pick(payload.get("ui_language"), ui.get("language"), default="zh")),
             coverage_filters=dict(_pick(payload.get("coverage_filters"), ui.get("coverage_filters"), default={}) or {}),
             browser_state=dict(_pick(payload.get("browser_state"), ui.get("browser"), default={}) or {}),
@@ -360,6 +362,7 @@ class AppConfig:
             "rate_limit_mode": self.rate_limit_mode,
             "provider_captures": dict(self.provider_captures or {}),
             "mount_provider_mapping": dict(self.mount_provider_mapping or {}),
+            "source_provider_preference": self.source_provider_preference,
             "ui_language": self.ui_language,
             "coverage_filters": dict(self.coverage_filters or {}),
             "browser_state": dict(self.browser_state or {}),
@@ -429,6 +432,7 @@ class AppConfig:
             "source_session": {
                 "provider_captures": dict(self.provider_captures or {}),
                 "mount_provider_mapping": dict(self.mount_provider_mapping or {}),
+                "provider_preference": self.source_provider_preference,
             },
             "targets": {
                 "active_target": self.target_key,

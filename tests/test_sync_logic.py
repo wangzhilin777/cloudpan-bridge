@@ -26,6 +26,7 @@ from cloudpan_bridge.provider_capture import (
 )
 from cloudpan_bridge.source_adapter import OpenListSourceProvider, create_source_provider
 from cloudpan_bridge.source_adapter import (
+    build_source_provider_resolution,
     build_source_runtime_status,
     SourceProviderCompatMixin,
     build_source_provider_context,
@@ -261,6 +262,7 @@ def test_config_has_scan_throttle_defaults(tmp_path) -> None:
     assert cfg.openlist_request_interval_ms == 300
     assert cfg.queue_interval_ms == 3000
     assert cfg.auto_download_threshold_mb == 10
+    assert cfg.source_provider_preference == "auto"
     assert cfg.to_flat_dict()["openlist_page_size"] == 200
     assert cfg.to_flat_dict()["queue_interval_ms"] == 3000
     assert cfg.to_flat_dict()["provider_captures"] == {}
@@ -349,6 +351,7 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     "rate_limit_mode": "balanced"
   },
   "source_session": {
+    "provider_preference": "direct_preferred",
     "provider_captures": {
       "quark": {
         "status": "captured",
@@ -418,6 +421,7 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert cfg.sftp_target_username == "sftp-user"
     assert cfg.sftp_target_password == "sftp-pass"
     assert cfg.target_delete_removed is False
+    assert cfg.source_provider_preference == "direct_preferred"
     assert cfg.provider_captures["quark"]["captured"]["cookie_header"] == "k=v"
     assert cfg.ui_language == "mix"
     assert cfg.coverage_filters["onlyGaps"] is True
@@ -436,6 +440,7 @@ def test_config_supports_nested_structure_roundtrip(tmp_path) -> None:
     assert nested["targets"]["ftp"]["url"] == "ftp://ftp.example.com:21/root"
     assert nested["targets"]["sftp"]["url"] == "sftp://sftp.example.com:22/root"
     assert nested["source_session"]["provider_captures"]["quark"]["captured"]["cookie_header"] == "k=v"
+    assert nested["source_session"]["provider_preference"] == "direct_preferred"
     assert nested["ui"]["language"] == "mix"
     assert nested["ui"]["browser"]["mounted_source"] == "/mount"
     flat = cfg.to_flat_dict()
@@ -543,6 +548,26 @@ def test_config_roundtrip_provider_captures(tmp_path) -> None:
         }
     }
     assert cfg.to_flat_dict()["provider_captures"]["quark"]["captured"]["cookie_header"] == "k=v"
+
+
+def test_config_roundtrip_source_provider_preference(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "source_session": {
+    "provider_preference": "openlist_only"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    cfg = AppConfig.load(path)
+    assert cfg.source_provider_preference == "openlist_only"
+    assert cfg.to_flat_dict()["source_provider_preference"] == "openlist_only"
+    assert cfg.to_dict()["source_session"]["provider_preference"] == "openlist_only"
 
 
 def test_config_roundtrip_mount_provider_mapping(tmp_path) -> None:
@@ -756,10 +781,56 @@ def test_build_source_runtime_status_exposes_provider_runtime_shape(tmp_path: Pa
     assert runtime["provider_class"] == "OpenListSourceProvider"
     assert runtime["provider_factory"] == "create_source_provider"
     assert runtime["provider_key"] == "quark"
+    assert runtime["requested_provider_preference"] == "auto"
+    assert runtime["selected_source_mode"] == "openlist_mount"
     assert runtime["auth_state"]["base_url"] == "http://127.0.0.1:5244"
     assert runtime["auth_state"]["username"] == "admin"
     assert runtime["auth_state"]["has_token"] is True
     assert runtime["direct_provider_candidate"] is True
+
+
+def test_source_provider_resolution_prefers_direct_candidate_but_falls_back_honestly(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/alist/quark/demo",
+                    "target_path": "/dst",
+                },
+                "openlist": {
+                    "url": "http://127.0.0.1:5244",
+                    "token": "token-1",
+                    "username": "admin",
+                },
+                "source_session": {
+                    "provider_preference": "direct_preferred",
+                    "mount_provider_mapping": {
+                        "/alist/quark": "quark",
+                    },
+                    "provider_captures": {
+                        "quark": {
+                            "status": "captured",
+                            "captured": {
+                                "cookie_header": "sid=1; token=2",
+                            },
+                        }
+                    },
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    cfg = AppConfig.load(path)
+    context = build_source_provider_context(cfg)
+    resolution = build_source_provider_resolution(cfg, context)
+    assert resolution["requested_provider_preference"] == "direct_preferred"
+    assert resolution["direct_provider_candidate"] is True
+    assert resolution["direct_provider_ready"] is True
+    assert resolution["selected_source_mode"] == "direct_provider_bridge_pending"
+    assert resolution["selected_provider_key"] == "quark"
+    assert "回退 OpenList" in resolution["fallback_reason"]
 
 
 def test_sync_runner_uses_source_provider_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -3709,6 +3780,7 @@ def test_status_restores_provider_captures_from_config(tmp_path: Path) -> None:
     body = status.json()
     assert body["provider_captures"]["quark"]["captured"]["cookie_header"] == "sid=1; token=2"
     assert body["source_runtime"]["provider_class"] == "OpenListSourceProvider"
+    assert body["source_runtime"]["requested_provider_preference"] == "auto"
     assert body["active_target"] == "guangya"
     assert body["active_target_state"]["has_state"] is True
     assert body["active_target_state"]["field_count"] == 3
