@@ -9,7 +9,7 @@ from typing import Callable
 from .config import AppConfig
 from .models import PendingFileState, QueueItemState, SourceEntry, SyncFileState, SyncPlanItem, SyncState, normalize_posix_path
 from .source_adapter import SourceProvider, create_source_provider
-from .target_adapter import TargetAdapter, create_target_adapter
+from .target_adapter import TargetAdapter, create_target_adapter, target_delete_if_enabled, target_upload_stream
 
 LogFn = Callable[[str], None]
 
@@ -564,7 +564,7 @@ class SyncRunner:
         target_path = self._resolve_target_path(item.source.path)
         target_parent = str(PurePosixPath(target_path).parent)
         target_parent_id = target.ensure_target_dir(target_parent)
-        target.delete_if_exists(target_parent_id, item.source.name)
+        target_delete_if_enabled(target, target_parent_id, item.source.name)
 
         result = target.try_fast_upload(
             file_name=item.source.name,
@@ -590,7 +590,7 @@ class SyncRunner:
         target_path = self._resolve_target_path(item.source.path, source_root_override)
         target_parent = str(PurePosixPath(target_path).parent)
         target_parent_id = target.ensure_target_dir(target_parent)
-        target.delete_if_exists(target_parent_id, item.source.name)
+        target_delete_if_enabled(target, target_parent_id, item.source.name)
 
         local_path = self._download_source_file(item.source.path)
         if item.source.md5:
@@ -598,7 +598,7 @@ class SyncRunner:
         else:
             self.log(f"[跳过 MD5 校验] {item.source.path}: 源端未提供 MD5，仅保留 GCID/其它元数据。")
         self.log(f"[下载补传] {item.source.path} -> {target_path}")
-        target.upload_local_file(local_path, target_parent_id, item.source.name)
+        target_upload_stream(target, local_path, target_parent_id, item.source.name)
         try:
             local_path.unlink(missing_ok=True)
             self.log(f"[清理临时文件] {local_path}")

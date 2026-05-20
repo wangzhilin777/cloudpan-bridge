@@ -115,6 +115,13 @@
 - [x] 增加首页壳页测试，固定 `auth-lock-panel / workflow-roadmap` 等关键容器
 - [x] 相关回归通过：`python -m compileall src tests`、`node --check src/cloudpan_bridge/web/assets/app.js`、`pytest -q tests/test_sync_logic.py -x`
 
+### 里程碑 14：Target Provider 抽象兼容层第一步（起步）
+
+- [x] `target_adapter.py` 已补统一 helper：`target_upload_stream / target_delete_if_enabled`
+- [x] `SyncRunner` 已改为优先走统一 helper，而不是直接依赖旧的 `upload_local_file / delete_if_exists` 命名
+- [x] 新旧目标端方法名可以共存，后续新适配器可逐步向 `upload_stream / delete_if_enabled` 迁移
+- [x] 相关回归通过：`python -m compileall src tests`、`pytest -q tests/test_sync_logic.py -k "target_adapter_upload_stream_helper_falls_back_to_legacy_upload_method or target_adapter_delete_helper_prefers_new_delete_if_enabled_method or enriches_missing_fast_upload_fingerprint_before_direct_sync"`、`pytest -q tests/test_sync_logic.py -x`
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

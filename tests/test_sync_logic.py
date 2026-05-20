@@ -34,7 +34,7 @@ from cloudpan_bridge.syncer import (
     serialize_source_entry,
     summarize_source_entries,
 )
-from cloudpan_bridge.target_adapter import AzureBlobTargetAdapter, FtpTargetAdapter, GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, S3TargetAdapter, SeafileTargetAdapter, SftpTargetAdapter, SmbTargetAdapter, WebDavTargetAdapter
+from cloudpan_bridge.target_adapter import AzureBlobTargetAdapter, FtpTargetAdapter, GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, S3TargetAdapter, SeafileTargetAdapter, SftpTargetAdapter, SmbTargetAdapter, WebDavTargetAdapter, target_delete_if_enabled, target_upload_stream
 from cloudpan_bridge.webapp import (
     build_pending_selected_execution_groups,
     compute_rate_limit_cooldown_ms,
@@ -940,6 +940,38 @@ def test_auto_download_threshold_accepts_small_file_without_md5(tmp_path) -> Non
     runner = SyncRunner(AppConfig.load(path), log=lambda _message: None)
     item = build_plan([SourceEntry(path="/src/a.txt", md5="", size=5 * 1024 * 1024, last_op_time="1", hash_type="none")], SyncState())[0][0]
     assert runner._should_auto_download(item) is True
+
+
+def test_target_adapter_upload_stream_helper_falls_back_to_legacy_upload_method(tmp_path: Path) -> None:
+    local_file = tmp_path / "demo.bin"
+    local_file.write_bytes(b"demo")
+    seen: dict[str, object] = {}
+
+    class LegacyTarget:
+        def upload_local_file(self, local_path: Path, target_parent_id: str, target_name: str) -> dict[str, object]:
+            seen["legacy"] = (local_path.name, target_parent_id, target_name)
+            return {"ok": True}
+
+    result = target_upload_stream(LegacyTarget(), local_file, "parent-1", "demo.bin")  # type: ignore[arg-type]
+    assert result == {"ok": True}
+    assert seen["legacy"] == ("demo.bin", "parent-1", "demo.bin")
+
+
+def test_target_adapter_delete_helper_prefers_new_delete_if_enabled_method() -> None:
+    seen: list[str] = []
+
+    class NewTarget:
+        def delete_if_enabled(self, parent_id: str, name: str) -> bool:
+            seen.append(f"new:{parent_id}:{name}")
+            return True
+
+        def delete_if_exists(self, parent_id: str, name: str) -> bool:
+            seen.append(f"legacy:{parent_id}:{name}")
+            return False
+
+    result = target_delete_if_enabled(NewTarget(), "parent-1", "demo.bin")  # type: ignore[arg-type]
+    assert result is True
+    assert seen == ["new:parent-1:demo.bin"]
 
 
 def test_sync_runner_builds_guangya_target_adapter(tmp_path) -> None:
