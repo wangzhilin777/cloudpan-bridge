@@ -11,6 +11,20 @@ from .source_enrich_rules import MAINSTREAM_SOURCE_PROVIDERS, build_provider_rul
 LogFn = Callable[[str], None]
 
 
+def _build_bridge_preparation_summary(bridge_runtime: dict[str, Any]) -> dict[str, Any]:
+    preparation = dict(bridge_runtime.get("preparation") or {})
+    return {
+        "execution_state": str(preparation.get("execution_state") or ""),
+        "transport_hint": str(preparation.get("transport_hint") or ""),
+        "fingerprint_expectation": list(preparation.get("fingerprint_expectation") or []),
+        "selected_group": list(preparation.get("selected_group") or []),
+        "selected_field_names": list(preparation.get("selected_field_names") or []),
+        "selected_field_count": int(preparation.get("selected_field_count") or 0),
+        "available": bool(preparation.get("available")),
+        "degrade_to": list(preparation.get("degrade_to") or []),
+    }
+
+
 def supports_enrichment(provider_key: str) -> bool:
     return str(provider_key or "").strip().lower() in MAINSTREAM_SOURCE_PROVIDERS
 
@@ -26,6 +40,7 @@ def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dic
     capture_required = bool(rule.get("capture_required"))
     bridge_runtime = build_bridge_runtime(normalized, captured)
     capture_ready = bool(bridge_runtime.get("ready")) if capture_required else True
+    bridge_preparation_summary = _build_bridge_preparation_summary(bridge_runtime)
     return {
         "provider_key": normalized,
         "supported": supported,
@@ -39,6 +54,7 @@ def build_source_enrichment_runtime(config: AppConfig, provider_key: str) -> dic
         "strategy_level": str(rule.get("strategy_level") or ("provider_normalization" if supported else "openlist_only")),
         "bridge_status": str(bridge_runtime.get("status") or (rule.get("bridge_status") or ("capture_guided_normalization" if supported else "not_supported"))),
         "bridge_runtime": bridge_runtime,
+        "bridge_preparation_summary": bridge_preparation_summary,
         "runtime_mode": "openlist_first_provider_snapshot_enrichment" if supported else "openlist_only",
     }
 

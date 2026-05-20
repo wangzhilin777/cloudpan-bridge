@@ -22,6 +22,8 @@
 - [x] 让传输预览继续输出 `reason_code / bridge_provider_stage / bridge_transport_hint` 等诚实摘要，避免页面只剩 mode 计数
 - [x] 目录分析样本条目附带 `transferPlan`，页面可直接看到当前文件会走快传、普通上传还是仅记录待补传
 - [x] 新增 `app.bridgeview.js`，把桥接挂起原因、桥接阶段、传输原因与执行模式文案从 `app.workflow.js` 剥离
+- [x] 把 `bridge_preparation_summary` 扁平化到 `sourceEnrichment` 运行态，直接暴露预期补指纹、命中字段组与 transport hint
+- [x] 页面摘要已显示主流 provider 的 bridge 准备态细节，不再只显示 `bridge_ready_but_api_pending` 这类状态码
 - [ ] 深化首批主流源端的真实直连补指纹桥接实现
 - [ ] 继续拆分前端与过大的 Python/JS 文件，优先压到单文件 `100 KB` 左右，并按统一分级阈值治理
 - [ ] 完成更多主流 provider 的互传能力验证与 UI 诚实提示收口

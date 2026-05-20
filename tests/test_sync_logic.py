@@ -917,6 +917,9 @@ def test_source_enrichment_runtime_reports_mainstream_provider_capture_state(tmp
     assert "gcid" in runtime["preferred_hashes"]
     assert runtime["bridge_runtime"]["status"] == "bridge_ready_but_api_pending"
     assert runtime["bridge_runtime"]["matched_groups"] == [["authorization", "device_id"]]
+    assert runtime["bridge_preparation_summary"]["transport_hint"] == "authorization_plus_device_id"
+    assert runtime["bridge_preparation_summary"]["fingerprint_expectation"] == ["gcid", "md5", "sha1"]
+    assert runtime["bridge_preparation_summary"]["selected_field_names"] == ["authorization", "device_id"]
 
 
 def test_source_enrichment_runtime_marks_session_bridge_ready_when_capture_available(tmp_path: Path) -> None:
@@ -1054,6 +1057,43 @@ def test_source_enrichment_runtime_reports_bridge_status_for_aliyundriveopen(tmp
     assert runtime["strategy_level"] == "provider_normalization"
     assert "etag" not in runtime["hash_aliases"]["md5"]
     assert runtime["bridge_runtime"]["next_action"] == "prepare_aliyundriveopen_api_bridge"
+    assert runtime["bridge_preparation_summary"]["transport_hint"] == "refresh_token_or_authorization"
+    assert runtime["bridge_preparation_summary"]["fingerprint_expectation"] == ["sha1", "md5", "crc64"]
+    assert runtime["bridge_preparation_summary"]["selected_field_names"] == ["refresh_token"]
+
+
+def test_source_runtime_status_exposes_bridge_preparation_summary(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/alist/onedrive/demo",
+                    "target_path": "/dst"
+                },
+                "source_session": {
+                    "mount_provider_mapping": {
+                        "/alist/onedrive": "onedrive",
+                    },
+                    "provider_captures": {
+                        "onedrive": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh"
+                            }
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_runtime_status(AppConfig.load(path))
+    summary = runtime["source_enrichment"]["bridge_preparation_summary"]
+    assert summary["transport_hint"] == "refresh_token_or_authorization"
+    assert summary["fingerprint_expectation"] == ["sha1", "md5", "content_hash"]
+    assert summary["selected_field_names"] == ["refresh_token"]
 
 
 def test_bridge_runtime_reports_missing_keys_for_baidu_capture() -> None:

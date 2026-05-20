@@ -61,6 +61,25 @@
     return pickText(ctx, pair[0], pair[1]);
   }
 
+  function bridgeTransportHintText(ctx, key) {
+    const mapping = {
+      cookie_or_session_snapshot: ["Cookie 或会话快照", "Cookie or session snapshot"],
+      cookie_snapshot: ["Cookie 快照", "Cookie snapshot"],
+      cookie_plus_bdstoken: ["Cookie + bdstoken", "Cookie + bdstoken"],
+      authorization_plus_device_id: ["Authorization + device_id", "Authorization + device_id"],
+      refresh_token_or_authorization: ["Refresh Token 或 Authorization", "Refresh token or Authorization"],
+      openlist_only: ["仅 OpenList 元数据", "OpenList metadata only"],
+    };
+    const pair = mapping[String(key || "").trim()] || [key || "-", key || "-"];
+    return pickText(ctx, pair[0], pair[1]);
+  }
+
+  function bridgeExpectationText(ctx, hashes) {
+    const items = Array.isArray(hashes) ? hashes.filter(Boolean) : [];
+    if (!items.length) return "-";
+    return items.join(", ");
+  }
+
   function formatCountMap(ctx, counts, formatter) {
     return Object.entries(counts || {}).map(([key, value]) => `${formatter(ctx, key)}: ${value}`).join(" | ") || "-";
   }
@@ -71,6 +90,8 @@
     bridgeProviderStageText,
     transferReasonCodeText,
     transferModeText,
+    bridgeTransportHintText,
+    bridgeExpectationText,
     formatCountMap,
   };
 })();
