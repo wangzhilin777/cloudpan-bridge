@@ -73,6 +73,7 @@
           <div class="panel">
             <h2 class="help-anchor" data-i18n="panel.source_browser" data-help-key="panel_source_browser">目录浏览</h2>
             <div class="subtle" data-i18n="desc.source_browser">页面进入时会优先按配置里的 <code>source_path</code> 恢复当前浏览目录；如果该目录读取失败，再回退到挂载根目录。</div>
+            <div class="notice" id="source-driver-summary">等待源端上下文...</div>
             <div class="actions">
               <button class="secondary" id="browse-root" data-i18n="btn.browse_root" data-help-key="btn_browse_root">浏览挂载根目录</button>
               <button class="secondary" id="browse-up" data-i18n="btn.browse_up" data-help-key="btn_browse_up">返回上级</button>
@@ -144,6 +145,7 @@
               <button class="accent" id="save-config-overview" data-i18n="btn.save_task_config" data-help-key="btn_save_task_config">保存当前任务配置</button>
               <button class="secondary" id="use-mounted-source" data-i18n="btn.use_mounted_source" data-help-key="btn_use_mounted_source">使用挂载源目录</button>
             </div>
+            <div class="notice" id="task-mode-summary">等待任务策略分析...</div>
           </div>
 
           <div class="panel">

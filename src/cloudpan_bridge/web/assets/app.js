@@ -353,6 +353,7 @@
       if (!context.driver) {
         capabilityAssessmentCache = null;
         renderCapabilitySummary();
+        renderTaskModeSummary();
         return;
       }
       try {
@@ -368,6 +369,7 @@
         capabilityAssessmentCache = null;
       }
       renderCapabilitySummary();
+      renderTaskModeSummary();
     }
 
     function buildCoverageAuditPayload(filters) {
@@ -1376,6 +1378,7 @@
       setGroupedConfigValue(["ui", "browser", "current_path"], currentDirectoryPath || "/");
       setGroupedConfigValue(["ui", "browser", "current_parent_path"], currentParentPath || "");
       scheduleUiPrefsPersist();
+      renderSourceDriverSummary();
       const root = document.getElementById("dir-browser-list");
       const dirs = Array.isArray(data?.directories) ? data.directories : [];
       if (!dirs.length) {
@@ -1933,6 +1936,48 @@
       `;
     }
 
+    function renderSourceDriverSummary() {
+      const root = document.getElementById("source-driver-summary");
+      if (!root) return;
+      const context = currentDriverContext();
+      const sourcePath = String(document.getElementById("source_path")?.value || configCache?.source_path || "/").trim() || "/";
+      const browsingPath = String(currentDirectoryPath || "/").trim() || "/";
+      const selectedMount = String(document.getElementById("mounted_source_select")?.value || "").trim();
+      const rateMode = String(document.getElementById("rate_limit_mode")?.value || configCache?.rate_limit_mode || "safe").trim() || "safe";
+      root.innerHTML = `
+        <div class="mono">driver=${escapeHtml(context.driver || "-")} | mount=${escapeHtml(selectedMount || "-")} | rate=${escapeHtml(rateMode)}</div>
+        <div class="mono">source_path=${escapeHtml(sourcePath)} | browsing=${escapeHtml(browsingPath)}</div>
+      `;
+    }
+
+    function renderTaskModeSummary() {
+      const root = document.getElementById("task-mode-summary");
+      if (!root) return;
+      const sourcePath = String(document.getElementById("source_path")?.value || configCache?.source_path || "/").trim() || "/";
+      const targetKey = activeTargetKey();
+      const targetPath = String(document.getElementById("target_path")?.value || configCache?.target_path || "/").trim() || "/";
+      const autoThreshold = String(document.getElementById("auto_download_threshold_mb")?.value || configCache?.auto_download_threshold_mb || "0").trim() || "0";
+      const deleteRemoved = Boolean(document.getElementById("delete_removed")?.checked);
+      const deleteRealTarget = Boolean(document.getElementById("target_delete_removed")?.checked);
+      const recommendedMode = String(capabilityAssessmentCache?.strategy?.recommendedMode || "-");
+      const assessedLevel = capabilityLevelText(capabilityAssessmentCache?.assessedLevel || capabilityAssessmentCache?.level || "unsupported");
+      const rationale = capabilityAssessmentCache?.rationale
+        ? translateDriverText(capabilityAssessmentCache.rationale.zh || "", capabilityAssessmentCache.rationale.en || "")
+        : "";
+      root.innerHTML = `
+        <div class="mono">source=${escapeHtml(sourcePath)} -> target=${escapeHtml(targetKey)}:${escapeHtml(targetPath)}</div>
+        <div class="mono">recommended=${escapeHtml(recommendedMode)} | level=${escapeHtml(assessedLevel)} | auto_small_mb=${escapeHtml(autoThreshold)}</div>
+        <div class="mono">delete_state=${deleteRemoved ? "on" : "off"} | delete_target=${deleteRealTarget ? "on" : "off"}</div>
+        ${rationale ? `<div>${escapeHtml(rationale)}</div>` : ""}
+      `;
+    }
+
+    function renderWorkflowSummaries(syncState = {}, runtimeState = {}) {
+      renderOverviewRouteSummary(syncState, runtimeState);
+      renderSourceDriverSummary();
+      renderTaskModeSummary();
+    }
+
     async function refreshStatus() {
       const data = await call("/api/status");
       renderSync(data.sync || {});
@@ -1946,7 +1991,7 @@
       renderPendingTree(data.sync?.persistent_pending || []);
       if (data.sync?.directory_browser) renderDirectoryBrowser(data.sync.directory_browser);
       renderLogs(data.logs || []);
-      renderOverviewRouteSummary(data.sync || {}, data.openlist_runtime || {});
+      renderWorkflowSummaries(data.sync || {}, data.openlist_runtime || {});
     }
 
     async function analyzeCurrentSource() {
