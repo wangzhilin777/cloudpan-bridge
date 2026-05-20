@@ -68,32 +68,41 @@ def plan_transfer_mode(
     small_file_auto = bool(threshold_bytes > 0 and int(entry.size) <= threshold_bytes)
     mode = "record_pending_only"
     reason_code = "no_auto_fallback"
+    next_action_hint = "manual_review"
     reason = "当前目标端不支持可直接使用的快传指纹，且本轮未允许自动降级。"
     if fast_hash_hits:
         mode = "fast_upload"
         reason_code = "fast_hash_ready"
+        next_action_hint = "direct_fast_upload_ready"
         reason = f"目标端支持当前文件的快传指纹: {', '.join(fast_hash_hits)}"
     elif "download_upload" in fallback_modes and small_file_auto:
         mode = "download_upload"
         reason_code = "small_file_auto_fallback"
+        next_action_hint = "fallback_download_upload_ready"
         reason = "文件命中小文件自动补传阈值，建议直接下载后上传。"
     elif "download_upload" in fallback_modes and allow_full_fallback:
         mode = "download_upload"
         reason_code = "full_download_fallback_allowed"
+        next_action_hint = "fallback_download_upload_ready"
         reason = "当前执行模式允许完整降级到下载后上传。"
     elif "stream_upload" in fallback_modes and allow_full_fallback:
         mode = "stream_upload"
         reason_code = "full_stream_fallback_allowed"
+        next_action_hint = "fallback_stream_upload_ready"
         reason = "当前执行模式允许目标端走普通上传/流式写入。"
     elif "download_upload" in fallback_modes or "stream_upload" in fallback_modes:
         mode = "record_pending_only"
         reason_code = "fallback_available_but_deferred"
+        next_action_hint = "defer_to_pending_tree"
         reason = "当前目标端可降级上传，但本轮建议先记录到待补传。"
     if not fast_hash_hits and bridge_candidates:
         pending_reason = str(bridge_meta.get("pending_reason") or "")
         supported_fast = [str(item or "").strip().lower() for item in list(capability.get("fast_upload_hashes") or capability.get("fastUploadHashes") or []) if str(item or "").strip()]
         if pending_reason == "provider_api_bridge_not_executed_yet":
             reason_code = "provider_api_bridge_not_executed_yet"
+            next_action_hint = "execute_provider_api_enrich"
+            if any(key in {"md5", "gcid"} for key in bridge_missing_expected_hashes):
+                next_action_hint = "execute_provider_api_for_fast_hashes"
             if bridge_missing_expected_hashes:
                 reason = (
                     "源端 bridge 已进入 API 准备态，但当前版本还没有执行真实 provider enrich；"
@@ -106,22 +115,26 @@ def plan_transfer_mode(
                 )
         elif pending_reason == "non_fast_hashes_only_after_session_snapshot":
             reason_code = "non_fast_hashes_only_after_session_snapshot"
+            next_action_hint = "wait_for_fast_hash_or_fallback"
             reason = (
                 "源端 session snapshot 已补出候选哈希，但当前仍缺少目标端可直接快传的指纹；"
                 f"候选哈希: {', '.join(bridge_candidates)}"
             )
         elif supported_fast:
             reason_code = "target_hash_not_supported"
+            next_action_hint = "fallback_target_does_not_accept_hashes"
             reason = (
                 "源端已补出候选哈希，但当前目标端不认这些快传指纹；"
                 f"源端候选={', '.join(bridge_candidates)}，目标端支持={', '.join(supported_fast)}"
             )
     elif not fast_hash_hits and not capability.get("supports_fast_upload") and not capability.get("fast_upload_hashes") and ("download_upload" in fallback_modes or "stream_upload" in fallback_modes):
         reason_code = "target_no_fast_capability"
+        next_action_hint = "fallback_target_has_no_fast_upload"
         reason = "当前目标端未声明元数据秒传能力，只能走普通上传、流式写入或下载补传。"
     return {
         "mode": mode,
         "reason_code": reason_code,
+        "next_action_hint": next_action_hint,
         "reason": reason,
         "fast_hash_hits": fast_hash_hits,
         "bridge_candidate_hashes": bridge_candidates,
@@ -157,6 +170,7 @@ def summarize_transfer_plan(
     bridge_maturity_level_counts: dict[str, int] = {}
     bridge_maturity_honesty_counts: dict[str, int] = {}
     bridge_missing_expected_hash_counts: dict[str, int] = {}
+    next_action_hint_counts: dict[str, int] = {}
     for entry in entries:
         plan = plan_transfer_mode(
             entry,
@@ -173,6 +187,9 @@ def summarize_transfer_plan(
         reason_code = str(plan.get("reason_code") or "").strip()
         if reason_code:
             reason_code_counts[reason_code] = reason_code_counts.get(reason_code, 0) + 1
+        next_action_hint = str(plan.get("next_action_hint") or "").strip()
+        if next_action_hint:
+            next_action_hint_counts[next_action_hint] = next_action_hint_counts.get(next_action_hint, 0) + 1
         pending_reason = str(plan.get("bridge_pending_reason") or "").strip()
         if pending_reason:
             bridge_pending_reason_counts[pending_reason] = bridge_pending_reason_counts.get(pending_reason, 0) + 1
@@ -206,6 +223,7 @@ def summarize_transfer_plan(
         "bridge_maturity_level_counts": bridge_maturity_level_counts,
         "bridge_maturity_honesty_counts": bridge_maturity_honesty_counts,
         "bridge_missing_expected_hash_counts": bridge_missing_expected_hash_counts,
+        "next_action_hint_counts": next_action_hint_counts,
         "auto_download_threshold_mb": max(0, int(auto_download_threshold_mb or 0)),
         "allow_full_fallback": bool(allow_full_fallback),
     }

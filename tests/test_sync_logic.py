@@ -1364,6 +1364,7 @@ def test_transfer_planner_prefers_fast_upload_when_target_hash_matches() -> None
     )
     assert plan["mode"] == "fast_upload"
     assert plan["fast_hash_hits"] == ["md5"]
+    assert plan["next_action_hint"] == "direct_fast_upload_ready"
 
 
 def test_transfer_planner_prefers_download_for_small_file_when_no_fast_hash_hit() -> None:
@@ -1374,6 +1375,7 @@ def test_transfer_planner_prefers_download_for_small_file_when_no_fast_hash_hit(
         auto_download_threshold_mb=10,
     )
     assert plan["mode"] == "download_upload"
+    assert plan["next_action_hint"] == "fallback_download_upload_ready"
 
 
 def test_transfer_planner_explains_api_bridge_pending_with_candidate_hashes() -> None:
@@ -1401,6 +1403,31 @@ def test_transfer_planner_explains_api_bridge_pending_with_candidate_hashes() ->
     assert plan["bridge_pending_reason"] == "provider_api_bridge_not_executed_yet"
     assert "理论预期哈希" in plan["reason"]
     assert plan["bridge_missing_expected_hashes"] == ["md5", "content_hash"]
+    assert plan["next_action_hint"] == "execute_provider_api_for_fast_hashes"
+
+
+def test_transfer_planner_marks_api_bridge_pending_without_fast_hash_gap() -> None:
+    entry = SourceEntry(
+        path="/src/api-only.bin",
+        md5="",
+        size=10,
+        provider="OneDrive",
+        sha1="A" * 40,
+        provider_specific={
+            "__bridge_candidate_hashes": "sha1",
+            "__bridge_pending_reason": "provider_api_bridge_not_executed_yet",
+            "__bridge_execution_state": "api_bridge_prepared_but_not_executed",
+            "__bridge_expected_hashes": "sha1,content_hash",
+            "__bridge_missing_expected_hashes": "content_hash",
+        },
+    )
+    plan = plan_transfer_mode(
+        entry,
+        {"supports_fast_upload": True, "fast_upload_hashes": ["md5", "gcid"], "fallback_modes": ["download_upload"]},
+        auto_download_threshold_mb=0,
+    )
+    assert plan["reason_code"] == "provider_api_bridge_not_executed_yet"
+    assert plan["next_action_hint"] == "execute_provider_api_enrich"
 
 
 def test_transfer_planner_explains_non_fast_session_snapshot_candidates() -> None:
@@ -1425,6 +1452,40 @@ def test_transfer_planner_explains_non_fast_session_snapshot_candidates() -> Non
     assert plan["bridge_candidate_hashes"] == ["sha1", "slice_md5"]
     assert plan["bridge_pending_reason"] == "non_fast_hashes_only_after_session_snapshot"
     assert "session snapshot" in plan["reason"]
+    assert plan["next_action_hint"] == "wait_for_fast_hash_or_fallback"
+
+
+def test_transfer_planner_marks_target_without_fast_capability_for_fallback() -> None:
+    entry = SourceEntry(path="/src/no-fast.txt", md5="abc", size=10)
+    plan = plan_transfer_mode(
+        entry,
+        {"supports_fast_upload": False, "fast_upload_hashes": [], "fallback_modes": ["stream_upload"]},
+        auto_download_threshold_mb=0,
+        allow_full_fallback=False,
+    )
+    assert plan["mode"] == "record_pending_only"
+    assert plan["reason_code"] == "target_no_fast_capability"
+    assert plan["next_action_hint"] == "fallback_target_has_no_fast_upload"
+
+
+def test_transfer_planner_marks_target_hash_not_supported_for_fallback() -> None:
+    entry = SourceEntry(
+        path="/src/sha1-only.bin",
+        md5="",
+        size=10,
+        sha1="B" * 40,
+        provider_specific={
+            "__bridge_candidate_hashes": "sha1",
+            "__bridge_pending_reason": "bridge_not_registered",
+        },
+    )
+    plan = plan_transfer_mode(
+        entry,
+        {"supports_fast_upload": True, "fast_upload_hashes": ["md5"], "fallback_modes": ["download_upload"]},
+        auto_download_threshold_mb=0,
+    )
+    assert plan["reason_code"] == "target_hash_not_supported"
+    assert plan["next_action_hint"] == "fallback_target_does_not_accept_hashes"
 
 
 def test_transfer_planner_summarizes_mode_counts() -> None:
@@ -1495,6 +1556,8 @@ def test_transfer_planner_summary_collects_bridge_candidate_counts() -> None:
     assert summary["bridge_maturity_honesty_counts"]["api_prepared_not_executed"] == 1
     assert summary["bridge_missing_expected_hash_counts"]["md5"] == 1
     assert summary["bridge_missing_expected_hash_counts"]["content_hash"] == 1
+    assert summary["next_action_hint_counts"]["execute_provider_api_for_fast_hashes"] == 1
+    assert summary["next_action_hint_counts"]["wait_for_fast_hash_or_fallback"] == 1
 
 
 def test_sync_runner_uses_source_provider_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -6337,11 +6400,13 @@ def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
     assert payload["sourceEnrichmentBatch"]["candidate_hash_counts"]["gcid"] == 1
     assert payload["sourceEnrichmentBatch"]["bridge_execution_state_counts"]["api_bridge_prepared_but_not_executed"] == 1
     assert payload["transferPlanPreview"]["reason_code_counts"]["fast_hash_ready"] == 2
+    assert payload["transferPlanPreview"]["next_action_hint_counts"]["direct_fast_upload_ready"] == 2
     assert payload["transferPlanPreview"]["bridge_maturity_level_counts"]["capture_missing"] == 1
     assert payload["transferPlanPreview"]["bridge_missing_expected_hash_counts"]["md5"] == 1
     assert payload["transferPlanPreview"]["bridge_missing_expected_hash_counts"]["sha1"] == 1
     assert payload["entries"][0]["transferPlan"]["mode"] == "fast_upload"
     assert payload["entries"][0]["transferPlan"]["reason_code"] == "fast_hash_ready"
+    assert payload["entries"][0]["transferPlan"]["next_action_hint"] == "direct_fast_upload_ready"
     assert payload["truncated"] is True
 
 

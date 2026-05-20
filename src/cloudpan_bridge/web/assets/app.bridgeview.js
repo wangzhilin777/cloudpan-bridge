@@ -61,6 +61,23 @@
     return pickText(ctx, pair[0], pair[1]);
   }
 
+  function nextActionHintText(ctx, key) {
+    const mapping = {
+      manual_review: ["需要人工复核", "Needs manual review"],
+      direct_fast_upload_ready: ["可直接执行快传", "Fast upload can run directly"],
+      fallback_download_upload_ready: ["可直接走下载补传", "Download-upload fallback is ready"],
+      fallback_stream_upload_ready: ["可直接走普通流式上传", "Normal stream upload fallback is ready"],
+      defer_to_pending_tree: ["建议先进入待补传目录树", "Prefer deferring into the pending tree first"],
+      execute_provider_api_enrich: ["应先执行源端 API 补指纹", "Run source-side API enrichment first"],
+      execute_provider_api_for_fast_hashes: ["应优先补齐快传关键哈希", "Prioritize recovering fast-upload hashes first"],
+      wait_for_fast_hash_or_fallback: ["等待快传关键哈希，或转降级上传", "Wait for fast hashes or fall back to normal upload"],
+      fallback_target_does_not_accept_hashes: ["目标端不认这些哈希，应转普通上传", "The target does not accept these hashes, so fall back to normal upload"],
+      fallback_target_has_no_fast_upload: ["目标端无秒传能力，应直接走普通上传", "The target has no fast-upload capability, so use normal upload"],
+    };
+    const pair = mapping[String(key || "").trim()] || [key || "-", key || "-"];
+    return pickText(ctx, pair[0], pair[1]);
+  }
+
   function bridgeTransportHintText(ctx, key) {
     const mapping = {
       cookie_or_session_snapshot: ["Cookie 或会话快照", "Cookie or session snapshot"],
@@ -118,6 +135,7 @@
     bridgeExpectationText,
     bridgeMaturityText,
     bridgeHonestyText,
+    nextActionHintText,
     formatCountMap,
   };
 })();
