@@ -240,18 +240,15 @@ def _collect_capture_entry_payloads(entry: SourceEntry, runtime: dict[str, Any])
         for mapping in _iter_capture_named_values(captured, CAPTURE_PATH_CONTAINER_KEYS):
             if isinstance(mapping, dict):
                 direct = mapping.get(normalized_entry_path)
-                if isinstance(direct, dict):
-                    payloads.append(_normalize_payload_aliases({str(inner_key): inner_value for inner_key, inner_value in direct.items()}))
+                payloads.extend(_collect_nested_payloads(direct))
                 alt = mapping.get(normalized_entry_path.lstrip("/"))
-                if isinstance(alt, dict):
-                    payloads.append(_normalize_payload_aliases({str(inner_key): inner_value for inner_key, inner_value in alt.items()}))
+                payloads.extend(_collect_nested_payloads(alt))
     source_id = str(entry.source_id or "").strip()
     if source_id:
         for mapping in _iter_capture_named_values(captured, CAPTURE_ID_CONTAINER_KEYS):
             if isinstance(mapping, dict):
                 direct = mapping.get(source_id)
-                if isinstance(direct, dict):
-                    payloads.append(_normalize_payload_aliases({str(inner_key): inner_value for inner_key, inner_value in direct.items()}))
+                payloads.extend(_collect_nested_payloads(direct))
     for collection in _iter_capture_named_values(captured, CAPTURE_COLLECTION_KEYS):
         for item in _iter_collection_entries(collection):
             normalized = _normalize_payload_aliases({str(inner_key): inner_value for inner_key, inner_value in item.items()})

@@ -1585,6 +1585,43 @@ def test_source_enrichment_runtime_accepts_camel_case_capture_cache_container_ke
     assert summary["hash_fields"] == ["content_hash", "sha1"]
 
 
+def test_source_enrichment_runtime_reads_nested_json_string_values_inside_capture_maps(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "aliyundriveopen": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                                "file_hashes_by_path": {
+                                    "/src/demo.bin": "{\"data\":{\"hash_info\":{\"sha1\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"md5\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}}}"
+                                },
+                                "entry_hashes_by_id": {
+                                    "item-9": [
+                                        {"algorithm": "crc64", "value": "cccccccccccccccc"}
+                                    ]
+                                },
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "aliyundriveopen")
+    summary = runtime["capture_cache_summary"]
+    assert summary["available"] is True
+    assert summary["path_entry_count"] == 1
+    assert summary["id_entry_count"] == 1
+    assert summary["lookup_modes"] == ["path", "source_id"]
+    assert summary["hash_fields"] == ["crc64", "md5", "sha1"]
+
+
 def test_bridge_runtime_reports_missing_keys_for_baidu_capture() -> None:
     runtime = build_bridge_runtime("baidu", {"cookie_header": "sid=1"})
     assert runtime["ready"] is False
@@ -1754,6 +1791,46 @@ def test_execute_source_bridge_reads_api_capture_cache_by_path_for_aliyundriveop
     assert report["bridge_maturity_level"] == "api_capture_cache_ready"
     assert report["bridge_maturity_honesty"] == "capture_cache_snapshot_only"
     assert report["pending_reason"] == ""
+    assert report["fast_upload_ready_after_bridge"] is True
+
+
+def test_execute_source_bridge_reads_nested_json_string_capture_map_values_for_aliyundriveopen(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "aliyundriveopen": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                                "file_hashes_by_path": {
+                                    "/src/demo.bin": "{\"data\":{\"hash_info\":{\"sha1\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"md5\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}}}"
+                                },
+                                "entry_hashes_by_id": {
+                                    "item-9": [
+                                        {"algorithm": "crc64", "value": "cccccccccccccccc"}
+                                    ]
+                                },
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "aliyundriveopen")
+    enriched, report = execute_source_bridge(
+        SourceEntry(path="/src/demo.bin", md5="", size=10, provider="AliyunDriveOpen", source_id="item-9"),
+        runtime,
+    )
+    assert enriched.sha1 == "A" * 40
+    assert enriched.md5 == "B" * 32
+    assert enriched.crc64 == "C" * 16
+    assert report["bridge_execution_state"] == "api_capture_cache_normalized"
     assert report["fast_upload_ready_after_bridge"] is True
 
 

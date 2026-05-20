@@ -99,6 +99,9 @@
 - 条目匹配规则也继续补了一层真实返回体兼容：
   - 现在支持只给 `parentPath + server_filename`、而不直接给完整 `path` 的抓取条目
   - 这类结构在 `Baidu / 123Pan` 一类目录接口里更常见，补上后能减少“缓存明明有哈希但仍匹配不到文件”的情况
+- `file_hashes_by_path / ...by_id` 这类缓存 map 的值也继续向真实抓包靠拢：
+  - 现在不仅支持平铺 dict，还支持值本身是 JSON 字符串、算法列表，或再包一层 `data / hash_info`
+  - 这让 `AliyunDriveOpen / OneDrive / Thunder` 一类抓取缓存，即使值不是仓库内部理想的扁平对象，也能继续被 summary 与 enrich 主链消费
 - 统一体积分级阈值这轮也已落到实处：
   - 当前生产源码里最大的 Python / JS 文件是 `webapp.py`，约 `94.2 KB`
   - 前端主入口 `app.js` 约 `88.8 KB`

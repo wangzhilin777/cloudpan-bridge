@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Callable
 
 from .config import AppConfig
@@ -50,6 +51,18 @@ def _iter_capture_collection_entries(value: Any) -> list[dict[str, Any]]:
     return entries
 
 
+def _parse_capture_json(value: Any) -> Any:
+    text = str(value or "").strip()
+    if len(text) < 2:
+        return value
+    if not ((text.startswith("{") and text.endswith("}")) or (text.startswith("[") and text.endswith("]"))):
+        return value
+    try:
+        return json.loads(text)
+    except Exception:
+        return value
+
+
 def _build_bridge_preparation_summary(bridge_runtime: dict[str, Any]) -> dict[str, Any]:
     preparation = dict(bridge_runtime.get("preparation") or {})
     return {
@@ -73,9 +86,40 @@ def _extract_capture_cache_summary(captured: dict[str, Any]) -> dict[str, Any]:
     collection_count = 0
     hash_fields: set[str] = set()
 
-    def collect_hash_fields(payload: Any) -> None:
+    def collect_hash_fields(payload: Any, *, depth: int = 0) -> None:
+        if depth > 4:
+            return
+        if isinstance(payload, str):
+            parsed = _parse_capture_json(payload)
+            if parsed is not payload:
+                collect_hash_fields(parsed, depth=depth + 1)
+            return
+        if isinstance(payload, list):
+            for item in payload:
+                collect_hash_fields(item, depth=depth + 1)
+            return
         if not isinstance(payload, dict):
             return
+        algorithm = str(payload.get("algorithm") or payload.get("alg") or payload.get("name") or payload.get("type") or "").strip().lower()
+        algorithm_value = payload.get("value")
+        if algorithm == "sha1hash":
+            algorithm = "sha1"
+        elif algorithm == "sha256hash":
+            algorithm = "sha256"
+        elif algorithm == "crc64hash":
+            algorithm = "crc64"
+        elif algorithm == "md5hash":
+            algorithm = "md5"
+        elif algorithm in {"md5sum", "md5_sum"}:
+            algorithm = "md5"
+        elif algorithm in {"gcidhash", "gcid_hash"}:
+            algorithm = "gcid"
+        elif algorithm in {"pickcode", "pick_code"}:
+            algorithm = "pickcode"
+        elif algorithm == "contenthash":
+            algorithm = "content_hash"
+        if algorithm in CAPTURE_CACHE_HASH_KEYS and str(algorithm_value or "").strip():
+            hash_fields.add(algorithm)
         for key, value in payload.items():
             normalized = str(key or "").strip().lower()
             if normalized == "sha1hash":
@@ -96,18 +140,19 @@ def _extract_capture_cache_summary(captured: dict[str, Any]) -> dict[str, Any]:
                 normalized = "content_hash"
             if normalized in CAPTURE_CACHE_HASH_KEYS and str(value or "").strip():
                 hash_fields.add(normalized)
+            collect_hash_fields(value, depth=depth + 1)
 
     for mapping in _iter_capture_named_values(captured, CAPTURE_CACHE_PATH_KEYS):
         if isinstance(mapping, dict):
             for item in mapping.values():
-                if isinstance(item, dict):
+                if isinstance(item, (dict, list, str)):
                     path_count += 1
                     collect_hash_fields(item)
 
     for mapping in _iter_capture_named_values(captured, CAPTURE_CACHE_ID_KEYS):
         if isinstance(mapping, dict):
             for item in mapping.values():
-                if isinstance(item, dict):
+                if isinstance(item, (dict, list, str)):
                     id_count += 1
                     collect_hash_fields(item)
 
