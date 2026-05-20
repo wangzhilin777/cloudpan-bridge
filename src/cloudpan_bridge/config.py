@@ -109,6 +109,7 @@ class AppConfig:
     auto_download_threshold_mb: int = 10
     rate_limit_mode: str = "safe"
     provider_captures: dict[str, Any] | None = None
+    mount_provider_mapping: dict[str, str] | None = None
     ui_language: str = "zh"
     coverage_filters: dict[str, Any] | None = None
     browser_state: dict[str, Any] | None = None
@@ -246,6 +247,7 @@ class AppConfig:
             auto_download_threshold_mb=_int_or_default(_pick(payload.get("auto_download_threshold_mb"), sync.get("auto_download_threshold_mb"), default=10), 10, minimum=0),
             rate_limit_mode=str(_pick(payload.get("rate_limit_mode"), sync.get("rate_limit_mode"), default="safe")),
             provider_captures=dict(_pick(payload.get("provider_captures"), payload.get("source_session", {}).get("provider_captures"), default={}) or {}),
+            mount_provider_mapping=dict(_pick(payload.get("mount_provider_mapping"), payload.get("source_session", {}).get("mount_provider_mapping"), default={}) or {}),
             ui_language=str(_pick(payload.get("ui_language"), ui.get("language"), default="zh")),
             coverage_filters=dict(_pick(payload.get("coverage_filters"), ui.get("coverage_filters"), default={}) or {}),
             browser_state=dict(_pick(payload.get("browser_state"), ui.get("browser"), default={}) or {}),
@@ -357,6 +359,7 @@ class AppConfig:
             "auto_download_threshold_mb": self.auto_download_threshold_mb,
             "rate_limit_mode": self.rate_limit_mode,
             "provider_captures": dict(self.provider_captures or {}),
+            "mount_provider_mapping": dict(self.mount_provider_mapping or {}),
             "ui_language": self.ui_language,
             "coverage_filters": dict(self.coverage_filters or {}),
             "browser_state": dict(self.browser_state or {}),
@@ -425,6 +428,7 @@ class AppConfig:
             },
             "source_session": {
                 "provider_captures": dict(self.provider_captures or {}),
+                "mount_provider_mapping": dict(self.mount_provider_mapping or {}),
             },
             "targets": {
                 "active_target": self.target_key,
@@ -571,6 +575,7 @@ def write_example_config(path: Path) -> None:
         auto_download_threshold_mb=10,
         rate_limit_mode="safe",
         provider_captures={},
+        mount_provider_mapping={},
         ui_language="zh",
         coverage_filters={},
         browser_state={},

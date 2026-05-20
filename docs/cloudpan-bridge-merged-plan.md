@@ -49,6 +49,7 @@
 
 - [x] 前端加入“源 Profile 覆盖”入口，可针对当前挂载源手动指定 source profile
 - [x] 覆盖值写入 `grouped_config.source_session.mount_provider_mapping`
+- [x] `AppConfig` 正式接入 `mount_provider_mapping`，并补齐 round-trip 回归测试
 - [x] 当前驱动上下文优先读取覆盖值，再决定源端能力评估
 - [x] 覆盖保存/清除后会联动刷新源端摘要与任务能力判断
 - [ ] 后端补齐更正式的 mount/provider override 接口与矩阵回写

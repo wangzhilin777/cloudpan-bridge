@@ -530,6 +530,32 @@ def test_config_roundtrip_provider_captures(tmp_path) -> None:
     assert cfg.to_flat_dict()["provider_captures"]["quark"]["captured"]["cookie_header"] == "k=v"
 
 
+def test_config_roundtrip_mount_provider_mapping(tmp_path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "source_session": {
+    "mount_provider_mapping": {
+      "/alist/quark": "quark",
+      "/alist/mystery": "generic"
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    cfg = AppConfig.load(path)
+    assert cfg.mount_provider_mapping == {
+        "/alist/quark": "quark",
+        "/alist/mystery": "generic",
+    }
+    assert cfg.to_flat_dict()["mount_provider_mapping"]["/alist/quark"] == "quark"
+    assert cfg.to_dict()["source_session"]["mount_provider_mapping"]["/alist/mystery"] == "generic"
+
+
 def test_sync_state_supports_generic_target_states_and_legacy_guangya_tokens() -> None:
     restored = SyncState.from_dict(
         {
