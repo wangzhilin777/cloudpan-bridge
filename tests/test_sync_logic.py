@@ -6647,6 +6647,107 @@ def test_provider_capability_openlist_target_defaults_to_download_upload_only(tm
     assert "OpenList" in payload["recommendedFlowEn"]
 
 
+@pytest.mark.parametrize(
+    ("driver", "target", "target_label"),
+    [
+        ("Thunder", "openlist", "OpenList"),
+        ("Quark", "webdav", "WebDAV"),
+        ("Baidu", "s3", "S3"),
+        ("189Cloud", "seafile", "Seafile"),
+        ("AliyundriveOpen", "azureblob", "Azure Blob"),
+        ("OneDrive", "smb", "SMB"),
+        ("123Open", "ftp", "FTP"),
+        ("Quark", "sftp", "SFTP"),
+        ("Thunder", "localfs", "LocalFS"),
+    ],
+)
+def test_provider_capability_assess_mainstream_sources_to_upload_only_targets_stays_honest(
+    tmp_path: Path,
+    driver: str,
+    target: str,
+    target_label: str,
+) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "targets": {
+    "active_target": "guangya"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/capability_assess",
+        json={
+            "driver": driver,
+            "target": target,
+            "analysis_summary": {
+                "total": 3,
+                "fast_upload_ready": 1,
+                "md5_ready": 1,
+                "gcid_ready": 0,
+                "missing_fast_upload": 2,
+            },
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["targetProfile"]["key"] == target
+    assert payload["level"] == "download_upload_only"
+    assert payload["assessedLevel"] == "download_upload_only"
+    assert payload["recommendedFlowEn"].startswith(f"This combination can write into the {target_label} target")
+    assert payload["sourceTargetRoute"]["decision_bucket"] == "target_upload_only"
+    assert payload["sourceTargetRoute"]["route_honesty"] == "target_has_no_metadata_fast_upload"
+    assert payload["sourceTargetRoute"]["preferred_execution_mode"] == "download_upload"
+    assert payload["targetHashAcceptance"]["bucket"] == "target_upload_only"
+    assert payload["targetHashAcceptance"]["targetFastHashes"] == []
+    assert payload["targetHashAcceptance"]["bridgeRecoverableAccepts"] == []
+    assert payload["targetHashAcceptance"]["captureCacheAccepts"] == []
+    assert payload["targetHashAcceptance"]["summary"]["zh"] == "当前目标端主要按普通上传/覆盖处理，不承诺元数据秒传。"
+    assert target_label in payload["rationale"]["en"]
+
+
+@pytest.mark.parametrize(
+    ("driver", "target"),
+    [
+        ("Thunder", "openlist"),
+        ("Quark", "webdav"),
+        ("Baidu", "s3"),
+        ("AliyundriveOpen", "localfs"),
+    ],
+)
+def test_provider_capability_endpoint_for_upload_only_targets_keeps_honest_static_boundary(
+    tmp_path: Path,
+    driver: str,
+    target: str,
+) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "targets": {
+    "active_target": "guangya"
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get(f"/api/provider/capability?driver={driver}&target={target}")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["targetProfile"]["key"] == target
+    assert payload["level"] == "download_upload_only"
+    assert "prefer a target" in payload["notes"]["en"].lower()
+
+
 def test_provider_coverage_audit_accepts_grouped_filters(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(

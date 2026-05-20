@@ -1072,6 +1072,9 @@ def assess_driver_target_capability(
     live_driver_fields_map: dict[str, list[OpenListDriverField]] | None = None,
 ) -> dict[str, Any]:
     capability = build_driver_target_capability(driver, target=target, live_driver_fields_map=live_driver_fields_map)
+    target_profile = dict(capability.get("targetProfile") or {})
+    target_label_zh = str(target_profile.get("labelZh") or target_profile.get("label") or str(target or "目标端")) or "目标端"
+    target_label_en = str(target_profile.get("label") or str(target or "target")) or "target"
     summary = dict(analysis_summary or {})
     total = int(summary.get("total") or 0)
     fast_ready = int(summary.get("fast_upload_ready") or 0)
@@ -1102,8 +1105,8 @@ def assess_driver_target_capability(
                 rationale_en = "Only part of this directory is fast-upload ready, so use metadata-first sync and then fallback reupload."
         elif base_level == "download_upload_only":
             if fast_ready > 0 and (md5_ready > 0 or gcid_ready > 0):
-                rationale_zh = "当前目录虽然出现了部分快传指纹，但该驱动对 Guangya 默认仍按保守补传策略处理。"
-                rationale_en = "Fast-upload fingerprints do exist in this directory, but this driver is still treated conservatively for Guangya."
+                rationale_zh = f"当前目录虽然出现了部分快传指纹，但该驱动对 {target_label_zh} 默认仍按保守补传策略处理。"
+                rationale_en = f"Fast-upload fingerprints do exist in this directory, but this driver is still treated conservatively for {target_label_en}."
             else:
                 rationale_zh = "当前目录缺少稳定快传指纹，应按下载补传或待补传链路处理。"
                 rationale_en = "This directory lacks stable fast-upload fingerprints, so it should follow the fallback upload path."
