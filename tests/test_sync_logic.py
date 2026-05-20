@@ -789,7 +789,7 @@ def test_build_source_runtime_status_exposes_provider_runtime_shape(tmp_path: Pa
     assert runtime["execution_provider_factory"] == "create_source_provider"
     assert runtime["provider_key"] == "quark"
     assert runtime["requested_provider_preference"] == "auto"
-    assert runtime["selected_source_mode"] == "openlist_mount"
+    assert runtime["selected_source_mode"] == "openlist_with_capture_gap_candidate"
     assert runtime["auth_state"]["base_url"] == "http://127.0.0.1:5244"
     assert runtime["auth_state"]["username"] == "admin"
     assert runtime["auth_state"]["has_token"] is True
@@ -888,6 +888,50 @@ def test_create_source_provider_runtime_context_includes_resolution(tmp_path: Pa
     assert runtime["execution_provider_class"] == "OpenListSourceProvider"
     assert "回退 OpenList" in runtime["fallback_reason"]
     provider.close()
+
+
+def test_source_provider_resolution_marks_api_pending_candidate_honestly(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/alist/onedrive/demo",
+                    "target_path": "/dst",
+                },
+                "openlist": {
+                    "url": "http://127.0.0.1:5244",
+                    "token": "token-1",
+                    "username": "admin",
+                },
+                "source_session": {
+                    "provider_preference": "direct_preferred",
+                    "mount_provider_mapping": {
+                        "/alist/onedrive": "onedrive",
+                    },
+                    "provider_captures": {
+                        "onedrive": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                            },
+                        }
+                    },
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    cfg = AppConfig.load(path)
+    context = build_source_provider_context(cfg)
+    resolution = build_source_provider_resolution(cfg, context)
+    assert resolution["direct_provider_candidate"] is True
+    assert resolution["direct_provider_ready"] is False
+    assert resolution["direct_provider_api_pending"] is True
+    assert resolution["direct_provider_capture_missing"] is False
+    assert resolution["selected_source_mode"] == "direct_provider_api_pending"
+    assert "API 型直连 provider 候选" in resolution["fallback_reason"]
 
 
 def test_source_enrichment_runtime_reports_mainstream_provider_capture_state(tmp_path: Path) -> None:

@@ -27,6 +27,7 @@
 - [x] 新增 `bridge_maturity_summary`，把会话快照 ready、API 准备态、缺 capture、未注册 bridge 等阶段显式分层
 - [x] 为 `189Cloud / Quark / 123Pan / Baidu / Thunder / AliyunDriveOpen / OneDrive` 继续补专用 enrich/runtime 回归，强化首批主流 provider 覆盖
 - [x] 将 bridge 成熟度落到文件级 `transferPlan` 与目录级预览分桶，页面能直接看到当前目录主要卡在哪个 bridge 层级
+- [x] 收紧 `source_adapter` 选路语义，API 型 provider 不再误记为 `direct_provider_ready`，而是单独落到 `api_pending / capture_gap` 分支
 - [ ] 深化首批主流源端的真实直连补指纹桥接实现
 - [ ] 继续拆分前端与过大的 Python/JS 文件，优先压到单文件 `100 KB` 左右，并按统一分级阈值治理
 - [ ] 完成更多主流 provider 的互传能力验证与 UI 诚实提示收口
