@@ -53,7 +53,9 @@
 - [x] 当前驱动上下文优先读取覆盖值，再决定源端能力评估
 - [x] 覆盖保存/清除后会联动刷新源端摘要与任务能力判断
 - [x] 后端补齐正式的 `source_mapping` 读取/写入接口，并覆盖保存、清除、回读测试
-- [ ] 将 mapping 结果进一步写回能力矩阵与更多执行链路
+- [x] `provider/registry` 与 `provider/capability_assess` 返回 `sourceMappingContext`，明确当前挂载源的 override/effective driver
+- [x] `load_grouped_config_payload()` 兼容显式 `grouped_config` 读入，避免映射上下文在只读场景下丢失
+- [ ] 将 mapping 结果进一步写回更多矩阵展示与实际同步执行链路
 
 ## 摘要
 

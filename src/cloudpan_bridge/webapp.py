@@ -416,10 +416,31 @@ def create_app(config_path: Path) -> FastAPI:
 
     def normalize_capability_payload(payload: dict[str, Any] | None, runtime_config: AppConfig) -> dict[str, Any]:
         raw = normalize_registry_payload(payload, runtime_config)
-        raw["driver"] = str(resolve_payload_value(raw, "driver", default="")).strip()
+        mapping_context = resolve_source_mapping_context(raw, runtime_config)
+        raw["mount_path"] = mapping_context["mount_path"]
+        raw["source_profile_override"] = mapping_context["source_profile_override"]
+        raw["requested_driver"] = mapping_context["requested_driver"]
+        raw["driver"] = mapping_context["effective_driver"]
         analysis_summary = raw.get("analysis_summary")
         raw["analysis_summary"] = analysis_summary if isinstance(analysis_summary, dict) else {}
         return raw
+
+    def resolve_source_mapping_context(payload: dict[str, Any] | None, runtime_config: AppConfig) -> dict[str, str]:
+        raw = dict(payload or {})
+        mount_path = str(
+            resolve_payload_value(raw, "mount_path", ("ui", "browser", "mounted_source"), default="")
+        ).strip()
+        normalized_mount_path = normalize_posix_path(mount_path) if mount_path else ""
+        mapping = dict(runtime_config.mount_provider_mapping or {})
+        configured_override = str(mapping.get(normalized_mount_path) or "").strip() if normalized_mount_path else ""
+        requested_driver = str(resolve_payload_value(raw, "driver", default="")).strip()
+        effective_driver = configured_override or requested_driver
+        return {
+            "mount_path": normalized_mount_path,
+            "requested_driver": requested_driver,
+            "source_profile_override": configured_override,
+            "effective_driver": effective_driver,
+        }
 
     def normalize_provider_capture_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
         raw = dict(payload or {})
@@ -506,11 +527,14 @@ def create_app(config_path: Path) -> FastAPI:
             return normalized
         raw_payload = json.loads(config_path.read_text(encoding="utf-8"))
         flat_keys = set(normalized_model.to_flat_dict().keys()) | {"grouped_config", "config_meta", "effective_openlist_url"}
+        grouped_explicit = dict(raw_payload.get("grouped_config", {}) or {}) if isinstance(raw_payload.get("grouped_config"), dict) else {}
         raw_grouped = {
             key: value
             for key, value in raw_payload.items()
             if key not in flat_keys
         }
+        if grouped_explicit:
+            raw_grouped = deep_merge_dicts(raw_grouped, grouped_explicit)
         return deep_merge_dicts(normalized, raw_grouped)
 
     def save_config_payload(payload: dict[str, Any]) -> None:
@@ -1404,12 +1428,31 @@ def create_app(config_path: Path) -> FastAPI:
     def get_provider_registry() -> dict[str, Any]:
         implemented_targets = supported_target_keys()
         target_profiles = list_target_profiles()
+        grouped = load_grouped_config_payload()
+        source_context = resolve_source_mapping_context(
+            {
+                "mount_path": payload_nested_get(grouped, ("ui", "browser", "mounted_source"), ""),
+                "driver": "",
+            },
+            config,
+        )
+        current_source_capability = (
+            build_driver_target_capability(source_context["effective_driver"], target=config.target_key)
+            if source_context["effective_driver"]
+            else None
+        )
         return {
             "guides": list_driver_guides(),
             "source_profiles": list_source_profiles(),
             "target_profiles": target_profiles,
             "driver_matrix": build_driver_capability_matrix(target=config.target_key),
             "active_target": config.target_key,
+            "source_mapping": dict(config.mount_provider_mapping or {}),
+            "current_source_context": {
+                **source_context,
+                "source_path": str(config.source_path or "/"),
+                "current_capability": current_source_capability,
+            },
             "implemented_targets": implemented_targets,
             "target_implementation_status": {
                 key: {
@@ -1470,7 +1513,10 @@ def create_app(config_path: Path) -> FastAPI:
         if not driver.strip():
             raise HTTPException(status_code=400, detail="缺少 driver")
         effective_target = str(target or config.target_key or "guangya").strip() or "guangya"
-        return build_driver_target_capability(driver, target=effective_target)
+        context = resolve_source_mapping_context({"driver": driver}, config)
+        capability = build_driver_target_capability(context["effective_driver"] or driver, target=effective_target)
+        capability["sourceMappingContext"] = context
+        return capability
 
     @app.post("/api/provider/coverage_audit")
     def post_provider_coverage_audit(payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1518,12 +1564,19 @@ def create_app(config_path: Path) -> FastAPI:
         if not driver:
             raise HTTPException(status_code=400, detail="缺少 driver")
         summary = dict(payload.get("analysis_summary") or {})
-        return assess_driver_target_capability(
+        result = assess_driver_target_capability(
             driver,
             analysis_summary=summary,
             target=target,
             live_driver_fields_map=build_live_driver_fields_map([driver]),
         )
+        result["sourceMappingContext"] = {
+            "mount_path": str(payload.get("mount_path") or ""),
+            "requested_driver": str(payload.get("requested_driver") or ""),
+            "source_profile_override": str(payload.get("source_profile_override") or ""),
+            "effective_driver": driver,
+        }
+        return result
 
     @app.get("/api/openlist/storages")
     def get_openlist_storages(page: int = 1, per_page: int = 200) -> dict[str, Any]:

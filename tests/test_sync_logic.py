@@ -1597,6 +1597,42 @@ def test_provider_registry_endpoint_returns_active_target(tmp_path: Path) -> Non
     assert payload["target_implementation_status"]["smb"]["selectable"] is True
 
 
+def test_provider_registry_endpoint_returns_current_source_mapping_context(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "source_session": {
+    "mount_provider_mapping": {
+      "/alist/quark": "quark"
+    }
+  },
+  "grouped_config": {
+    "ui": {
+      "browser": {
+        "mounted_source": "/alist/quark"
+      }
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.get("/api/provider/registry")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source_mapping"]["/alist/quark"] == "quark"
+    assert payload["current_source_context"]["mount_path"] == "/alist/quark"
+    assert payload["current_source_context"]["source_profile_override"] == "quark"
+    assert payload["current_source_context"]["effective_driver"] == "quark"
+    assert payload["current_source_context"]["current_capability"]["driver"] == "quark"
+
+
 def test_provider_source_mapping_endpoint_roundtrip(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(
@@ -1633,6 +1669,43 @@ def test_provider_source_mapping_endpoint_roundtrip(tmp_path: Path) -> None:
     )
     assert clear_response.status_code == 200
     assert clear_response.json()["items"] == {}
+
+
+def test_provider_capability_assess_uses_mount_override_context(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst",
+  "source_session": {
+    "mount_provider_mapping": {
+      "/alist/quark": "quark"
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/capability_assess",
+        json={
+            "driver": "generic",
+            "mount_path": "/alist/quark",
+            "target": "guangya",
+            "analysis_summary": {},
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["driver"] == "quark"
+    assert payload["sourceMappingContext"]["mount_path"] == "/alist/quark"
+    assert payload["sourceMappingContext"]["requested_driver"] == "generic"
+    assert payload["sourceMappingContext"]["source_profile_override"] == "quark"
+    assert payload["sourceMappingContext"]["effective_driver"] == "quark"
 
 
 def test_target_preflight_endpoint_reports_supported_target(tmp_path: Path) -> None:
