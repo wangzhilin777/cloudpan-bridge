@@ -44,6 +44,17 @@ def target_upload_stream(target: TargetAdapter, local_path: Path, target_parent_
     return target.upload_local_file(local_path, target_parent_id, target_name)  # type: ignore[call-arg]
 
 
+def target_preflight_capability(target: TargetAdapter) -> dict[str, Any]:
+    if hasattr(target, "preflight_capability"):
+        return dict(target.preflight_capability() or {})  # type: ignore[call-arg]
+    supports_fast_upload = hasattr(target, "try_fast_upload")
+    return {
+        "supports_fast_upload": supports_fast_upload,
+        "fast_upload_hashes": ["md5", "gcid"] if supports_fast_upload else [],
+        "fallback_modes": ["download_upload"],
+    }
+
+
 class TargetAdapterCompatMixin:
     def delete_if_enabled(self, parent_id: str, name: str) -> bool:
         return self.delete_if_exists(parent_id, name)  # type: ignore[attr-defined]

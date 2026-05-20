@@ -25,6 +25,7 @@ from cloudpan_bridge.provider_capture import (
     resolve_capture_spec_for_driver,
 )
 from cloudpan_bridge.source_adapter import OpenListSourceProvider, create_source_provider
+from cloudpan_bridge.source_enrich import build_source_enrichment_runtime, enrich_entry
 from cloudpan_bridge.source_adapter import (
     build_source_provider_resolution,
     build_source_runtime_status,
@@ -37,6 +38,7 @@ from cloudpan_bridge.source_adapter import (
     source_get_runtime_context,
     source_walk_tree,
 )
+from cloudpan_bridge.transfer_planner import compute_fast_upload_hits, plan_transfer_mode, summarize_transfer_plan
 from cloudpan_bridge.syncer import (
     SyncRunner,
     build_plan,
@@ -875,6 +877,85 @@ def test_create_source_provider_runtime_context_includes_resolution(tmp_path: Pa
     assert runtime["execution_provider_class"] == "OpenListSourceProvider"
     assert "回退 OpenList" in runtime["fallback_reason"]
     provider.close()
+
+
+def test_source_enrichment_runtime_reports_mainstream_provider_capture_state(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "thunder": {
+                            "status": "captured",
+                            "captured": {
+                                "authorization": "Bearer demo",
+                                "device_id": "dev-1",
+                            },
+                        }
+                    },
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "thunder")
+    assert runtime["supported"] is True
+    assert runtime["capture_ready"] is True
+    assert "gcid" in runtime["preferred_hashes"]
+
+
+def test_source_enrichment_promotes_hashes_from_existing_raw_fields(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/a.bin",
+        md5="",
+        size=10,
+        provider="thunder",
+        raw_hash_info={"file_gcid": "GCID-123", "md5": "md5-abc"},
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.gcid == "GCID-123"
+    assert enriched.md5 == "MD5-ABC"
+    assert report["changed"] is True
+
+
+def test_transfer_planner_prefers_fast_upload_when_target_hash_matches() -> None:
+    entry = SourceEntry(path="/src/a.txt", md5="abc", size=10)
+    plan = plan_transfer_mode(
+        entry,
+        {"supports_fast_upload": True, "fast_upload_hashes": ["md5"], "fallback_modes": ["download_upload"]},
+        auto_download_threshold_mb=0,
+    )
+    assert plan["mode"] == "fast_upload"
+    assert plan["fast_hash_hits"] == ["md5"]
+
+
+def test_transfer_planner_prefers_download_for_small_file_when_no_fast_hash_hit() -> None:
+    entry = SourceEntry(path="/src/a.txt", md5="", size=2 * 1024 * 1024, sha1="sha1-only")
+    plan = plan_transfer_mode(
+        entry,
+        {"supports_fast_upload": True, "fast_upload_hashes": ["md5", "gcid"], "fallback_modes": ["download_upload"]},
+        auto_download_threshold_mb=10,
+    )
+    assert plan["mode"] == "download_upload"
+
+
+def test_transfer_planner_summarizes_mode_counts() -> None:
+    entries = [
+        SourceEntry(path="/src/1.txt", md5="abc", size=10),
+        SourceEntry(path="/src/2.txt", md5="", size=2 * 1024 * 1024),
+    ]
+    summary = summarize_transfer_plan(
+        entries,
+        {"supports_fast_upload": True, "fast_upload_hashes": ["md5"], "fallback_modes": ["download_upload"]},
+        auto_download_threshold_mb=10,
+    )
+    assert summary["mode_counts"]["fast_upload"] == 1
+    assert summary["mode_counts"]["download_upload"] == 1
+    assert compute_fast_upload_hits(entries[0], {"fast_upload_hashes": ["md5"]}) == ["md5"]
 
 
 def test_sync_runner_uses_source_provider_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -17,7 +17,9 @@ from .source_adapter import (
     source_get_file_fingerprints,
     source_walk_tree,
 )
-from .target_adapter import TargetAdapter, create_target_adapter, target_delete_if_enabled, target_upload_stream
+from .source_enrich import build_source_enrichment_runtime, enrich_entry
+from .target_adapter import TargetAdapter, create_target_adapter, target_delete_if_enabled, target_preflight_capability, target_upload_stream
+from .transfer_planner import plan_transfer_mode
 
 LogFn = Callable[[str], None]
 
@@ -237,6 +239,7 @@ class SyncRunner:
         self.source_root_for_target = normalize_posix_path(source_root_for_target or config.source_path)
         self.source: SourceProvider = create_source_provider(config, on_progress=log)
         self.source_context = source_get_runtime_context(self.source)
+        self.target_capability: dict[str, object] = {}
         self.log = log or print
 
     def _build_target_adapter(self, state: SyncState) -> TargetAdapter:
@@ -282,22 +285,25 @@ class SyncRunner:
         )
 
     def _enrich_source_entry_for_fast_upload(self, entry: SourceEntry) -> SourceEntry:
-        if entry.has_fast_upload_fingerprint:
-            return entry
+        merged, provider_report = enrich_entry(entry, self.config, log=self.log)
+        if provider_report.get("changed"):
+            return merged
+        if merged.has_fast_upload_fingerprint:
+            return merged
         candidates = self._get_source_fingerprints(entry.path)
         matched = next((item for item in candidates if item.path == entry.path), None)
         if matched is None:
             self.log(f"[补指纹未命中] {entry.path}: 源端没有返回匹配的单文件指纹。")
-            return entry
-        merged = self._merge_source_entry(entry, matched)
-        if merged.has_fast_upload_fingerprint and not entry.has_fast_upload_fingerprint:
+            return merged
+        merged_from_source = self._merge_source_entry(merged, matched)
+        if merged_from_source.has_fast_upload_fingerprint and not merged.has_fast_upload_fingerprint:
             self.log(
                 f"[补指纹成功] {entry.path}: "
-                f"MD5={'Y' if bool(merged.md5) else 'N'} GCID={'Y' if bool(merged.gcid) else 'N'}"
+                f"MD5={'Y' if bool(merged_from_source.md5) else 'N'} GCID={'Y' if bool(merged_from_source.gcid) else 'N'}"
             )
-            return merged
+            return merged_from_source
         self.log(f"[补指纹后仍缺少秒传指纹] {entry.path}: 仍缺少 MD5/GCID。")
-        return merged
+        return merged_from_source
 
     def run(self, allow_download_upload: bool | None = None, dry_run: bool = False) -> SyncSummary:
         self.config.ensure_parent_dirs()
@@ -321,6 +327,14 @@ class SyncRunner:
                     self.log(f"[源端选路] {selection_reason}")
                 if fallback_reason:
                     self.log(f"[源端回退] {fallback_reason}")
+            enrich_runtime = build_source_enrichment_runtime(self.config, str(self.source_context.get("provider_key") or ""))
+            self.log(
+                "[源端补指纹] "
+                f"provider={enrich_runtime.get('provider_key', '-')} "
+                f"supported={enrich_runtime.get('supported', False)} "
+                f"capture_ready={enrich_runtime.get('capture_ready', False)} "
+                f"preferred_hashes={','.join(list(enrich_runtime.get('preferred_hashes') or [])) or '-'}"
+            )
             entries = self._walk_source_tree(self.config.source_path)
             self.config.export_file.write_text(
                 "\n".join(
@@ -360,12 +374,21 @@ class SyncRunner:
             target = self._build_target_adapter(state)
             target.ensure_auth()
             state.set_target_state(self.config.target_key, target.export_state())
+            self.target_capability = target_preflight_capability(target)
 
             need_download: list[SyncPlanItem] = []
             for item in plan:
-                if self._try_direct_metadata_sync(item, target, state):
+                item.source = self._enrich_source_entry_for_fast_upload(item.source)
+                plan_decision = plan_transfer_mode(
+                    item.source,
+                    self.target_capability,
+                    auto_download_threshold_mb=self.config.auto_download_threshold_mb,
+                    allow_full_fallback=False,
+                )
+                self.log(f"[传输规划] {item.source.path}: {plan_decision['mode']} | {plan_decision['reason']}")
+                if plan_decision["mode"] == "fast_upload" and self._try_direct_metadata_sync(item, target, state):
                     summary.direct_success += 1
-                elif self._should_auto_download(item):
+                elif plan_decision["mode"] in {"download_upload", "stream_upload"}:
                     try:
                         self.log(
                             f"[自动补传] {item.source.path} 命中小文件阈值 "
@@ -458,12 +481,21 @@ class SyncRunner:
             target = self._build_target_adapter(state)
             target.ensure_auth()
             state.set_target_state(self.config.target_key, target.export_state())
+            self.target_capability = target_preflight_capability(target)
 
             pending: list[str] = []
             for item in plan:
-                if self._try_direct_metadata_sync(item, target, state):
+                item.source = self._enrich_source_entry_for_fast_upload(item.source)
+                plan_decision = plan_transfer_mode(
+                    item.source,
+                    self.target_capability,
+                    auto_download_threshold_mb=self.config.auto_download_threshold_mb,
+                    allow_full_fallback=False,
+                )
+                self.log(f"[传输规划] {item.source.path}: {plan_decision['mode']} | {plan_decision['reason']}")
+                if plan_decision["mode"] == "fast_upload" and self._try_direct_metadata_sync(item, target, state):
                     summary.direct_success += 1
-                elif self._should_auto_download(item):
+                elif plan_decision["mode"] in {"download_upload", "stream_upload"}:
                     try:
                         self.log(
                             f"[自动补传] {item.source.path} 命中小文件阈值 "
@@ -565,7 +597,6 @@ class SyncRunner:
         return relative_target_path(source_root_override or self.source_root_for_target, source_path, self.config.target_path)
 
     def _try_direct_metadata_sync(self, item: SyncPlanItem, target: TargetAdapter, state: SyncState) -> bool:
-        item.source = self._enrich_source_entry_for_fast_upload(item.source)
         if not item.source.has_fast_upload_fingerprint:
             self.log(f"[无秒传指纹] {item.source.path}: 缺少 MD5/GCID，改走降级路径。")
             return False

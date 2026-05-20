@@ -1,0 +1,231 @@
+# CloudPan Bridge 主流网盘互传与秒传优先总计划（首批主流版）
+
+## 摘要
+
+这版计划只聚焦首批主流网盘，范围固定为：
+
+- 源端首批：`189Cloud`、`Quark`、`123Pan`、`Baidu`、`Thunder`、`AliyunDriveOpen`、`OneDrive`
+- 目标端范围：当前仓库已实现的全部可写目标端
+  - `guangya`
+  - `openlist`
+  - `localfs`
+  - `webdav`
+  - `s3`
+  - `seafile`
+  - `azureblob`
+  - `ftp`
+  - `sftp`
+  - `smb`
+
+最终目标不是“只围着 Guangya 转”，而是把这 7 个主流源网盘全部纳入统一互传任务流；系统规则统一为：
+
+1. 先读 OpenList 已暴露指纹
+2. 指纹不够时，按 source provider 直连补指纹
+3. 若目标端支持当前指纹的快传/秒传，则优先快传
+4. 若目标端不支持，或快传未命中，则降级普通上传/下载补传
+5. 全流程都必须诚实显示“当前命中的是哪一层能力”
+
+这份计划按“最终版方案”书写，但实现必须诚实遵守当前仓库事实：
+
+- `Guangya` 是首个正式秒传目标端
+- 其他目标端先统一纳入互传框架与能力矩阵
+- 如果目标端没有真实秒传接口，就只走普通上传，不伪装成秒传
+
+## 关键实现变更
+
+### 1. 固定首批主流源网盘清单与能力策略
+
+为以下 7 个 source provider 建立专用实现档案，不再只停留在 profile / capture / guide 描述层：
+
+- `189Cloud`
+- `Quark`
+- `123Pan`
+- `Baidu`
+- `Thunder`
+- `AliyunDriveOpen`
+- `OneDrive`
+
+每个 source provider 都必须明确 5 个维度：
+
+- OpenList 常规可见指纹：如 `md5 / sha1 / gcid / pickcode / etag / size / mtime`
+- 直连补指纹策略：Cookie、Token、Header、session 字段从哪里取，用哪个 provider capture 快照喂给实现
+- 指纹优先级：例如 `Thunder` 优先 `gcid`，`AliyunDriveOpen` 优先 `sha1`，`189Cloud / Quark / 123Pan / Baidu` 优先 `md5`
+- 风控节流默认值：分页、请求间隔、目录间隔、是否强制小批量
+- 降级边界：哪些情况下只允许记录待补传，不允许自动下载补传
+
+实现上新增统一 source 直连补指纹接口层，接口语义固定为：
+
+- `supports_enrichment(provider_key) -> bool`
+- `enrich_entry(entry, capture_snapshot, config) -> SourceEntry`
+- `enrich_batch(entries, provider_key, capture_snapshot, config) -> list[SourceEntry]`
+
+第一批只要求对以上 7 个 provider 给出专用实现；其余 provider 继续回退通用 OpenList 模式。
+
+### 2. 统一秒传决策器，改成“源指纹 -> 目标能力”双向判断
+
+当前秒传判断继续升级为固定流水线，所有源到所有目标统一走这一套：
+
+1. 从 OpenList 读取当前目录树文件元数据
+2. 对缺关键指纹的文件，尝试 source provider 直连补指纹
+3. 生成标准化 `SourceEntry` 指纹视图
+4. 读取当前目标端能力声明
+5. 对每个文件计算执行模式：
+   - `fast_upload`
+   - `stream_upload`
+   - `download_upload`
+   - `record_pending_only`
+
+目标端能力声明必须固定输出这些字段：
+
+- `supports_fast_upload`
+- `fast_upload_hashes`
+- `fallback_modes`
+- `requires_local_download`
+- `supports_overwrite`
+- `supports_auto_create_dir`
+
+规则固定如下：
+
+- `guangya`
+  - 若文件具备 `md5` 或 `gcid`，先走元数据秒传
+  - 未命中再走 `stream_upload` 或 `download_upload`
+- `openlist / localfs / webdav / s3 / seafile / azureblob / ftp / sftp / smb`
+  - 当前全部纳入统一互传框架
+  - 默认不承诺元数据秒传
+  - 统一走普通上传/覆盖
+  - 页面必须明确显示“已纳入互传，但当前目标端无正式秒传能力”
+
+不允许实现者自行发明新的隐式优先级；所有目标端都必须通过同一决策器输出执行模式。
+
+### 3. 页面主流程重构为“源端 -> 目标端 -> 任务 -> 执行”，并把主流网盘选路讲清楚
+
+页面结构固定为 5 步：
+
+1. 控制台登录 / 运行时连接
+2. 选择或挂载源网盘
+3. 选择目标端
+4. 配置任务
+5. 执行与查看结果
+
+任务配置区必须固定包含：
+
+- `source provider`
+- `source_path`
+- `target_key`
+- `target_path`
+- `source_provider_preference`
+- `auto_download_threshold_mb`
+- `rate_limit_mode`
+- `delete_removed`
+- `target_delete_removed`
+
+界面必须新增两块固定信息：
+
+- `源端指纹能力摘要`
+  - OpenList 已给出哪些指纹
+  - 当前 provider 是否支持直连补指纹
+  - 本次目录分析里有多少文件具备快传关键指纹
+- `目标端执行能力摘要`
+  - 当前目标端是否支持秒传
+  - 支持哪些 hash
+  - 本次任务最终会优先走哪种模式
+
+首批 7 个主流源网盘在页面上必须有专用说明和默认值，不再只靠 generic driver 提示。复杂驱动如 `AliyunDriveOpen`、`OneDrive` 必须保留单独流程提示、默认值和文档入口。
+
+### 4. 执行层固定成“统一互传框架 + 诚实分级”，不允许虚假宣传
+
+执行层必须固定支持：
+
+- `dry_run`
+- `direct`
+- `full`
+- `download_selected`
+- `leaf_stream`
+- `leaf_stream_full`
+- `queue_next`
+- `queue_all`
+
+并统一输出以下运行态字段：
+
+- `provider_key`
+- `requested_provider_preference`
+- `selected_source_mode`
+- `selected_provider_key`
+- `selection_reason`
+- `fallback_reason`
+- `target_key`
+- `target_capability`
+- `planned_transfer_mode`
+- `fingerprint_coverage_summary`
+
+日志中必须分开标记：
+
+- `[OpenList 指纹]`
+- `[直连补指纹]`
+- `[秒传命中]`
+- `[秒传未命中]`
+- `[普通上传]`
+- `[下载补传]`
+- `[仅记录待补传]`
+
+实现时不允许把“目标端已纳入统一互传”误写成“目标端已经支持秒传”。
+
+### 5. 代码拆分约束
+
+这轮继续控制大文件体积，默认要求 Python 单文件尽量不超过 `100 KB`。实现者必须继续拆分：
+
+- source provider enrich 逻辑拆到独立模块，不塞回 `webapp.py`
+- 秒传决策器独立为单模块，不把 provider 判断散在 `syncer.py`
+- 页面 JS 若继续增大，拆为多文件入口，`index.html` 只保留壳与静态挂载
+
+至少新增以下模块边界：
+
+- `source_enrich/`：首批 7 个主流 provider 的补指纹实现
+- `transfer_planner.py`：统一文件级执行模式决策
+- `task_runtime.py` 继续承接 current task / source runtime 组装
+- 前端若继续扩展，拆出 `task.js / source.js / target.js / execute.js`
+
+## 测试与验收
+
+### 必做回归
+
+- `pytest` 回归继续覆盖现有 `test_sync_logic.py` 主链
+- 新增 source provider enrich 单测：
+  - 189Cloud
+  - Quark
+  - 123Pan
+  - Baidu
+  - Thunder
+  - AliyunDriveOpen
+  - OneDrive
+- 新增 transfer planner 单测：
+  - `md5 -> guangya -> fast_upload`
+  - `gcid -> guangya -> fast_upload`
+  - `sha1 only -> guangya -> download_upload`
+  - `md5 -> openlist -> stream_upload/download_upload`
+  - `no hash -> target unsupported -> record_pending_only`
+
+### 页面验收
+
+- 任务区能直接选择 `source_provider_preference`
+- 首批 7 个主流源网盘都有专用提示、默认值、能力摘要
+- 选择不同目标端时，目标能力摘要会同步变化
+- 页面不会把非 Guangya 目标端误显示为“可秒传”
+
+### 执行验收
+
+- 对首批 7 个主流源网盘，目录分析时能稳定输出指纹覆盖统计
+- 当 OpenList 缺少关键指纹时，系统会尝试 provider 直连补指纹
+- `Guangya` 目标端能吃到增强后的 `md5/gcid` 并优先尝试秒传
+- 非 Guangya 目标端统一进入普通上传路径，但仍保留统一任务与日志结构
+- `leaf_stream`、队列、待补传执行时，`current_source_context` 与日志输出一致
+
+## 假设与默认值
+
+- 首批主流范围固定为：`189Cloud / Quark / 123Pan / Baidu / Thunder / AliyunDriveOpen / OneDrive`
+- 当前所有已实现目标端都纳入统一互传框架，但只有真实有接口能力的目标端才允许声明秒传
+- `Guangya` 仍是第一优先秒传目标端
+- `openlist / localfs / webdav / s3 / seafile / azureblob / ftp / sftp / smb` 当前默认按普通上传目标处理
+- OpenList 仍是第一层指纹来源；直连 source provider 只作为补强层
+- 默认同步语义仍为“新增 + 覆盖”；删除仍为独立开关
+- 如果某主流 provider 的直连补指纹在实现中发现接口不可稳定复用，允许该 provider 暂时回退为 `OpenList-only + pending-first`，但页面、日志、能力矩阵必须明确标记为“未完成直连增强”
