@@ -501,6 +501,60 @@ def build_driver_capability_matrix(
     return matrix
 
 
+def build_source_mapping_context(
+    *,
+    mount_path: str = "",
+    requested_driver: str = "",
+    effective_driver: str = "",
+    source_profile_override: str = "",
+    source_path: str = "",
+    target: str = "guangya",
+    live_driver_fields_map: dict[str, list[OpenListDriverField]] | None = None,
+) -> dict[str, Any]:
+    requested = str(requested_driver or "").strip()
+    effective = str(effective_driver or requested_driver or "generic").strip() or "generic"
+    target_key = str(target or "guangya").strip().lower() or "guangya"
+    source_profile = get_source_profile_by_key_or_alias(effective)
+    capability = build_driver_target_capability(
+        effective,
+        target=target_key,
+        live_driver_fields_map=live_driver_fields_map,
+    )
+    target_profile = dict(capability.get("targetProfile") or {})
+    capability_level = str(capability.get("level") or "unsupported")
+    fallback_strategy = {
+        "fast_upload_supported": "metadata_then_fallback",
+        "fast_upload_partial": "metadata_then_pending",
+        "download_upload_only": "download_upload_only",
+        "relay_supported": "stream_relay_first",
+        "unsupported": "manual_verify_first",
+    }.get(capability_level, "analyze_then_probe")
+    provider_key = str(source_profile.get("key") or "")
+    if provider_key == "generic":
+        provider_key = "generic_openlist_driver"
+    target_fast_upload_hashes = list(target_profile.get("fastUploadHashes") or [])
+    supports_fast_upload = capability_level in {"fast_upload_supported", "fast_upload_partial"} or bool(target_fast_upload_hashes)
+    target_mode = "metadata_import" if target_fast_upload_hashes else "direct_write"
+    return {
+        "mount_path": str(mount_path or "").strip(),
+        "source_path": str(source_path or "").strip(),
+        "requested_driver": requested,
+        "effective_driver": effective,
+        "provider_key": provider_key or _normalize_key(effective) or "generic_openlist_driver",
+        "source_profile_key": str(source_profile.get("key") or "generic"),
+        "source_mode": "openlist_mount",
+        "target_key": target_key,
+        "target_mode": target_mode,
+        "source_profile_override": str(source_profile_override or "").strip(),
+        "supports_fingerprint_enrichment": bool(source_profile.get("supportsFingerprintEnrichment")),
+        "supports_direct_target_write": bool(target_profile.get("key")),
+        "supports_fast_upload": supports_fast_upload,
+        "target_fast_upload_hashes": target_fast_upload_hashes,
+        "fallback_strategy": fallback_strategy,
+        "capability_level": capability_level,
+    }
+
+
 def build_driver_coverage_audit(
     drivers: list[str],
     target: str = "guangya",

@@ -10,6 +10,7 @@ from cloudpan_bridge.cli import build_parser
 from cloudpan_bridge.guangya_direct import GuangyaMiaochuanImporter
 from cloudpan_bridge.guangya import GuangyaService
 from cloudpan_bridge.fast_upload_decision import assess_directory_fast_upload
+from cloudpan_bridge.provider_registry import build_source_mapping_context
 from cloudpan_bridge.models import DirectImportResult, PendingFileState, QueueItemState, SourceEntry, SyncFileState, SyncPlanItem, SyncState, normalize_posix_path
 from cloudpan_bridge.openlist_admin import OpenListDriverField, OpenListDriverInfo, build_storage_payload
 from cloudpan_bridge.openlist import OpenListClient
@@ -2067,6 +2068,13 @@ def test_provider_registry_endpoint_returns_current_source_mapping_context(tmp_p
     assert payload["current_source_context"]["mount_path"] == "/alist/quark"
     assert payload["current_source_context"]["source_profile_override"] == "quark"
     assert payload["current_source_context"]["effective_driver"] == "quark"
+    assert payload["current_source_context"]["provider_key"] == "quark"
+    assert payload["current_source_context"]["source_mode"] == "openlist_mount"
+    assert payload["current_source_context"]["target_mode"] == "metadata_import"
+    assert payload["current_source_context"]["supports_fingerprint_enrichment"] is True
+    assert payload["current_source_context"]["supports_direct_target_write"] is True
+    assert payload["current_source_context"]["supports_fast_upload"] is True
+    assert payload["current_source_context"]["fallback_strategy"] == "metadata_then_pending"
     assert payload["current_source_context"]["current_capability"]["driver"] == "quark"
 
 
@@ -2143,6 +2151,9 @@ def test_provider_capability_assess_uses_mount_override_context(tmp_path: Path) 
     assert payload["sourceMappingContext"]["requested_driver"] == "generic"
     assert payload["sourceMappingContext"]["source_profile_override"] == "quark"
     assert payload["sourceMappingContext"]["effective_driver"] == "quark"
+    assert payload["sourceMappingContext"]["provider_key"] == "quark"
+    assert payload["sourceMappingContext"]["supports_fast_upload"] is True
+    assert payload["sourceMappingContext"]["target_mode"] == "metadata_import"
 
 
 def test_provider_registry_resolves_source_mapping_by_longest_prefix(tmp_path: Path) -> None:
@@ -2171,6 +2182,25 @@ def test_provider_registry_resolves_source_mapping_by_longest_prefix(tmp_path: P
     assert payload["current_source_context"]["mount_path"] == "/alist/quark"
     assert payload["current_source_context"]["source_path"] == "/alist/quark/photos/2026"
     assert payload["current_source_context"]["effective_driver"] == "quark"
+
+
+def test_build_source_mapping_context_normalizes_generic_driver_into_conservative_provider() -> None:
+    payload = build_source_mapping_context(
+        mount_path="/alist/mystery",
+        requested_driver="mystery",
+        effective_driver="generic",
+        source_profile_override="generic",
+        source_path="/alist/mystery/a",
+        target="openlist",
+    )
+    assert payload["provider_key"] == "generic_openlist_driver"
+    assert payload["source_profile_key"] == "generic"
+    assert payload["source_mode"] == "openlist_mount"
+    assert payload["target_key"] == "openlist"
+    assert payload["target_mode"] == "direct_write"
+    assert payload["supports_direct_target_write"] is True
+    assert payload["supports_fast_upload"] is False
+    assert payload["fallback_strategy"] == "download_upload_only"
 
 
 def test_start_sync_writes_source_mapping_context_into_runtime_status(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -152,6 +152,14 @@
 - [x] 首页壳页测试已补充 `task / execute` 标签存在性检查
 - [ ] 后续仍需继续梳理“补传 / 秒传能力 / 关于”与主流程的边界，决定是否进一步弱化次级页签
 
+### 里程碑 19：挂载驱动映射上下文升级为统一 Provider 语义（起步）
+
+- [x] `provider_registry.py` 新增统一 `build_source_mapping_context()`，把 mount override、source profile、target capability 归一为标准 provider 语义
+- [x] `/api/provider/registry`、`/api/provider/capability`、`/api/provider/capability_assess` 现已返回扩充后的 `sourceMappingContext`
+- [x] 映射上下文已显式给出 `provider_key / source_mode / target_mode / supports_fast_upload / fallback_strategy` 等统一字段
+- [x] 对未知挂载驱动统一归入 `generic_openlist_driver`，并明确保守降级策略，而不是只回一个裸 `generic`
+- [ ] 后续仍需把这套统一 provider 语义继续接入更多直连 source provider，而不是只停留在 OpenList 挂载源
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

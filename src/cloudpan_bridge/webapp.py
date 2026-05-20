@@ -29,6 +29,7 @@ from .provider_registry import (
     build_driver_coverage_scaffold,
     filter_driver_coverage_audit,
     assess_driver_target_capability,
+    build_source_mapping_context,
     build_driver_capability_matrix,
     build_driver_target_capability,
     get_driver_guide,
@@ -379,7 +380,7 @@ def create_app(config_path: Path) -> FastAPI:
             return normalized_fallback
         return normalized_fallback
 
-    def resolve_source_mapping_context(payload: dict[str, Any] | None, runtime_config: AppConfig) -> dict[str, str]:
+    def resolve_source_mapping_context(payload: dict[str, Any] | None, runtime_config: AppConfig) -> dict[str, Any]:
         raw = dict(payload or {})
         mapping = dict(runtime_config.mount_provider_mapping or {})
         source_path = str(resolve_payload_value(raw, "source_path", ("sync", "source_path"), default="")).strip()
@@ -388,12 +389,14 @@ def create_app(config_path: Path) -> FastAPI:
         configured_override = str(mapping.get(normalized_mount_path) or "").strip() if normalized_mount_path else ""
         requested_driver = str(resolve_payload_value(raw, "driver", default="")).strip()
         effective_driver = configured_override or requested_driver
-        return {
-            "mount_path": normalized_mount_path,
-            "requested_driver": requested_driver,
-            "source_profile_override": configured_override,
-            "effective_driver": effective_driver,
-        }
+        return build_source_mapping_context(
+            mount_path=normalized_mount_path,
+            requested_driver=requested_driver,
+            effective_driver=effective_driver,
+            source_profile_override=configured_override,
+            source_path=source_path,
+            target=runtime_config.target_key,
+        )
 
     def build_current_task_snapshot(
         mode: str,
@@ -1592,12 +1595,15 @@ def create_app(config_path: Path) -> FastAPI:
             target=target,
             live_driver_fields_map=build_live_driver_fields_map([driver]),
         )
-        result["sourceMappingContext"] = {
-            "mount_path": str(payload.get("mount_path") or ""),
-            "requested_driver": str(payload.get("requested_driver") or ""),
-            "source_profile_override": str(payload.get("source_profile_override") or ""),
-            "effective_driver": driver,
-        }
+        result["sourceMappingContext"] = build_source_mapping_context(
+            mount_path=str(payload.get("mount_path") or ""),
+            requested_driver=str(payload.get("requested_driver") or ""),
+            effective_driver=driver,
+            source_profile_override=str(payload.get("source_profile_override") or ""),
+            source_path=str(payload.get("source_path") or ""),
+            target=target,
+            live_driver_fields_map=build_live_driver_fields_map([driver]),
+        )
         return result
 
     @app.get("/api/openlist/storages")
