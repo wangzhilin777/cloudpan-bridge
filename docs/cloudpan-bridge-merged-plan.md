@@ -168,6 +168,14 @@
 - [x] 相关回归覆盖了复杂驱动的 catalog 输出，不破坏现有 `provider captures` 页面消费
 - [ ] 后续仍需把 catalog 与真正的直连 source provider 实现逐步绑实，而不是只停留在连接/抓取描述层
 
+### 里程碑 21：统一 Source Provider 上下文下沉到 adapter/factory（起步）
+
+- [x] `source_adapter.py` 新增 `build_source_provider_context / resolve_source_mount_path / source_get_runtime_context`
+- [x] `create_source_provider()` 现会把统一 provider 语义写入 source provider runtime context，而不再只返回裸 OpenList client 包装
+- [x] `SyncRunner` 已持有并记录 source provider runtime context，执行主链可以直接看到 `provider_key / source_mode / effective_driver`
+- [x] `webapp.py` 的 source mapping 解析已复用 source adapter helper，避免页面侧和执行侧再维护两套路径
+- [ ] 后续仍需把这份 runtime context 进一步用于选择真正的直连 source provider，而不是目前先统一到 OpenList 首个实现
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

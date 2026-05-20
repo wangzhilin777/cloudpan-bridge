@@ -29,7 +29,7 @@ from .provider_registry import (
     build_driver_coverage_scaffold,
     filter_driver_coverage_audit,
     assess_driver_target_capability,
-    build_source_mapping_context,
+    build_source_mapping_context as build_registry_source_mapping_context,
     build_driver_capability_matrix,
     build_driver_target_capability,
     get_driver_guide,
@@ -40,6 +40,7 @@ from .provider_registry import (
     render_driver_coverage_audit_markdown,
     render_driver_coverage_scaffold_markdown,
 )
+from .source_adapter import build_source_provider_context
 from .fast_upload_decision import assess_directory_fast_upload
 from .target_adapter import build_target_preflight_capability, supported_target_keys
 from .syncer import (
@@ -352,50 +353,16 @@ def create_app(config_path: Path) -> FastAPI:
         raw["analysis_summary"] = analysis_summary if isinstance(analysis_summary, dict) else {}
         return raw
 
-    def resolve_mapped_mount_path(
-        source_path: str,
-        mapping: dict[str, Any] | None = None,
-        fallback_mount_path: str = "",
-    ) -> str:
-        normalized_source_path = normalize_posix_path(source_path) if str(source_path or "").strip() else ""
-        normalized_fallback = normalize_posix_path(fallback_mount_path) if str(fallback_mount_path or "").strip() else ""
-        if not normalized_source_path:
-            return normalized_fallback
-        candidates = [
-            normalize_posix_path(str(path))
-            for path in dict(mapping or {}).keys()
-            if str(path).strip()
-        ]
-        best_match = ""
-        for candidate in candidates:
-            if normalized_source_path == candidate or normalized_source_path.startswith(candidate.rstrip("/") + "/"):
-                if len(candidate) > len(best_match):
-                    best_match = candidate
-        if best_match:
-            return best_match
-        if normalized_fallback and (
-            normalized_source_path == normalized_fallback
-            or normalized_source_path.startswith(normalized_fallback.rstrip("/") + "/")
-        ):
-            return normalized_fallback
-        return normalized_fallback
-
     def resolve_source_mapping_context(payload: dict[str, Any] | None, runtime_config: AppConfig) -> dict[str, Any]:
         raw = dict(payload or {})
-        mapping = dict(runtime_config.mount_provider_mapping or {})
         source_path = str(resolve_payload_value(raw, "source_path", ("sync", "source_path"), default="")).strip()
         mount_path = str(resolve_payload_value(raw, "mount_path", ("ui", "browser", "mounted_source"), default="")).strip()
-        normalized_mount_path = resolve_mapped_mount_path(source_path, mapping, mount_path)
-        configured_override = str(mapping.get(normalized_mount_path) or "").strip() if normalized_mount_path else ""
         requested_driver = str(resolve_payload_value(raw, "driver", default="")).strip()
-        effective_driver = configured_override or requested_driver
-        return build_source_mapping_context(
-            mount_path=normalized_mount_path,
-            requested_driver=requested_driver,
-            effective_driver=effective_driver,
-            source_profile_override=configured_override,
+        return build_source_provider_context(
+            runtime_config,
             source_path=source_path,
-            target=runtime_config.target_key,
+            mount_path=mount_path,
+            requested_driver=requested_driver,
         )
 
     def build_current_task_snapshot(
@@ -1656,7 +1623,7 @@ def create_app(config_path: Path) -> FastAPI:
             target=target,
             live_driver_fields_map=build_live_driver_fields_map([driver]),
         )
-        result["sourceMappingContext"] = build_source_mapping_context(
+        result["sourceMappingContext"] = build_registry_source_mapping_context(
             mount_path=str(payload.get("mount_path") or ""),
             requested_driver=str(payload.get("requested_driver") or ""),
             effective_driver=driver,

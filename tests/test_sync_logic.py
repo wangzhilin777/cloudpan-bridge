@@ -27,9 +27,12 @@ from cloudpan_bridge.provider_capture import (
 from cloudpan_bridge.source_adapter import OpenListSourceProvider, create_source_provider
 from cloudpan_bridge.source_adapter import (
     SourceProviderCompatMixin,
+    build_source_provider_context,
+    resolve_source_mount_path,
     source_download_stream,
     source_ensure_auth,
     source_get_file_fingerprints,
+    source_get_runtime_context,
     source_walk_tree,
 )
 from cloudpan_bridge.syncer import (
@@ -656,6 +659,70 @@ def test_create_source_provider_returns_openlist_provider(tmp_path: Path) -> Non
     try:
         assert provider.get_provider_key() == "openlist"
         assert provider.get_auth_state()["token"] == "token-1"
+        assert provider.get_runtime_context()["source_mode"] == "openlist_mount"
+    finally:
+        provider.close()
+
+
+def test_source_provider_context_uses_longest_mount_prefix_and_override(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/alist/quark/photos/2026",
+                    "target_path": "/dst",
+                    "target_key": "guangya",
+                },
+                "source_session": {
+                    "mount_provider_mapping": {
+                        "/alist": "generic",
+                        "/alist/quark": "quark",
+                    }
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    cfg = AppConfig.load(path)
+    assert resolve_source_mount_path("/alist/quark/photos/2026", cfg.mount_provider_mapping or {}, "") == "/alist/quark"
+    context = build_source_provider_context(cfg)
+    assert context["mount_path"] == "/alist/quark"
+    assert context["provider_key"] == "quark"
+    assert context["source_mode"] == "openlist_mount"
+    assert context["target_mode"] == "metadata_import"
+
+
+def test_source_runtime_context_helper_reads_real_provider_context(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/alist/quark/demo",
+                    "target_path": "/dst",
+                },
+                "openlist": {
+                    "url": "http://127.0.0.1:5244",
+                    "token": "token-1",
+                },
+                "source_session": {
+                    "mount_provider_mapping": {
+                        "/alist/quark": "quark",
+                    }
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    provider = create_source_provider(AppConfig.load(path))
+    try:
+        context = source_get_runtime_context(provider)
+        assert context["provider_key"] == "quark"
+        assert context["effective_driver"] == "quark"
+        assert context["supports_fast_upload"] is True
     finally:
         provider.close()
 

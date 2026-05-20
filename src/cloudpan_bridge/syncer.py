@@ -10,6 +10,7 @@ from .config import AppConfig
 from .models import PendingFileState, QueueItemState, SourceEntry, SyncFileState, SyncPlanItem, SyncState, normalize_posix_path
 from .source_adapter import (
     SourceProvider,
+    source_get_runtime_context,
     create_source_provider,
     source_download_stream,
     source_ensure_auth,
@@ -235,6 +236,7 @@ class SyncRunner:
         self.config = config
         self.source_root_for_target = normalize_posix_path(source_root_for_target or config.source_path)
         self.source: SourceProvider = create_source_provider(config, on_progress=log)
+        self.source_context = source_get_runtime_context(self.source)
         self.log = log or print
 
     def _build_target_adapter(self, state: SyncState) -> TargetAdapter:
@@ -304,6 +306,13 @@ class SyncRunner:
 
         try:
             self._ensure_source_auth()
+            if self.source_context:
+                self.log(
+                    "[源端 Provider] "
+                    f"provider_key={self.source_context.get('provider_key', '-')} "
+                    f"source_mode={self.source_context.get('source_mode', '-')} "
+                    f"effective_driver={self.source_context.get('effective_driver', '-')}"
+                )
             entries = self._walk_source_tree(self.config.source_path)
             self.config.export_file.write_text(
                 "\n".join(
