@@ -385,6 +385,12 @@ def create_app(config_path: Path) -> FastAPI:
             },
             runtime_config,
         )
+        source_runtime_context = build_source_runtime_status(
+            runtime_config,
+            source_path=source_path,
+            mount_path=str(mapping_context.get("mount_path") or ""),
+            requested_driver=str(raw.get("driver") or ""),
+        )
         return {
             "mode": mode,
             "source_path": source_path,
@@ -393,6 +399,7 @@ def create_app(config_path: Path) -> FastAPI:
             "target_path": target_path,
             "selected_paths_count": len(list(raw.get("selected_paths") or [])),
             "source_mapping_context": mapping_context,
+            "source_runtime_context": source_runtime_context,
         }
 
     def normalize_provider_capture_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
@@ -748,7 +755,11 @@ def create_app(config_path: Path) -> FastAPI:
             runtime_task = build_current_task_snapshot(mode, config, payload)
             with sync_lock:
                 sync_state["current_task"] = runtime_task
-                sync_state["current_source_context"] = dict(runtime_task.get("source_mapping_context") or {})
+                sync_state["current_source_context"] = dict(
+                    runtime_task.get("source_runtime_context")
+                    or runtime_task.get("source_mapping_context")
+                    or {}
+                )
             if mode in {"dry_run", "direct"} and active_source.strip() == "/":
                 raise RuntimeError("当前 source_path 还是 OpenList 根目录 / 。请先进入具体挂载目录，再使用“使用当前目录作为源目录”，或把最底层目录批量入队。")
             logger.info(f"开始同步任务: {mode}")
@@ -848,9 +859,17 @@ def create_app(config_path: Path) -> FastAPI:
                         "running": True,
                         "current_source": current_source,
                         "remaining": total - index + 1,
-                        "source_mapping_context": dict(task_snapshot.get("source_mapping_context") or {}),
+                        "source_mapping_context": dict(
+                            task_snapshot.get("source_runtime_context")
+                            or task_snapshot.get("source_mapping_context")
+                            or {}
+                        ),
                     }
-                    sync_state["current_source_context"] = dict(task_snapshot.get("source_mapping_context") or {})
+                    sync_state["current_source_context"] = dict(
+                        task_snapshot.get("source_runtime_context")
+                        or task_snapshot.get("source_mapping_context")
+                        or {}
+                    )
                 logger.info(f"开始执行队列目录 [{index}/{total}]: {current_source}")
                 ok = run_sync_job(
                     "direct",
@@ -909,10 +928,18 @@ def create_app(config_path: Path) -> FastAPI:
                         "running": True,
                         "current_source": leaf_path,
                         "remaining": -1,
-                        "source_mapping_context": dict(task_snapshot.get("source_mapping_context") or {}),
+                        "source_mapping_context": dict(
+                            task_snapshot.get("source_runtime_context")
+                            or task_snapshot.get("source_mapping_context")
+                            or {}
+                        ),
                     }
                     sync_state["running"] = True
-                    sync_state["current_source_context"] = dict(task_snapshot.get("source_mapping_context") or {})
+                    sync_state["current_source_context"] = dict(
+                        task_snapshot.get("source_runtime_context")
+                        or task_snapshot.get("source_mapping_context")
+                        or {}
+                    )
                 logger.info(f"发现最底层目录并立即执行 [{count}]: {leaf_path}")
                 ok = run_sync_job(
                     mode,
@@ -965,10 +992,18 @@ def create_app(config_path: Path) -> FastAPI:
                         "running": True,
                         "current_source": directory,
                         "remaining": total - index + 1,
-                        "source_mapping_context": dict(task_snapshot.get("source_mapping_context") or {}),
+                        "source_mapping_context": dict(
+                            task_snapshot.get("source_runtime_context")
+                            or task_snapshot.get("source_mapping_context")
+                            or {}
+                        ),
                     }
                     sync_state["running"] = True
-                    sync_state["current_source_context"] = dict(task_snapshot.get("source_mapping_context") or {})
+                    sync_state["current_source_context"] = dict(
+                        task_snapshot.get("source_runtime_context")
+                        or task_snapshot.get("source_mapping_context")
+                        or {}
+                    )
                 logger.info(f"开始按勾选目录顺序补传 [{index}/{total}]: {directory}")
                 ok = run_sync_job(
                     "download_selected",
@@ -1496,6 +1531,12 @@ def create_app(config_path: Path) -> FastAPI:
             },
             config,
         )
+        source_runtime = build_source_runtime_status(
+            config,
+            source_path=str(config.source_path or "/"),
+            mount_path=str(source_context.get("mount_path") or ""),
+            requested_driver="",
+        )
         current_source_capability = (
             build_driver_target_capability(source_context["effective_driver"], target=config.target_key)
             if source_context["effective_driver"]
@@ -1510,7 +1551,7 @@ def create_app(config_path: Path) -> FastAPI:
             "active_target": config.target_key,
             "source_mapping": dict(config.mount_provider_mapping or {}),
             "current_source_context": {
-                **source_context,
+                **source_runtime,
                 "source_path": str(config.source_path or "/"),
                 "current_capability": current_source_capability,
             },

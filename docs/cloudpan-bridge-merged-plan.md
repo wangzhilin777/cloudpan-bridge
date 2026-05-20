@@ -200,6 +200,14 @@
 - [x] 总览/源端摘要/任务摘要都能直接看到当前源端选路结果，不再只能翻 `/api/status` JSON
 - [ ] 后续继续把这个选择结果真正作用到“直连 source provider 执行链路”，而不是当前先统一落回 OpenList provider
 
+### 里程碑 25：运行中 Source Context 统一成同一套选路语义
+
+- [x] `build_current_task_snapshot()` 已同时产出 `source_mapping_context` 与 `source_runtime_context`
+- [x] `sync.current_source_context` 与 `queue_runner.source_mapping_context` 已优先写入带 resolution 的 `source_runtime_context`
+- [x] `/api/provider/registry` 的 `current_source_context` 也已切到同一套 source runtime 结构
+- [x] 执行前、执行中、运行概览现在都能看到一致的 `requested_provider_preference / selected_source_mode / selected_provider_key`
+- [ ] 后续仍需让真正的直连 source provider 实现消费这套结构，而不是当前统一映射回 OpenList provider
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。
