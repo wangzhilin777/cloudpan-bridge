@@ -2063,6 +2063,49 @@ def test_execute_source_bridge_matches_graph_style_parent_reference_paths(tmp_pa
     assert report["bridge_execution_state"] == "api_capture_cache_normalized"
 
 
+def test_execute_source_bridge_matches_extended_graph_style_parent_reference_paths(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "onedrive": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                                "entries": [
+                                    {
+                                        "file": {
+                                            "id": "item-12",
+                                            "name": "graph2.docx",
+                                        },
+                                        "parentReference": {
+                                            "path": "/drives/drive-id/root:/src/docs:/children",
+                                        },
+                                        "hashes": {
+                                            "sha1Hash": "b" * 40,
+                                        },
+                                    }
+                                ],
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "onedrive")
+    enriched, report = execute_source_bridge(
+        SourceEntry(path="/src/docs/graph2.docx", md5="", size=10, provider="OneDrive", source_id="item-12"),
+        runtime,
+    )
+    assert enriched.sha1 == "B" * 40
+    assert report["bridge_execution_state"] == "api_capture_cache_normalized"
+
+
 def test_execute_source_bridge_reads_api_capture_cache_list_for_onedrive(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text(

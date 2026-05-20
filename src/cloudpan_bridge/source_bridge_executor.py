@@ -173,16 +173,15 @@ def _normalize_entry_path(value: Any) -> str:
     if not text:
         return ""
     normalized_lower = text.lower()
-    graph_prefixes = (
-        "/drive/root:",
-        "drive/root:",
-        "/root:",
-        "root:",
-    )
-    for prefix in graph_prefixes:
-        if normalized_lower.startswith(prefix):
-            text = text[len(prefix):] or "/"
-            break
+    graph_root_index = normalized_lower.find("root:")
+    if graph_root_index >= 0:
+        text = text[graph_root_index + len("root:"):] or "/"
+    if text.endswith(":/children"):
+        text = text[:-len(":/children")] or "/"
+    if text.endswith(":/content"):
+        text = text[:-len(":/content")] or "/"
+    if text.endswith(":"):
+        text = text[:-1] or "/"
     if not text.startswith("/"):
         text = f"/{text}"
     while "//" in text:

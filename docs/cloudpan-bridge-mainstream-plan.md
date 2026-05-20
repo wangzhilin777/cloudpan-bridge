@@ -115,6 +115,9 @@
 - 路径标准化也继续补了一层开放平台风格兼容：
   - 现在支持 `parentReference.path = "/drive/root:/src/docs"` 这类 Graph 风格父路径
   - 这样即使 path 不是纯净的 POSIX 目录串，只要能还原到真实目录层级，也可以继续参与条目匹配
+- Graph / OpenAPI 风格父路径这轮又继续泛化了一层：
+  - 不只支持简单的 `drive/root:`，也兼容 `"/drives/{id}/root:/path:/children"` 这类更完整的 Graph 路径形态
+  - 这样 OneDrive 一类开放平台返回体里的 parent path 即使带额外前缀和后缀，也能继续还原到真实目录层级
 - 统一体积分级阈值这轮也已落到实处：
   - 当前生产源码里最大的 Python / JS 文件是 `webapp.py`，约 `94.2 KB`
   - 前端主入口 `app.js` 约 `88.8 KB`
