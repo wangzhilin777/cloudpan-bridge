@@ -74,11 +74,23 @@
             <h2 class="help-anchor" data-i18n="panel.source_browser" data-help-key="panel_source_browser">目录浏览</h2>
             <div class="subtle" data-i18n="desc.source_browser">页面进入时会优先按配置里的 <code>source_path</code> 恢复当前浏览目录；如果该目录读取失败，再回退到挂载根目录。</div>
             <div class="notice" id="source-driver-summary">等待源端上下文...</div>
+            <div class="panel-grid">
+              <div>
+                <label>源 Profile 覆盖</label>
+                <select id="source_profile_override"></select>
+              </div>
+              <div>
+                <label>覆盖说明</label>
+                <div class="notice" id="source-profile-override-notice">默认按挂载驱动自动匹配 source profile；如果当前驱动识别不准，可以在这里手动改绑。</div>
+              </div>
+            </div>
             <div class="actions">
               <button class="secondary" id="browse-root" data-i18n="btn.browse_root" data-help-key="btn_browse_root">浏览挂载根目录</button>
               <button class="secondary" id="browse-up" data-i18n="btn.browse_up" data-help-key="btn_browse_up">返回上级</button>
               <button class="secondary" id="browse-refresh" data-i18n="btn.browse_refresh" data-help-key="btn_browse_refresh">刷新当前目录</button>
               <button class="accent" id="use-current-dir" data-i18n="btn.use_current_dir" data-help-key="btn_use_current_dir">使用当前目录作为源目录</button>
+              <button class="secondary" id="save-source-profile-override">保存源 Profile 覆盖</button>
+              <button class="secondary" id="clear-source-profile-override">清除覆盖</button>
             </div>
             <div class="notice" id="dir-notice">等待操作</div>
             <div class="mono" id="dir-current">当前浏览: 未载入</div>

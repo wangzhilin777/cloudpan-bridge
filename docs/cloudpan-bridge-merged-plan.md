@@ -45,6 +45,14 @@
 - [x] 拆分后编译与测试通过：`python -m compileall src tests`、`pytest -q -x`、`pytest -q`
 - [ ] 继续评估是否还需要对 `webapp.py`、`provider_capture.py`、`target_adapter.py` 做进一步细拆
 
+### 里程碑 6：挂载驱动到 Source Profile 映射层（起步）
+
+- [x] 前端加入“源 Profile 覆盖”入口，可针对当前挂载源手动指定 source profile
+- [x] 覆盖值写入 `grouped_config.source_session.mount_provider_mapping`
+- [x] 当前驱动上下文优先读取覆盖值，再决定源端能力评估
+- [x] 覆盖保存/清除后会联动刷新源端摘要与任务能力判断
+- [ ] 后端补齐更正式的 mount/provider override 接口与矩阵回写
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

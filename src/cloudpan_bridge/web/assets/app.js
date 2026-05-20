@@ -341,6 +341,7 @@
       providerRegistryPayload = data || providerRegistryPayload;
       driverGuideRegistry = data?.guides || {};
       populateTargetOptions();
+      populateSourceProfileOverrideOptions();
       populateCoverageFilterOptions();
       await refreshTargetPreflight();
       renderCapabilitySummary();
@@ -437,13 +438,69 @@
 
     function currentDriverContext() {
       const selectedMount = document.getElementById("mounted_source_select")?.value || "";
+      const overrideMap = getGroupedConfigValue(["source_session", "mount_provider_mapping"], {}) || {};
+      const overrideProfile = typeof overrideMap === "object" && overrideMap
+        ? String(overrideMap[selectedMount] || "")
+        : "";
       const selectedStorage = storageRecords.find((item) => String(item.mount_path || item.mountPath || item.path || "/") === String(selectedMount));
       const mountedDriver = selectedStorage?.driver || selectedStorage?.driver_name || selectedStorage?.driverName || "";
-      const driver = mountedDriver || document.getElementById("driver-select")?.value || "";
+      const driver = overrideProfile || mountedDriver || document.getElementById("driver-select")?.value || "";
       return {
         driver,
+        overrideProfile,
+        mountedDriver,
         mountPath: selectedMount || document.getElementById("source_path")?.value || "/",
       };
+    }
+
+    function populateSourceProfileOverrideOptions() {
+      const select = document.getElementById("source_profile_override");
+      if (!select) return;
+      const profiles = Object.values(providerRegistryPayload?.source_profiles || {});
+      const current = currentDriverContext();
+      const options = [
+        `<option value="">${currentLang() === "en" ? "Auto detect from mount driver" : currentLang() === "mix" ? "自动按挂载驱动识别 / Auto detect from mount driver" : "自动按挂载驱动识别"}</option>`,
+        ...profiles.map((profile) => {
+          const key = String(profile?.key || "");
+          const label = escapeHtml(translateDriverText(profile?.label_zh || key, profile?.label || key) || key);
+          const selected = current.overrideProfile === key ? "selected" : "";
+          return `<option value="${escapeHtml(key)}" ${selected}>${label} [${escapeHtml(key)}]</option>`;
+        }),
+      ];
+      select.innerHTML = options.join("");
+      if (current.overrideProfile) select.value = current.overrideProfile;
+    }
+
+    function saveSourceProfileOverrideSelection(value = "") {
+      const selectedMount = String(document.getElementById("mounted_source_select")?.value || "").trim();
+      if (!selectedMount) {
+        setNotice("source-profile-override-notice", currentLang() === "en"
+          ? "Choose a mounted source first, then save an override."
+          : currentLang() === "mix"
+            ? "请先选择已挂载源目录，再保存覆盖。 / Choose a mounted source first."
+            : "请先选择已挂载源目录，再保存覆盖。");
+        return false;
+      }
+      const map = { ...(getGroupedConfigValue(["source_session", "mount_provider_mapping"], {}) || {}) };
+      const normalized = String(value || "").trim();
+      if (normalized) map[selectedMount] = normalized;
+      else delete map[selectedMount];
+      setGroupedConfigValue(["source_session", "mount_provider_mapping"], map);
+      populateSourceProfileOverrideOptions();
+      renderSourceDriverSummary();
+      refreshCapabilityAssessment();
+      setNotice("source-profile-override-notice", normalized
+        ? (currentLang() === "en"
+            ? `Saved override: ${selectedMount} -> ${normalized}`
+            : currentLang() === "mix"
+              ? `已保存覆盖：${selectedMount} -> ${normalized} / Override saved`
+              : `已保存覆盖：${selectedMount} -> ${normalized}`)
+        : (currentLang() === "en"
+            ? `Override cleared for ${selectedMount}`
+            : currentLang() === "mix"
+              ? `已清除覆盖：${selectedMount} / Override cleared`
+              : `已清除覆盖：${selectedMount}`));
+      return true;
     }
 
     function capabilityLevelText(level) {
@@ -1289,6 +1346,7 @@
       applyOpenListModeSnapshot(config?.openlist_mode || document.getElementById("openlist_mode")?.value || "external_local");
       document.getElementById("effective_openlist_url").value = config?.effective_openlist_url || "";
       applySavedCoverageFilters();
+      populateSourceProfileOverrideOptions();
       const langSelect = document.getElementById("ui_language");
       if (langSelect) langSelect.value = currentLang();
     }
@@ -1946,6 +2004,7 @@
       const rateMode = String(document.getElementById("rate_limit_mode")?.value || configCache?.rate_limit_mode || "safe").trim() || "safe";
       root.innerHTML = `
         <div class="mono">driver=${escapeHtml(context.driver || "-")} | mount=${escapeHtml(selectedMount || "-")} | rate=${escapeHtml(rateMode)}</div>
+        <div class="mono">mounted_driver=${escapeHtml(context.mountedDriver || "-")} | override=${escapeHtml(context.overrideProfile || "-")}</div>
         <div class="mono">source_path=${escapeHtml(sourcePath)} | browsing=${escapeHtml(browsingPath)}</div>
       `;
     }
@@ -2163,6 +2222,8 @@
         scheduleUiPrefsPersist();
         const selected = storageRecords.find((item) => String(item.mount_path || item.mountPath || item.path || "/") === String(event.target.value || ""));
         if (selected) applyProviderSelectionFromDriver(selected.driver || selected.driver_name || selected.driverName || "");
+        populateSourceProfileOverrideOptions();
+        renderSourceDriverSummary();
       });
       document.getElementById("provider-select").addEventListener("change", () => {
         renderProviderCapturePanel();
@@ -2202,6 +2263,17 @@
         await saveConfig();
         await browseDirectory(selected);
         setNotice("dir-notice", `已切换到挂载源目录: ${selected}`);
+      });
+      document.getElementById("save-source-profile-override").onclick = withBusy("save-source-profile-override", "保存中...", async () => {
+        const select = document.getElementById("source_profile_override");
+        const saved = saveSourceProfileOverrideSelection(select?.value || "");
+        if (saved) await saveConfig();
+      });
+      document.getElementById("clear-source-profile-override").onclick = withBusy("clear-source-profile-override", "清除中...", async () => {
+        const select = document.getElementById("source_profile_override");
+        if (select) select.value = "";
+        const saved = saveSourceProfileOverrideSelection("");
+        if (saved) await saveConfig();
       });
 
       document.getElementById("install-runtime").onclick = withBusy("install-runtime", "拉取中...", async () => {
