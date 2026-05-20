@@ -14,6 +14,27 @@ CAPTURE_CACHE_PATH_KEYS = ("file_hashes_by_path", "fingerprints_by_path", "hash_
 CAPTURE_CACHE_ID_KEYS = ("file_hashes_by_id", "fingerprints_by_id", "hash_cache_by_id", "entry_hashes_by_id")
 CAPTURE_CACHE_COLLECTION_KEYS = ("file_hashes", "fingerprints", "hash_cache", "entries", "items")
 CAPTURE_CACHE_HASH_KEYS = ("md5", "gcid", "sha1", "sha256", "crc64", "pre_hash", "slice_md5", "content_hash", "pickcode")
+CAPTURE_CACHE_NESTED_COLLECTION_KEYS = ("items", "entries", "files", "list", "records", "children", "value")
+
+
+def _iter_capture_collection_entries(value: Any) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict):
+                entries.append(item)
+    elif isinstance(value, dict):
+        for nested_key in CAPTURE_CACHE_NESTED_COLLECTION_KEYS:
+            nested_entries = value.get(nested_key)
+            if isinstance(nested_entries, list):
+                for item in nested_entries:
+                    if isinstance(item, dict):
+                        entries.append(item)
+        for nested_key in ("data", "result", "payload"):
+            nested_value = value.get(nested_key)
+            if isinstance(nested_value, (dict, list)):
+                entries.extend(_iter_capture_collection_entries(nested_value))
+    return entries
 
 
 def _build_bridge_preparation_summary(bridge_runtime: dict[str, Any]) -> dict[str, Any]:
@@ -44,6 +65,16 @@ def _extract_capture_cache_summary(captured: dict[str, Any]) -> dict[str, Any]:
             return
         for key, value in payload.items():
             normalized = str(key or "").strip().lower()
+            if normalized == "sha1hash":
+                normalized = "sha1"
+            elif normalized == "sha256hash":
+                normalized = "sha256"
+            elif normalized == "crc64hash":
+                normalized = "crc64"
+            elif normalized == "md5hash":
+                normalized = "md5"
+            elif normalized == "contenthash":
+                normalized = "content_hash"
             if normalized in CAPTURE_CACHE_HASH_KEYS and str(value or "").strip():
                 hash_fields.add(normalized)
 
@@ -65,18 +96,9 @@ def _extract_capture_cache_summary(captured: dict[str, Any]) -> dict[str, Any]:
 
     for key in CAPTURE_CACHE_COLLECTION_KEYS:
         collection = captured.get(key)
-        if isinstance(collection, list):
-            for item in collection:
-                if isinstance(item, dict):
-                    collection_count += 1
-                    collect_hash_fields(item)
-        elif isinstance(collection, dict):
-            nested_entries = collection.get("items") or collection.get("entries") or collection.get("files")
-            if isinstance(nested_entries, list):
-                for item in nested_entries:
-                    if isinstance(item, dict):
-                        collection_count += 1
-                        collect_hash_fields(item)
+        for item in _iter_capture_collection_entries(collection):
+            collection_count += 1
+            collect_hash_fields(item)
 
     lookup_modes: list[str] = []
     if path_count:

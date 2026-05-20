@@ -61,6 +61,26 @@ HASH_ITEM_LABEL_KEYS = ("algorithm", "alg", "name", "type", "hash_type", "kind",
 HASH_ITEM_VALUE_KEYS = ("value", "hash", "digest", "checksum", "content", "content_hash", "etag", "md5", "sha1", "sha256", "gcid", "crc64", "pre_hash", "slice_md5")
 
 
+def _iter_collection_entries(value: Any) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict):
+                entries.append(item)
+    elif isinstance(value, dict):
+        for nested_key in ("items", "entries", "files", "list", "records", "children", "value"):
+            nested_entries = value.get(nested_key)
+            if isinstance(nested_entries, list):
+                for item in nested_entries:
+                    if isinstance(item, dict):
+                        entries.append({str(inner_key): inner_value for inner_key, inner_value in item.items()})
+        for nested_key in ("data", "result", "payload"):
+            nested_value = value.get(nested_key)
+            if isinstance(nested_value, (dict, list)):
+                entries.extend(_iter_collection_entries(nested_value))
+    return entries
+
+
 def _normalize_hash_label(value: Any) -> str:
     text = str(value or "").strip().lower().replace(" ", "_")
     if not text:
@@ -108,7 +128,11 @@ def _capture_payload_matches_entry(payload: dict[str, Any], entry: SourceEntry) 
     if normalized_entry_path and normalized_entry_path in {path for path in payload_paths if path}:
         return True
     source_id = str(entry.source_id or "").strip()
-    payload_ids = [str(payload.get(key) or "").strip() for key in ("source_id", "file_id", "id", "fid", "res_id") if str(payload.get(key) or "").strip()]
+    payload_ids = [
+        str(payload.get(key) or "").strip()
+        for key in ("source_id", "file_id", "id", "fid", "res_id", "fs_id", "item_id", "driveItemId", "drive_item_id")
+        if str(payload.get(key) or "").strip()
+    ]
     if source_id and source_id in payload_ids:
         return True
     return False
@@ -140,22 +164,10 @@ def _collect_capture_entry_payloads(entry: SourceEntry, runtime: dict[str, Any])
                     payloads.append({str(inner_key): inner_value for inner_key, inner_value in direct.items()})
     for key in ("file_hashes", "fingerprints", "hash_cache", "entries", "items"):
         collection = captured.get(key)
-        if isinstance(collection, list):
-            for item in collection:
-                if not isinstance(item, dict):
-                    continue
-                normalized = {str(inner_key): inner_value for inner_key, inner_value in item.items()}
-                if _capture_payload_matches_entry(normalized, entry):
-                    payloads.append(normalized)
-        elif isinstance(collection, dict):
-            nested_entries = collection.get("items") or collection.get("entries") or collection.get("files")
-            if isinstance(nested_entries, list):
-                for item in nested_entries:
-                    if not isinstance(item, dict):
-                        continue
-                    normalized = {str(inner_key): inner_value for inner_key, inner_value in item.items()}
-                    if _capture_payload_matches_entry(normalized, entry):
-                        payloads.append(normalized)
+        for item in _iter_collection_entries(collection):
+            normalized = {str(inner_key): inner_value for inner_key, inner_value in item.items()}
+            if _capture_payload_matches_entry(normalized, entry):
+                payloads.append(normalized)
     return _dedupe_payloads(payloads)
 
 

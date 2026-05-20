@@ -76,6 +76,10 @@
   - `AliyunDriveOpen` 现在支持 `content_hash_name + content_hash` 组合推导 `sha1`
   - `OneDrive` 现在支持 `sha1Hash / contentHash` 这类 Graph 风格字段
   - provider 专用别名不再覆盖通用别名，而是按去重合并，避免新补的驼峰字段再次失效
+- 抓取缓存的文件级哈希结构也继续向真实返回体靠拢：
+  - 现在支持从 `data / result / payload` 下的 `list / records / value / children` 递归读取缓存条目
+  - 按 `source_id` 匹配时新增兼容 `fs_id / item_id / driveItemId / drive_item_id`
+  - 这让 `OneDrive / Baidu / 123Pan` 一类常见“外层包一层 data/result”的抓取快照也能进入统一 enrich 流水线
 
 ## 摘要
 

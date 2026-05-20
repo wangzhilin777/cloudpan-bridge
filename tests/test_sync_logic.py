@@ -1442,6 +1442,43 @@ def test_source_enrichment_runtime_exposes_capture_cache_summary(tmp_path: Path)
     assert runtime["bridge_maturity_summary"]["honesty"] == "api_prepared_with_capture_cache"
 
 
+def test_source_enrichment_runtime_counts_nested_capture_cache_entries(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "onedrive": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                                "entries": {
+                                    "result": {
+                                        "records": [
+                                            {"sha1Hash": "a" * 40, "contentHash": "sha1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+                                            {"sha1Hash": "b" * 40},
+                                        ]
+                                    }
+                                },
+                            }
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "onedrive")
+    summary = runtime["capture_cache_summary"]
+    assert summary["available"] is True
+    assert summary["entry_count"] == 2
+    assert summary["collection_entry_count"] == 2
+    assert summary["lookup_modes"] == ["collection_scan"]
+    assert summary["hash_fields"] == ["content_hash", "sha1"]
+
+
 def test_bridge_runtime_reports_missing_keys_for_baidu_capture() -> None:
     runtime = build_bridge_runtime("baidu", {"cookie_header": "sid=1"})
     assert runtime["ready"] is False
@@ -1652,6 +1689,46 @@ def test_execute_source_bridge_reads_api_capture_cache_list_for_onedrive(tmp_pat
     assert report["bridge_maturity_honesty"] == "capture_cache_snapshot_only"
     assert report["bridge_missing_expected_hashes"] == ["md5"]
     assert report["pending_reason"] == "provider_api_bridge_not_executed_yet"
+
+
+def test_execute_source_bridge_reads_nested_capture_cache_records_for_onedrive(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "onedrive": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                                "entries": {
+                                    "data": {
+                                        "list": [
+                                            {
+                                                "driveItemId": "item-1",
+                                                "sha1Hash": "a" * 40,
+                                                "contentHash": "sha1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                            }
+                                        ]
+                                    }
+                                },
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    entry = SourceEntry(path="/src/a.docx", md5="", size=10, provider="OneDrive", source_id="item-1")
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "onedrive")
+    enriched, report = execute_source_bridge(entry, runtime)
+    assert enriched.sha1 == "A" * 40
+    assert enriched.content_hash == "SHA1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    assert report["bridge_execution_state"] == "api_capture_cache_normalized"
+    assert report["provider_stage"] == "api_capture_cache"
 
 
 def test_execute_source_bridge_marks_non_fast_candidates_for_quark(tmp_path: Path) -> None:
