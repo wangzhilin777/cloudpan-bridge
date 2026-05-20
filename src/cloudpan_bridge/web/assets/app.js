@@ -700,6 +700,7 @@
           ? `${strategy?.throttleHint?.zh || ""} / ${strategy?.throttleHint?.en || ""}`.trim()
           : (strategy?.throttleHint?.zh || "");
       const suggestedActions = Array.isArray(strategy?.suggestedActions) ? strategy.suggestedActions : [];
+      const supportsFingerprintEnrichment = !!sourceProfile.supportsFingerprintEnrichment;
       const suggestedText = suggestedActions.length
         ? suggestedActions.map((item, index) => {
             const text = currentLang() === "en"
@@ -726,6 +727,7 @@
         <div class="mono">${currentLang() === "en" ? "Runtime assessment" : currentLang() === "mix" ? "动态判断 / Runtime assessment" : "动态判断"}: ${escapeHtml(capabilityLevelText(assessedLevel))}</div>
         <div class="mono">${currentLang() === "en" ? "Execution mode" : currentLang() === "mix" ? "执行模式 / Execution mode" : "执行模式"}: ${escapeHtml(strategyModeText(strategy?.recommendedMode || "analyze_first"))}</div>
         <div class="mono">${currentLang() === "en" ? "Likely hashes" : currentLang() === "mix" ? "常见哈希 / Likely hashes" : "常见哈希"}: ${escapeHtml(likelyHashes.join(", ") || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Fingerprint enrichment" : currentLang() === "mix" ? "补指纹能力 / Fingerprint enrichment" : "补指纹能力"}: ${supportsFingerprintEnrichment ? (currentLang() === "en" ? "declared" : currentLang() === "mix" ? "已声明 / declared" : "已声明") : (currentLang() === "en" ? "unknown" : currentLang() === "mix" ? "未知 / unknown" : "未知")}</div>
         <div class="mono">${currentLang() === "en" ? "Recommended rate profile" : currentLang() === "mix" ? "推荐频率 / Recommended rate profile" : "推荐频率"}: ${escapeHtml(sourceProfile.recommendedRateProfile || "-")}</div>
         <div class="mono">${escapeHtml(analysisLine)}</div>
         <div class="mono">${currentLang() === "en" ? "Suggested path" : currentLang() === "mix" ? "建议路径 / Suggested path" : "建议路径"}: ${escapeHtml(recommendedFlow || "-")}</div>
@@ -770,6 +772,7 @@
               <div class="mono">${currentLang() === "en" ? "login mode" : currentLang() === "mix" ? "登录模式 / login mode" : "登录模式"}=${escapeHtml(item.loginMode || "-")}</div>
               <div class="mono">${currentLang() === "en" ? "hashes" : currentLang() === "mix" ? "哈希 / hashes" : "哈希"}=${escapeHtml((item.likelyHashes || []).join(", ") || "-")}</div>
               <div class="mono">${currentLang() === "en" ? "supported hash fields" : currentLang() === "mix" ? "支持哈希字段 / supported hash fields" : "支持哈希字段"}=${escapeHtml((item.hashFieldsSupported || []).join(", ") || "-")}</div>
+              <div class="mono">${currentLang() === "en" ? "fingerprint enrichment" : currentLang() === "mix" ? "补指纹能力 / fingerprint enrichment" : "补指纹能力"}=${item.supportsFingerprintEnrichment ? (currentLang() === "en" ? "declared" : currentLang() === "mix" ? "已声明 / declared" : "已声明") : (currentLang() === "en" ? "unknown" : currentLang() === "mix" ? "未知 / unknown" : "未知")}</div>
               <div class="mono">${currentLang() === "en" ? "download links" : currentLang() === "mix" ? "下载链路 / download links" : "下载链路"}=${escapeHtml(item.downloadLinkSupported || "-")}</div>
               <div class="mono">${currentLang() === "en" ? "aliases" : currentLang() === "mix" ? "驱动别名 / aliases" : "驱动别名"}=${escapeHtml((item.driverAliases || []).join(", ") || "-")}</div>
               <div class="mono">${currentLang() === "en" ? "capture strategy" : currentLang() === "mix" ? "抓取策略 / capture strategy" : "抓取策略"}=${escapeHtml((currentLang() === "en" ? item.captureStrategyEn : currentLang() === "mix" ? `${item.captureStrategy || ""} / ${item.captureStrategyEn || ""}`.trim() : item.captureStrategy) || "-")}</div>

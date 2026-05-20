@@ -98,6 +98,14 @@
 - [x] 补指纹后仍缺少秒传指纹时，会明确记录日志并以“未命中秒传库存”进入待补传，而不是继续沿用“新增文件/源文件已修改”这类计划原因
 - [x] 相关回归通过：`python -m compileall src tests`、`pytest -q tests/test_sync_logic.py -k "enriches_missing_fast_upload_fingerprint_before_direct_sync or enrichment_still_lacks_fast_upload_fingerprint"`、`pytest -q tests/test_sync_logic.py -x`
 
+### 里程碑 12：补指纹能力提示贯通到矩阵与页面（起步）
+
+- [x] `sourceProfile` 序列化结果已显式返回 `supportsFingerprintEnrichment`
+- [x] `provider/capability_assess` 在目录级判断为 `fast_upload_after_enrichment` 时，会把推荐模式切到 `enrich_then_direct`
+- [x] 若当前源 Profile 已声明支持补指纹，能力建议会明确提示执行期会先回查单文件元数据
+- [x] 前端能力面板与 About 源 Profile 列表已显示“补指纹能力”状态
+- [x] 相关回归通过：`python -m compileall src tests`、`node --check src/cloudpan_bridge/web/assets/app.js`、`pytest -q tests/test_sync_logic.py -k "prefers_enrichment_mode_when_directory_needs_more_hashes or provider_capability_assess_uses_analysis_summary"`
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

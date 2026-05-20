@@ -4709,6 +4709,43 @@ def test_provider_capability_assess_accepts_grouped_target_and_filters(tmp_path:
     assert payload["assessedLevel"] == "fast_upload_supported"
 
 
+def test_provider_capability_assess_prefers_enrichment_mode_when_directory_needs_more_hashes(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "source_path": "/src",
+  "target_path": "/dst"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    from cloudpan_bridge.webapp import create_app
+
+    client = TestClient(create_app(config_path))
+    response = client.post(
+        "/api/provider/capability_assess",
+        json={
+            "driver": "Thunder",
+            "analysis_summary": {
+                "total": 2,
+                "fast_upload_ready": 0,
+                "md5_ready": 0,
+                "gcid_ready": 0,
+                "missing_fast_upload": 2,
+                "pickcode_ready": 2,
+                "sha1_ready": 2,
+            },
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sourceProfile"]["supportsFingerprintEnrichment"] is True
+    assert payload["fastUploadDecision"]["level"] == "fast_upload_after_enrichment"
+    assert payload["strategy"]["recommendedMode"] == "enrich_then_direct"
+    assert any(item["key"] == "provider_refresh_supported" for item in payload["strategy"]["suggestedActions"])
+
+
 def test_provider_capability_assess_without_analysis_requires_probe_first(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(

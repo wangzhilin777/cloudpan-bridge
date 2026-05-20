@@ -291,6 +291,9 @@ def _serialize_target_profile(profile: dict[str, Any]) -> dict[str, Any]:
 
 
 def _serialize_source_profile(profile: dict[str, Any]) -> dict[str, Any]:
+    hash_fields_supported = list(profile.get("hash_fields_supported") or [])
+    likely_hashes = list(profile.get("likely_hashes") or [])
+    supports_fingerprint_enrichment = bool(hash_fields_supported or likely_hashes)
     capability_to_targets = {
         str(target): {
             "level": str(value.get("level") or "unsupported"),
@@ -306,8 +309,9 @@ def _serialize_source_profile(profile: dict[str, Any]) -> dict[str, Any]:
         "labelZh": str(profile.get("label_zh") or ""),
         "driverAliases": list(profile.get("driver_aliases") or []),
         "loginMode": str(profile.get("login_mode") or ""),
-        "likelyHashes": list(profile.get("likely_hashes") or []),
-        "hashFieldsSupported": list(profile.get("hash_fields_supported") or []),
+        "likelyHashes": likely_hashes,
+        "hashFieldsSupported": hash_fields_supported,
+        "supportsFingerprintEnrichment": supports_fingerprint_enrichment,
         "downloadLinkSupported": str(profile.get("download_link_supported") or ""),
         "captureStrategy": str(profile.get("capture_strategy") or ""),
         "captureStrategyEn": str(profile.get("capture_strategy_en") or ""),
@@ -1026,6 +1030,7 @@ def assess_driver_target_capability(
     rationale_en = "No source analysis summary has been provided yet. Fall back to the static matrix."
     source_profile = dict(capability.get("sourceProfile") or {})
     recommended_rate_profile = str(source_profile.get("recommendedRateProfile") or "safe")
+    supports_fingerprint_enrichment = bool(source_profile.get("supportsFingerprintEnrichment"))
 
     if total > 0:
         if base_level == "fast_upload_partial":
@@ -1082,6 +1087,8 @@ def assess_driver_target_capability(
         throttle_hint_zh = "当前驱动相对适合快速验证，但仍建议先跑一个小目录。"
         throttle_hint_en = "This driver is relatively fast-friendly, but you should still validate with a small directory first."
 
+    fast_upload_decision = assess_directory_fast_upload(summary, target_capability=capability.get("targetCapability") or capability.get("targetProfile") or {})
+
     if not should_analyze_first:
         if assessed_level == "fast_upload_supported":
             recommended_mode = "direct_metadata_first"
@@ -1128,6 +1135,38 @@ def assess_driver_target_capability(
                         "key": "gcid_bias",
                         "zh": "当前目录更偏 GCID 指纹，建议先看 GCID 路径是否稳定可用。",
                         "en": "This directory is GCID-heavy. Check whether the GCID path is stable first.",
+                    }
+                )
+        elif fast_upload_decision.get("level") == "fast_upload_after_enrichment":
+            recommended_mode = "enrich_then_direct"
+            prefer_pending_tree = False
+            prefer_leaf_mode = True
+            suggested_actions = [
+                {
+                    "key": "enrich_fingerprint_first",
+                    "zh": "当前目录需要先补指纹，再决定哪些文件能直接秒传。",
+                    "en": "Enrich file fingerprints first, then decide which files can use direct fast upload.",
+                },
+                {
+                    "key": "leaf_probe",
+                    "zh": "建议先跑一个小叶子目录，确认补指纹命中率后再扩大范围。",
+                    "en": "Probe one small leaf directory first, then expand after verifying the enrichment hit rate.",
+                },
+            ]
+            if supports_fingerprint_enrichment:
+                suggested_actions.append(
+                    {
+                        "key": "provider_refresh_supported",
+                        "zh": "当前源 Profile 标记为支持补指纹，执行期会优先回查单文件元数据。",
+                        "en": "This source profile is marked as enrichment-capable. Runtime execution will refresh per-file metadata first.",
+                    }
+                )
+            else:
+                suggested_actions.append(
+                    {
+                        "key": "provider_refresh_unknown",
+                        "zh": "当前源 Profile 没有明确补指纹能力声明，建议先手动验证小目录。",
+                        "en": "This source profile has no explicit enrichment capability declared yet. Validate on a small directory first.",
                     }
                 )
         elif assessed_level == "relay_supported":
@@ -1177,8 +1216,6 @@ def assess_driver_target_capability(
                     "en": "If you must continue, probe with a very small directory only. Do not run the full tree directly.",
                 },
             ]
-
-    fast_upload_decision = assess_directory_fast_upload(summary, target_capability=capability.get("targetCapability") or capability.get("targetProfile") or {})
 
     return {
         **capability,
