@@ -23,7 +23,7 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
         "capture_fields": ["cookie_header", "session_key", "access_token", "refresh_token"],
         "bridge": {
             "mode": "session_snapshot",
-            "implemented": False,
+            "implemented": True,
             "required_groups": [
                 ["cookie_header"],
                 ["session_key"],
@@ -43,7 +43,7 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
         "capture_fields": ["cookie_header", "access_token", "refresh_token"],
         "bridge": {
             "mode": "session_snapshot",
-            "implemented": False,
+            "implemented": True,
             "required_groups": [
                 ["cookie_header"],
                 ["access_token", "refresh_token"],
@@ -66,7 +66,7 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
         "capture_fields": ["cookie_header", "access_token", "refresh_token"],
         "bridge": {
             "mode": "session_snapshot",
-            "implemented": False,
+            "implemented": True,
             "required_groups": [
                 ["cookie_header"],
                 ["access_token", "refresh_token"],
@@ -86,7 +86,7 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
         "capture_fields": ["cookie_header", "bdstoken", "access_token", "refresh_token"],
         "bridge": {
             "mode": "session_snapshot",
-            "implemented": False,
+            "implemented": True,
             "required_groups": [
                 ["cookie_header", "bdstoken"],
                 ["access_token", "refresh_token", "bdstoken"],

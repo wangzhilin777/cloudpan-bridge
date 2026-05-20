@@ -919,6 +919,33 @@ def test_source_enrichment_runtime_reports_mainstream_provider_capture_state(tmp
     assert runtime["bridge_runtime"]["matched_groups"] == [["authorization", "device_id"]]
 
 
+def test_source_enrichment_runtime_marks_session_bridge_ready_when_capture_available(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "quark": {
+                            "status": "captured",
+                            "captured": {
+                                "cookie_header": "sid=1; token=2",
+                            },
+                        }
+                    },
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "quark")
+    assert runtime["capture_ready"] is True
+    assert runtime["bridge_status"] == "bridge_ready"
+    assert runtime["bridge_runtime"]["status"] == "bridge_ready"
+    assert runtime["bridge_runtime"]["next_action"] == "prepare_quark_session_bridge"
+
+
 def test_source_enrichment_promotes_hashes_from_existing_raw_fields(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text("{}", encoding="utf-8")
