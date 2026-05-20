@@ -916,6 +916,7 @@
       const notes = capability.notes || {};
       const assessedLevel = assessment?.assessedLevel || capability.level;
       const sourceMappingContext = assessment?.sourceMappingContext || providerRegistryPayload?.current_source_context || {};
+      const sourceEnrichment = assessment?.sourceEnrichment || capability?.sourceEnrichment || {};
       const rationale = assessment?.rationale || {};
       const strategy = assessment?.strategy || {};
       const likelyHashes = Array.isArray(sourceProfile.likelyHashes) ? sourceProfile.likelyHashes : [];
@@ -960,6 +961,9 @@
         `${currentLang() === "en" ? "Prefer leaf mode" : currentLang() === "mix" ? "叶子目录优先 / Prefer leaf mode" : "叶子目录优先"}=${strategy?.preferLeafMode ? "yes" : "no"}`,
         `${currentLang() === "en" ? "Prefer pending tree" : currentLang() === "mix" ? "待补传树优先 / Prefer pending tree" : "待补传树优先"}=${strategy?.preferPendingTree ? "yes" : "no"}`,
       ].join(" | ");
+      const transferPreviewText = sourceAnalyzeCache?.transferPlanPreview
+        ? Object.entries(sourceAnalyzeCache.transferPlanPreview.mode_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ")
+        : "-";
       const quickActions = strategyQuickActions(strategy?.recommendedMode || "analyze_first", strategy);
       quickActionsRoot.innerHTML = quickActions.map((item) => (
         `<button class="secondary" type="button" data-capability-action="${escapeHtml(item.key)}">${escapeHtml(item.label)}</button>`
@@ -972,8 +976,10 @@
         <div class="mono">${currentLang() === "en" ? "Execution mode" : currentLang() === "mix" ? "执行模式 / Execution mode" : "执行模式"}: ${escapeHtml(strategyModeText(strategy?.recommendedMode || "analyze_first"))}</div>
         <div class="mono">${currentLang() === "en" ? "Likely hashes" : currentLang() === "mix" ? "常见哈希 / Likely hashes" : "常见哈希"}: ${escapeHtml(likelyHashes.join(", ") || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Fingerprint enrichment" : currentLang() === "mix" ? "补指纹能力 / Fingerprint enrichment" : "补指纹能力"}: ${supportsFingerprintEnrichment ? (currentLang() === "en" ? "declared" : currentLang() === "mix" ? "已声明 / declared" : "已声明") : (currentLang() === "en" ? "unknown" : currentLang() === "mix" ? "未知 / unknown" : "未知")}</div>
+        <div class="mono">${currentLang() === "en" ? "Enrichment runtime" : currentLang() === "mix" ? "补指纹运行态 / Enrichment runtime" : "补指纹运行态"}: supported=${escapeHtml(String(!!sourceEnrichment.supported))} | capture_ready=${escapeHtml(String(!!sourceEnrichment.capture_ready))} | preferred=${escapeHtml((sourceEnrichment.preferred_hashes || []).join(", ") || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Recommended rate profile" : currentLang() === "mix" ? "推荐频率 / Recommended rate profile" : "推荐频率"}: ${escapeHtml(sourceProfile.recommendedRateProfile || "-")}</div>
         <div class="mono">${escapeHtml(analysisLine)}</div>
+        <div class="mono">${currentLang() === "en" ? "Transfer preview" : currentLang() === "mix" ? "传输预览 / Transfer preview" : "传输预览"}: ${escapeHtml(transferPreviewText)}</div>
         <div class="mono">${currentLang() === "en" ? "Suggested path" : currentLang() === "mix" ? "建议路径 / Suggested path" : "建议路径"}: ${escapeHtml(recommendedFlow || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Runtime rationale" : currentLang() === "mix" ? "动态理由 / Runtime rationale" : "动态理由"}: ${escapeHtml(rationaleText || "-")}</div>
         <div class="mono">${currentLang() === "en" ? "Throttle hint" : currentLang() === "mix" ? "节奏建议 / Throttle hint" : "节奏建议"}: ${escapeHtml(throttleHintText || "-")}</div>

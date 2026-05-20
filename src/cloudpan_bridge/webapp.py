@@ -1605,6 +1605,7 @@ def create_app(config_path: Path) -> FastAPI:
         context = resolve_source_mapping_context({"driver": driver}, config)
         capability = build_driver_target_capability(context["effective_driver"] or driver, target=effective_target)
         capability["sourceMappingContext"] = context
+        capability["sourceEnrichment"] = build_source_enrichment_runtime(config, context["provider_key"] or context["effective_driver"] or driver)
         return capability
 
     @app.post("/api/provider/coverage_audit")
@@ -1668,6 +1669,7 @@ def create_app(config_path: Path) -> FastAPI:
             target=target,
             live_driver_fields_map=build_live_driver_fields_map([driver]),
         )
+        result["sourceEnrichment"] = build_source_enrichment_runtime(config, str(result["sourceMappingContext"].get("provider_key") or driver))
         return result
 
     @app.get("/api/openlist/storages")
