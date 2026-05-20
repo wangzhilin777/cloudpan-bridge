@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import PurePosixPath
 from typing import Any, Callable
 
 from .models import SourceEntry, normalize_fingerprint_value
@@ -69,6 +70,8 @@ CAPTURE_PATH_CONTAINER_KEYS = ("file_hashes_by_path", "fingerprints_by_path", "h
 CAPTURE_ID_CONTAINER_KEYS = ("file_hashes_by_id", "fingerprints_by_id", "hash_cache_by_id", "entry_hashes_by_id")
 CAPTURE_COLLECTION_KEYS = ("file_hashes", "fingerprints", "hash_cache", "entries", "items")
 PAYLOAD_PATH_KEYS = ("path", "file_path", "filePath", "source_path", "sourcePath", "full_path", "fullPath")
+PAYLOAD_PARENT_PATH_KEYS = ("parent_path", "parentPath", "dir", "directory", "folder_path", "folderPath")
+PAYLOAD_NAME_KEYS = ("name", "file_name", "fileName", "filename", "server_filename", "serverFileName")
 PAYLOAD_ID_KEYS = (
     "source_id",
     "sourceId",
@@ -177,6 +180,26 @@ def _capture_payload_matches_entry(payload: dict[str, Any], entry: SourceEntry) 
     ]
     if normalized_entry_path and normalized_entry_path in {path for path in payload_paths if path}:
         return True
+    payload_parent_path = next(
+        (
+            _normalize_entry_path(_resolve_payload_value(payload, key))
+            for key in PAYLOAD_PARENT_PATH_KEYS
+            if _normalize_entry_path(_resolve_payload_value(payload, key))
+        ),
+        "",
+    )
+    payload_name = next(
+        (
+            str(_resolve_payload_value(payload, key) or "").strip()
+            for key in PAYLOAD_NAME_KEYS
+            if str(_resolve_payload_value(payload, key) or "").strip()
+        ),
+        "",
+    )
+    if normalized_entry_path and payload_parent_path and payload_name:
+        combined_payload_path = _normalize_entry_path(str(PurePosixPath(payload_parent_path) / payload_name))
+        if combined_payload_path == normalized_entry_path:
+            return True
     source_id = str(entry.source_id or "").strip()
     payload_ids = [
         str(_resolve_payload_value(payload, key) or "").strip()

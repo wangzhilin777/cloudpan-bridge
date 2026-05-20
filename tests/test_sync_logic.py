@@ -1887,6 +1887,44 @@ def test_execute_source_bridge_reads_camel_case_capture_cache_entries_for_onedri
     assert report_id["bridge_execution_state"] == "api_capture_cache_normalized"
 
 
+def test_execute_source_bridge_matches_capture_entries_by_parent_path_and_file_name(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "baidu": {
+                            "status": "captured",
+                            "captured": {
+                                "cookie_header": "BAIDUSS=demo",
+                                "bdstoken": "token-1",
+                                "entries": [
+                                    {
+                                        "parentPath": "/src/album/2024",
+                                        "server_filename": "a.jpg",
+                                        "md5": "a" * 32,
+                                        "slice_md5": "b" * 32,
+                                    }
+                                ],
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "baidu")
+    enriched, report = execute_source_bridge(SourceEntry(path="/src/album/2024/a.jpg", md5="", size=10, provider="Baidu"), runtime)
+    assert enriched.md5 == "A" * 32
+    assert enriched.slice_md5 == "B" * 32
+    assert report["bridge_execution_state"] == "session_snapshot_normalized"
+    assert "md5" in report["candidate_hashes"]
+    assert "slice_md5" in report["candidate_hashes"]
+
+
 def test_execute_source_bridge_marks_non_fast_candidates_for_quark(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text(
