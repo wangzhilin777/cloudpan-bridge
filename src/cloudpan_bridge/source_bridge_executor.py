@@ -64,21 +64,57 @@ def _merge_entry_from_aliases(entry: SourceEntry, aliases_map: dict[str, list[st
     )
 
 
-def _build_report(entry: SourceEntry, merged: SourceEntry, runtime: dict[str, Any], *, executor_name: str, execution_state: str, message: str) -> dict[str, Any]:
+def _fingerprint_presence(entry: SourceEntry) -> dict[str, bool]:
+    return {
+        "md5": bool(entry.md5),
+        "gcid": bool(entry.gcid),
+        "sha1": bool(entry.sha1),
+        "sha256": bool(entry.sha256),
+        "crc64": bool(entry.crc64),
+        "pre_hash": bool(entry.pre_hash),
+        "slice_md5": bool(entry.slice_md5),
+        "pickcode": bool(entry.pickcode),
+        "content_hash": bool(entry.content_hash),
+    }
+
+
+def _candidate_hashes(entry: SourceEntry) -> list[str]:
+    presence = _fingerprint_presence(entry)
+    ordered = ["md5", "gcid", "sha1", "slice_md5", "crc64", "content_hash", "pickcode", "pre_hash", "sha256"]
+    return [key for key in ordered if presence.get(key)]
+
+
+def _build_report(
+    entry: SourceEntry,
+    merged: SourceEntry,
+    runtime: dict[str, Any],
+    *,
+    executor_name: str,
+    execution_state: str,
+    message: str,
+    provider_stage: str,
+    pending_reason: str = "",
+) -> dict[str, Any]:
     added_hashes: list[str] = []
     for field in ("md5", "gcid", "sha1", "sha256", "crc64", "pre_hash", "slice_md5", "pickcode", "content_hash"):
         if not getattr(entry, field) and getattr(merged, field):
             added_hashes.append(field)
     bridge_runtime = dict(runtime.get("bridge_runtime") or {})
     preparation = dict(bridge_runtime.get("preparation") or {})
+    merged_presence = _fingerprint_presence(merged)
     return {
         "changed": bool(added_hashes),
         "added_hashes": added_hashes,
         "bridge_execution_state": execution_state,
         "bridge_executor": executor_name,
+        "provider_stage": provider_stage,
         "bridge_transport_hint": str(preparation.get("transport_hint") or "-"),
         "bridge_selected_group": list(preparation.get("selected_group") or []),
         "bridge_hook_registered": bool(bridge_runtime.get("hook_registered")),
+        "candidate_hashes": _candidate_hashes(merged),
+        "fast_upload_ready_after_bridge": bool(merged.md5 or merged.gcid),
+        "fingerprint_presence": merged_presence,
+        "pending_reason": pending_reason,
         "message": message,
     }
 
@@ -86,12 +122,18 @@ def _build_report(entry: SourceEntry, merged: SourceEntry, runtime: dict[str, An
 def _normalize_session_snapshot(entry: SourceEntry, runtime: dict[str, Any], *, executor_name: str) -> tuple[SourceEntry, dict[str, Any]]:
     aliases_map = dict(runtime.get("hash_aliases") or {})
     merged = _merge_entry_from_aliases(entry, aliases_map)
+    candidate_hashes = _candidate_hashes(merged)
+    pending_reason = ""
+    if not (merged.md5 or merged.gcid) and candidate_hashes:
+        pending_reason = "non_fast_hashes_only_after_session_snapshot"
     report = _build_report(
         entry,
         merged,
         runtime,
         executor_name=executor_name,
         execution_state="session_snapshot_normalized",
+        provider_stage="session_snapshot",
+        pending_reason=pending_reason,
         message="已通过 session snapshot bridge 归并当前可见元数据。",
     )
     return merged, report
@@ -100,12 +142,15 @@ def _normalize_session_snapshot(entry: SourceEntry, runtime: dict[str, Any], *, 
 def _normalize_api_placeholder(entry: SourceEntry, runtime: dict[str, Any], *, executor_name: str) -> tuple[SourceEntry, dict[str, Any]]:
     aliases_map = dict(runtime.get("hash_aliases") or {})
     merged = _merge_entry_from_aliases(entry, aliases_map)
+    pending_reason = "provider_api_bridge_not_executed_yet"
     report = _build_report(
         entry,
         merged,
         runtime,
         executor_name=executor_name,
         execution_state="api_bridge_prepared_but_not_executed",
+        provider_stage="api_placeholder",
+        pending_reason=pending_reason,
         message="已命中 provider API bridge 准备态，当前版本先归并现有元数据，真实 API enrich 仍待后续接入。",
     )
     return merged, report
@@ -159,9 +204,14 @@ def execute_source_bridge(entry: SourceEntry, runtime: dict[str, Any]) -> tuple[
             "added_hashes": [],
             "bridge_execution_state": "bridge_not_registered",
             "bridge_executor": "",
+            "provider_stage": "none",
             "bridge_transport_hint": "-",
             "bridge_selected_group": [],
             "bridge_hook_registered": False,
+            "candidate_hashes": _candidate_hashes(entry),
+            "fast_upload_ready_after_bridge": bool(entry.md5 or entry.gcid),
+            "fingerprint_presence": _fingerprint_presence(entry),
+            "pending_reason": "bridge_not_registered",
             "message": "当前 provider 还没有 bridge executor。",
         }
     return executor(entry, runtime)

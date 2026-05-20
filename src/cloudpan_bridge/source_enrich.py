@@ -50,11 +50,19 @@ def enrich_entry(entry: SourceEntry, config: AppConfig, log: LogFn | None = None
     changed = bool(bridge_report.get("changed"))
     added_hashes = list(bridge_report.get("added_hashes") or [])
     message = str(bridge_report.get("message") or ("已按 provider bridge 归并出补充指纹。" if changed else "当前 provider 没有额外可归并的指纹。"))
-    if changed and log:
-        log(
-            f"[直连补指纹] {entry.path}: 新增 {', '.join(added_hashes)} | "
-            f"executor={bridge_report.get('bridge_executor', '-')}"
-        )
+    if log:
+        if changed:
+            log(
+                f"[直连补指纹] {entry.path}: 新增 {', '.join(added_hashes)} | "
+                f"executor={bridge_report.get('bridge_executor', '-')} | "
+                f"state={bridge_report.get('bridge_execution_state', '-')}"
+            )
+        elif bridge_report.get("candidate_hashes"):
+            log(
+                f"[直连补指纹候选] {entry.path}: "
+                f"candidates={','.join(list(bridge_report.get('candidate_hashes') or [])) or '-'} | "
+                f"pending={bridge_report.get('pending_reason', '-')}"
+            )
     return merged, {
         **runtime,
         **bridge_report,

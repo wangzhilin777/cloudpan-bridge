@@ -288,6 +288,13 @@ class SyncRunner:
         merged, provider_report = enrich_entry(entry, self.config, log=self.log)
         if provider_report.get("changed"):
             return merged
+        if provider_report.get("candidate_hashes"):
+            self.log(
+                f"[补指纹候选摘要] {entry.path}: "
+                f"state={provider_report.get('bridge_execution_state', '-')} | "
+                f"candidates={','.join(list(provider_report.get('candidate_hashes') or [])) or '-'} | "
+                f"pending={provider_report.get('pending_reason', '-')}"
+            )
         if merged.has_fast_upload_fingerprint:
             return merged
         candidates = self._get_source_fingerprints(entry.path)

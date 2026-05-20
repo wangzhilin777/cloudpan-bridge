@@ -10,6 +10,7 @@
 - [x] 建立首批主流源端的 `bridge_runtime` / hook 结构，明确缺失字段、桥接成熟度和下一步动作
 - [x] 建立 `source_bridge_registry.py`，把首批主流源端桥接入口收敛为统一 registry / preparation 结果
 - [x] 把 `source_enrich` 主执行路径切到 bridge executor，统一 session snapshot / API pending 两类执行语义
+- [x] 为 bridge executor 补充 provider 级候选哈希、pending 原因与执行状态报告
 - [ ] 深化首批主流源端的真实直连补指纹桥接实现
 - [ ] 继续拆分前端与过大的 Python/JS 文件，尽量压到单文件 100 KB 以内
 - [ ] 完成更多主流 provider 的互传能力验证与 UI 诚实提示收口

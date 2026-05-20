@@ -965,6 +965,8 @@ def test_source_enrichment_allows_baidu_etag_as_md5(tmp_path: Path) -> None:
     assert report["changed"] is True
     assert report["bridge_execution_state"] == "session_snapshot_normalized"
     assert report["bridge_executor"] == "prepare_baidu_session_bridge"
+    assert report["candidate_hashes"][0] == "md5"
+    assert report["fast_upload_ready_after_bridge"] is True
 
 
 def test_source_enrichment_runtime_reports_bridge_status_for_aliyundriveopen(tmp_path: Path) -> None:
@@ -1045,6 +1047,39 @@ def test_execute_source_bridge_marks_api_bridge_placeholder_for_onedrive(tmp_pat
     assert report["bridge_execution_state"] == "api_bridge_prepared_but_not_executed"
     assert report["bridge_executor"] == "prepare_onedrive_api_bridge"
     assert report["bridge_transport_hint"] == "refresh_token_or_authorization"
+    assert report["candidate_hashes"] == ["sha1"]
+    assert report["pending_reason"] == "provider_api_bridge_not_executed_yet"
+    assert report["fast_upload_ready_after_bridge"] is False
+
+
+def test_execute_source_bridge_marks_non_fast_candidates_for_quark(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "quark": {
+                            "status": "captured",
+                            "captured": {
+                                "cookie_header": "sid=1; token=2",
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    entry = SourceEntry(path="/src/q.bin", md5="", size=10, provider="Quark", raw_hash_info={"sha1": "b" * 40, "slice_md5": "c" * 32})
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "quark")
+    enriched, report = execute_source_bridge(entry, runtime)
+    assert enriched.sha1 == "B" * 40
+    assert enriched.slice_md5 == "C" * 32
+    assert report["candidate_hashes"] == ["sha1", "slice_md5"]
+    assert report["pending_reason"] == "non_fast_hashes_only_after_session_snapshot"
+    assert report["fast_upload_ready_after_bridge"] is False
 
 
 def test_transfer_planner_prefers_fast_upload_when_target_hash_matches() -> None:
