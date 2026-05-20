@@ -10,6 +10,9 @@ BridgePrepareFn = Callable[[dict[str, Any]], dict[str, Any]]
 def _build_base_result(provider_key: str, captured: dict[str, Any], *, transport_hint: str, fingerprint_expectation: list[str]) -> dict[str, Any]:
     rule = build_provider_rule(provider_key)
     bridge = dict(rule.get("bridge") or {})
+    throttle_defaults = dict(rule.get("throttle_defaults") or {})
+    fallback_policy = dict(rule.get("fallback_policy") or {})
+    preferred_hashes = [str(item).strip().lower() for item in list(rule.get("preferred_hashes") or []) if str(item).strip()]
     groups = [
         [str(item).strip() for item in list(group or []) if str(item).strip()]
         for group in list(bridge.get("required_groups") or [])
@@ -34,6 +37,9 @@ def _build_base_result(provider_key: str, captured: dict[str, Any], *, transport
         "selected_field_count": len(selected_fields),
         "transport_hint": transport_hint,
         "fingerprint_expectation": list(fingerprint_expectation),
+        "preferred_hashes": preferred_hashes,
+        "throttle_defaults": throttle_defaults,
+        "fallback_policy": fallback_policy,
         "degrade_to": ["openlist_normalization", "download_upload"],
         "execution_state": "prepared" if selected_group else "missing_capture",
     }
@@ -97,6 +103,9 @@ def prepare_source_bridge(provider_key: str, captured: dict[str, Any] | None = N
             "selected_field_count": 0,
             "transport_hint": "openlist_only",
             "fingerprint_expectation": [],
+            "preferred_hashes": [],
+            "throttle_defaults": {},
+            "fallback_policy": {},
             "degrade_to": ["openlist_normalization", "download_upload"],
             "execution_state": "bridge_not_registered",
             "hook_registered": False,

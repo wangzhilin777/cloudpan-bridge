@@ -42,6 +42,8 @@
     const bridgeRuntime = sourceEnrichment.bridge_runtime || {};
     const bridgePreparation = sourceEnrichment.bridge_preparation_summary || bridgeRuntime.preparation || {};
     const bridgeMaturity = sourceEnrichment.bridge_maturity_summary || {};
+    const bridgeThrottle = bridgePreparation.throttle_defaults || {};
+    const bridgeFallbackPolicy = bridgePreparation.fallback_policy || {};
     const rationale = assessment?.rationale || {};
     const strategy = assessment?.strategy || {};
     const likelyHashes = Array.isArray(sourceProfile.likelyHashes) ? sourceProfile.likelyHashes : [];
@@ -99,6 +101,18 @@
     const transferExpectedGapText = Object.entries(sourceAnalyzeCache?.transferPlanPreview?.bridge_missing_expected_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
     const transferTargetFastGapText = Object.entries(sourceAnalyzeCache?.transferPlanPreview?.missing_target_fast_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
     const transferRecoverableFastGapText = Object.entries(sourceAnalyzeCache?.transferPlanPreview?.bridge_missing_recoverable_fast_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
+    const bridgeThrottleText = [
+      `mode=${bridgeThrottle.rate_mode || "-"}`,
+      `page=${bridgeThrottle.page_size ?? "-"}`,
+      `req=${bridgeThrottle.request_interval_ms ?? "-"}ms`,
+      `dir=${bridgeThrottle.directory_interval_ms ?? "-"}ms`,
+      `small_batch=${bridgeThrottle.small_batch_only ? "yes" : "no"}`,
+    ].join(" | ");
+    const bridgeFallbackText = [
+      `auto_download=${bridgeFallbackPolicy.allow_auto_download ? "yes" : "no"}`,
+      `selected_only=${bridgeFallbackPolicy.download_selected_only ? "yes" : "no"}`,
+      `pending_first=${bridgeFallbackPolicy.pending_only_when_hash_missing ? "yes" : "no"}`,
+    ].join(" | ");
     const quickActions = strategyQuickActions(strategy?.recommendedMode || "analyze_first", strategy);
     quickActionsRoot.innerHTML = quickActions.map((item) => (
       `<button class="secondary" type="button" data-capability-action="${escapeHtml(item.key)}">${escapeHtml(item.label)}</button>`
@@ -115,7 +129,9 @@
       <div class="mono">${currentLang() === "en" ? "Bridge runtime" : currentLang() === "mix" ? "桥接运行态 / Bridge runtime" : "桥接运行态"}: status=${escapeHtml(bridgeRuntime.status || "-")} | next=${escapeHtml(bridgeRuntime.next_action || "-")} | missing=${escapeHtml((bridgeRuntime.missing_keys || []).join(", ") || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Bridge maturity" : currentLang() === "mix" ? "桥接成熟度 / Bridge maturity" : "桥接成熟度"}: ${escapeHtml(bridgeView.bridgeMaturityText(ctx, bridgeMaturity.level || "-"))} | ${escapeHtml(bridgeMaturity.summary || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Bridge preparation" : currentLang() === "mix" ? "桥接准备态 / Bridge preparation" : "桥接准备态"}: ${escapeHtml(bridgeView.bridgeExecutionStateText(ctx, bridgePreparation.execution_state || "-"))} | ${escapeHtml(bridgeView.bridgeTransportHintText(ctx, bridgePreparation.transport_hint || "-"))}</div>
-      <div class="mono">${currentLang() === "en" ? "Expected fingerprints" : currentLang() === "mix" ? "预期补指纹 / Expected fingerprints" : "预期补指纹"}: ${escapeHtml(bridgeView.bridgeExpectationText(ctx, bridgePreparation.fingerprint_expectation || []))} | ${currentLang() === "en" ? "Matched fields" : currentLang() === "mix" ? "命中字段 / Matched fields" : "命中字段"}=${escapeHtml((bridgePreparation.selected_field_names || []).join(", ") || "-")}</div>
+      <div class="mono">${currentLang() === "en" ? "Expected fingerprints" : currentLang() === "mix" ? "预期补指纹 / Expected fingerprints" : "预期补指纹"}: ${escapeHtml(bridgeView.bridgeExpectationText(ctx, bridgePreparation.fingerprint_expectation || []))} | ${currentLang() === "en" ? "Preferred hashes" : currentLang() === "mix" ? "优先哈希 / Preferred hashes" : "优先哈希"}=${escapeHtml((bridgePreparation.preferred_hashes || []).join(", ") || "-")}</div>
+      <div class="mono">${currentLang() === "en" ? "Matched fields" : currentLang() === "mix" ? "命中字段 / Matched fields" : "命中字段"}=${escapeHtml((bridgePreparation.selected_field_names || []).join(", ") || "-")} | ${currentLang() === "en" ? "Throttle defaults" : currentLang() === "mix" ? "默认节流 / Throttle defaults" : "默认节流"}=${escapeHtml(bridgeThrottleText)}</div>
+      <div class="mono">${currentLang() === "en" ? "Fallback boundary" : currentLang() === "mix" ? "降级边界 / Fallback boundary" : "降级边界"}=${escapeHtml(bridgeFallbackText)} | ${currentLang() === "en" ? "Policy" : currentLang() === "mix" ? "策略说明 / Policy" : "策略说明"}=${escapeHtml(bridgeFallbackPolicy.summary || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Recommended rate profile" : currentLang() === "mix" ? "推荐频率 / Recommended rate profile" : "推荐频率"}: ${escapeHtml(sourceProfile.recommendedRateProfile || "-")}</div>
       <div class="mono">${escapeHtml(analysisLine)}</div>
       <div class="mono">${currentLang() === "en" ? "Bridge candidate hashes" : currentLang() === "mix" ? "桥接候选哈希 / Bridge candidate hashes" : "桥接候选哈希"}: ${escapeHtml(enrichBatchText)}</div>
@@ -148,6 +164,8 @@
     const bridgeRuntime = enrichment.bridge_runtime || {};
     const bridgePreparation = enrichment.bridge_preparation_summary || bridgeRuntime.preparation || {};
     const bridgeMaturity = enrichment.bridge_maturity_summary || {};
+    const bridgeThrottle = bridgePreparation.throttle_defaults || {};
+    const bridgeFallbackPolicy = bridgePreparation.fallback_policy || {};
     const transferPreview = data?.transferPlanPreview || {};
     const entries = Array.isArray(data?.entries) ? data.entries : [];
     if (!data) {
@@ -195,7 +213,9 @@
           <div class="mono">${currentLang() === "en" ? "Bridge runtime" : currentLang() === "mix" ? "桥接运行态 / Bridge runtime" : "桥接运行态"}: status=${escapeHtml(bridgeRuntime.status || "-")} | next=${escapeHtml(bridgeRuntime.next_action || "-")} | missing=${escapeHtml((bridgeRuntime.missing_keys || []).join(", ") || "-")}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge maturity" : currentLang() === "mix" ? "桥接成熟度 / Bridge maturity" : "桥接成熟度"}: ${escapeHtml(bridgeView.bridgeMaturityText(ctx, bridgeMaturity.level || "-"))} | ${escapeHtml(bridgeMaturity.summary || "-")}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge preparation" : currentLang() === "mix" ? "桥接准备态 / Bridge preparation" : "桥接准备态"}: ${escapeHtml(bridgeView.bridgeExecutionStateText(ctx, bridgePreparation.execution_state || "-"))} | ${escapeHtml(bridgeView.bridgeTransportHintText(ctx, bridgePreparation.transport_hint || "-"))}</div>
-          <div class="mono">${currentLang() === "en" ? "Expected fingerprints" : currentLang() === "mix" ? "预期补指纹 / Expected fingerprints" : "预期补指纹"}: ${escapeHtml(bridgeView.bridgeExpectationText(ctx, bridgePreparation.fingerprint_expectation || []))} | ${currentLang() === "en" ? "Matched fields" : currentLang() === "mix" ? "命中字段 / Matched fields" : "命中字段"}=${escapeHtml((bridgePreparation.selected_field_names || []).join(", ") || "-")}</div>
+          <div class="mono">${currentLang() === "en" ? "Expected fingerprints" : currentLang() === "mix" ? "预期补指纹 / Expected fingerprints" : "预期补指纹"}: ${escapeHtml(bridgeView.bridgeExpectationText(ctx, bridgePreparation.fingerprint_expectation || []))} | ${currentLang() === "en" ? "Preferred hashes" : currentLang() === "mix" ? "优先哈希 / Preferred hashes" : "优先哈希"}=${escapeHtml((bridgePreparation.preferred_hashes || []).join(", ") || "-")}</div>
+          <div class="mono">${currentLang() === "en" ? "Throttle defaults" : currentLang() === "mix" ? "默认节流 / Throttle defaults" : "默认节流"}=${escapeHtml([`mode=${bridgeThrottle.rate_mode || "-"}`, `page=${bridgeThrottle.page_size ?? "-"}`, `req=${bridgeThrottle.request_interval_ms ?? "-"}ms`, `dir=${bridgeThrottle.directory_interval_ms ?? "-"}ms`, `small_batch=${bridgeThrottle.small_batch_only ? "yes" : "no"}`].join(" | "))}</div>
+          <div class="mono">${currentLang() === "en" ? "Fallback boundary" : currentLang() === "mix" ? "降级边界 / Fallback boundary" : "降级边界"}=${escapeHtml([`auto_download=${bridgeFallbackPolicy.allow_auto_download ? "yes" : "no"}`, `selected_only=${bridgeFallbackPolicy.download_selected_only ? "yes" : "no"}`, `pending_first=${bridgeFallbackPolicy.pending_only_when_hash_missing ? "yes" : "no"}`].join(" | "))} | ${currentLang() === "en" ? "Policy" : currentLang() === "mix" ? "策略说明 / Policy" : "策略说明"}=${escapeHtml(bridgeFallbackPolicy.summary || "-")}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge states" : currentLang() === "mix" ? "桥接执行态 / Bridge states" : "桥接执行态"}: ${escapeHtml(bridgeStateCounts)}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge stages" : currentLang() === "mix" ? "桥接阶段 / Bridge stages" : "桥接阶段"}: ${escapeHtml(bridgeStageCounts)}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge candidate hashes" : currentLang() === "mix" ? "桥接候选哈希 / Bridge candidate hashes" : "桥接候选哈希"}: ${escapeHtml(candidateCounts)}</div>
@@ -258,6 +278,8 @@
     const bridgeRuntime = sourceEnrichment.bridge_runtime || {};
     const bridgePreparation = sourceEnrichment.bridge_preparation_summary || bridgeRuntime.preparation || {};
     const bridgeMaturity = sourceEnrichment.bridge_maturity_summary || {};
+    const bridgeThrottle = bridgePreparation.throttle_defaults || {};
+    const bridgeFallbackPolicy = bridgePreparation.fallback_policy || {};
     root.innerHTML = `
       <div class="mono">driver=${escapeHtml(context.driver || "-")} | mount=${escapeHtml(selectedMount || "-")} | rate=${escapeHtml(rateMode)}</div>
       <div class="mono">mounted_driver=${escapeHtml(context.mountedDriver || "-")} | override=${escapeHtml(context.overrideProfile || "-")}</div>
@@ -266,8 +288,10 @@
       <div class="mono">route_pref=${escapeHtml(sourceRuntime.requested_provider_preference || "-")} | route_selected=${escapeHtml(sourceRuntime.selected_source_mode || "-")} | route_provider=${escapeHtml(sourceRuntime.selected_provider_key || "-")}</div>
       <div class="mono">enrich_supported=${escapeHtml(String(!!sourceEnrichment.supported))} | capture_ready=${escapeHtml(String(!!sourceEnrichment.capture_ready))} | bridge=${escapeHtml(sourceEnrichment.bridge_status || "-")} | preferred=${escapeHtml((sourceEnrichment.preferred_hashes || []).join(", ") || "-")}</div>
       <div class="mono">bridge_maturity=${escapeHtml(bridgeView.bridgeMaturityText(ctx, bridgeMaturity.level || "-"))} | honesty=${escapeHtml(bridgeMaturity.honesty || "-")}</div>
-      <div class="mono">bridge_transport=${escapeHtml(bridgeView.bridgeTransportHintText(ctx, bridgePreparation.transport_hint || "-"))} | expected=${escapeHtml(bridgeView.bridgeExpectationText(ctx, bridgePreparation.fingerprint_expectation || []))}</div>
+      <div class="mono">bridge_transport=${escapeHtml(bridgeView.bridgeTransportHintText(ctx, bridgePreparation.transport_hint || "-"))} | expected=${escapeHtml(bridgeView.bridgeExpectationText(ctx, bridgePreparation.fingerprint_expectation || []))} | preferred=${escapeHtml((bridgePreparation.preferred_hashes || []).join(", ") || "-")}</div>
       <div class="mono">bridge_fields=${escapeHtml((bridgePreparation.selected_field_names || []).join(", ") || "-")} | prep_state=${escapeHtml(bridgeView.bridgeExecutionStateText(ctx, bridgePreparation.execution_state || "-"))}</div>
+      <div class="mono">bridge_throttle=mode:${escapeHtml(String(bridgeThrottle.rate_mode || "-"))} page:${escapeHtml(String(bridgeThrottle.page_size ?? "-"))} req:${escapeHtml(String(bridgeThrottle.request_interval_ms ?? "-"))}ms dir:${escapeHtml(String(bridgeThrottle.directory_interval_ms ?? "-"))}ms small_batch:${escapeHtml(String(!!bridgeThrottle.small_batch_only))}</div>
+      <div class="mono">bridge_fallback=auto:${escapeHtml(String(!!bridgeFallbackPolicy.allow_auto_download))} selected_only:${escapeHtml(String(!!bridgeFallbackPolicy.download_selected_only))} pending_first:${escapeHtml(String(!!bridgeFallbackPolicy.pending_only_when_hash_missing))}</div>
       <div class="mono">bridge_next=${escapeHtml(bridgeRuntime.next_action || "-")} | missing=${escapeHtml((bridgeRuntime.missing_keys || []).join(", ") || "-")}</div>
       <div class="mono">source_path=${escapeHtml(sourcePath)} | browsing=${escapeHtml(browsingPath)}</div>
       ${sourceRuntime.selection_reason ? `<div>${escapeHtml(sourceRuntime.selection_reason)}</div>` : ""}

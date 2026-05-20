@@ -17,10 +17,13 @@ def _build_bridge_preparation_summary(bridge_runtime: dict[str, Any]) -> dict[st
         "execution_state": str(preparation.get("execution_state") or ""),
         "transport_hint": str(preparation.get("transport_hint") or ""),
         "fingerprint_expectation": list(preparation.get("fingerprint_expectation") or []),
+        "preferred_hashes": list(preparation.get("preferred_hashes") or []),
         "selected_group": list(preparation.get("selected_group") or []),
         "selected_field_names": list(preparation.get("selected_field_names") or []),
         "selected_field_count": int(preparation.get("selected_field_count") or 0),
         "available": bool(preparation.get("available")),
+        "throttle_defaults": dict(preparation.get("throttle_defaults") or {}),
+        "fallback_policy": dict(preparation.get("fallback_policy") or {}),
         "degrade_to": list(preparation.get("degrade_to") or []),
     }
 

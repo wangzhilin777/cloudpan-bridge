@@ -963,7 +963,10 @@ def test_source_enrichment_runtime_reports_mainstream_provider_capture_state(tmp
     assert runtime["bridge_runtime"]["matched_groups"] == [["authorization", "device_id"]]
     assert runtime["bridge_preparation_summary"]["transport_hint"] == "authorization_plus_device_id"
     assert runtime["bridge_preparation_summary"]["fingerprint_expectation"] == ["gcid", "md5", "sha1"]
+    assert runtime["bridge_preparation_summary"]["preferred_hashes"] == ["gcid", "md5"]
     assert runtime["bridge_preparation_summary"]["selected_field_names"] == ["authorization", "device_id"]
+    assert runtime["bridge_preparation_summary"]["throttle_defaults"]["rate_mode"] == "strict"
+    assert runtime["bridge_preparation_summary"]["fallback_policy"]["pending_only_when_hash_missing"] is True
     assert runtime["bridge_maturity_summary"]["level"] == "api_capture_ready_pending_provider_enrich"
 
 
@@ -1019,6 +1022,9 @@ def test_source_enrichment_runtime_reports_189cloud_session_bridge_summary(tmp_p
     assert runtime["capture_ready"] is True
     assert runtime["bridge_preparation_summary"]["transport_hint"] == "cookie_or_session_snapshot"
     assert runtime["bridge_preparation_summary"]["fingerprint_expectation"] == ["md5"]
+    assert runtime["bridge_preparation_summary"]["preferred_hashes"] == ["md5"]
+    assert runtime["bridge_preparation_summary"]["throttle_defaults"]["request_interval_ms"] == 900
+    assert runtime["bridge_preparation_summary"]["fallback_policy"]["allow_auto_download"] is True
     assert runtime["bridge_maturity_summary"]["level"] == "session_snapshot_ready"
 
 
@@ -1194,7 +1200,10 @@ def test_source_runtime_status_exposes_bridge_preparation_summary(tmp_path: Path
     summary = runtime["source_enrichment"]["bridge_preparation_summary"]
     assert summary["transport_hint"] == "refresh_token_or_authorization"
     assert summary["fingerprint_expectation"] == ["sha1", "md5", "content_hash"]
+    assert summary["preferred_hashes"] == ["sha1", "md5"]
     assert summary["selected_field_names"] == ["refresh_token"]
+    assert summary["throttle_defaults"]["page_size"] == 120
+    assert summary["fallback_policy"]["download_selected_only"] is True
 
 
 def test_bridge_runtime_reports_missing_keys_for_baidu_capture() -> None:
@@ -1226,6 +1235,9 @@ def test_prepare_source_bridge_reports_transport_hint_for_quark() -> None:
     assert prepared["transport_hint"] == "cookie_snapshot"
     assert prepared["selected_field_names"] == ["cookie_header"]
     assert "md5" in prepared["fingerprint_expectation"]
+    assert prepared["preferred_hashes"] == ["md5"]
+    assert prepared["throttle_defaults"]["small_batch_only"] is True
+    assert prepared["fallback_policy"]["pending_only_when_hash_missing"] is True
 
 
 def test_enrich_batch_reports_bridge_candidate_and_pending_counts(tmp_path: Path) -> None:

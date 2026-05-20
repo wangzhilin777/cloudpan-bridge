@@ -19,6 +19,19 @@ GENERIC_HASH_ALIASES: dict[str, list[str]] = {
 MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
     "189cloud": {
         "preferred_hashes": ["md5"],
+        "throttle_defaults": {
+            "rate_mode": "safe",
+            "page_size": 200,
+            "request_interval_ms": 900,
+            "directory_interval_ms": 2500,
+            "small_batch_only": False,
+        },
+        "fallback_policy": {
+            "allow_auto_download": True,
+            "download_selected_only": False,
+            "pending_only_when_hash_missing": False,
+            "summary": "天翼优先吃 OpenList 暴露的 md5，缺关键哈希时允许按安全节奏继续补传。",
+        },
         "capture_required": True,
         "capture_fields": ["cookie_header", "session_key", "access_token", "refresh_token"],
         "bridge": {
@@ -39,6 +52,19 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "quark": {
         "preferred_hashes": ["md5"],
+        "throttle_defaults": {
+            "rate_mode": "strict",
+            "page_size": 100,
+            "request_interval_ms": 1500,
+            "directory_interval_ms": 3000,
+            "small_batch_only": True,
+        },
+        "fallback_policy": {
+            "allow_auto_download": False,
+            "download_selected_only": True,
+            "pending_only_when_hash_missing": True,
+            "summary": "夸克优先保守分页与目录间隔，缺 md5 时建议先进待补传树，再按目录小批量补传。",
+        },
         "capture_required": True,
         "capture_fields": ["cookie_header", "access_token", "refresh_token"],
         "bridge": {
@@ -62,6 +88,19 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "123pan": {
         "preferred_hashes": ["md5"],
+        "throttle_defaults": {
+            "rate_mode": "safe",
+            "page_size": 150,
+            "request_interval_ms": 1100,
+            "directory_interval_ms": 2500,
+            "small_batch_only": False,
+        },
+        "fallback_policy": {
+            "allow_auto_download": True,
+            "download_selected_only": False,
+            "pending_only_when_hash_missing": False,
+            "summary": "123Pan 优先 md5，再参考 sha1；如果目录分析结果稳定，可接受正常补传节奏。",
+        },
         "capture_required": True,
         "capture_fields": ["cookie_header", "access_token", "refresh_token"],
         "bridge": {
@@ -82,6 +121,19 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "baidu": {
         "preferred_hashes": ["md5"],
+        "throttle_defaults": {
+            "rate_mode": "strict",
+            "page_size": 100,
+            "request_interval_ms": 1800,
+            "directory_interval_ms": 3500,
+            "small_batch_only": True,
+        },
+        "fallback_policy": {
+            "allow_auto_download": False,
+            "download_selected_only": True,
+            "pending_only_when_hash_missing": True,
+            "summary": "百度优先 md5 与 slice_md5，风控更敏感，建议缺关键哈希时先记待补传。",
+        },
         "capture_required": True,
         "capture_fields": ["cookie_header", "bdstoken", "access_token", "refresh_token"],
         "bridge": {
@@ -102,6 +154,19 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "thunder": {
         "preferred_hashes": ["gcid", "md5"],
+        "throttle_defaults": {
+            "rate_mode": "strict",
+            "page_size": 80,
+            "request_interval_ms": 1800,
+            "directory_interval_ms": 3200,
+            "small_batch_only": True,
+        },
+        "fallback_policy": {
+            "allow_auto_download": False,
+            "download_selected_only": True,
+            "pending_only_when_hash_missing": True,
+            "summary": "迅雷优先 gcid 和 md5；在真实 API enrich 未接通前，缺关键哈希时建议只记录待补传。",
+        },
         "capture_required": True,
         "capture_fields": ["authorization", "device_id", "x-device-id", "access_token", "refresh_token"],
         "bridge": {
@@ -125,6 +190,19 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "aliyundriveopen": {
         "preferred_hashes": ["sha1", "md5"],
+        "throttle_defaults": {
+            "rate_mode": "safe",
+            "page_size": 120,
+            "request_interval_ms": 1200,
+            "directory_interval_ms": 2500,
+            "small_batch_only": True,
+        },
+        "fallback_policy": {
+            "allow_auto_download": False,
+            "download_selected_only": True,
+            "pending_only_when_hash_missing": True,
+            "summary": "阿里云盘 Open 优先 sha1，再补 md5；当前 API bridge 仍属准备态，建议先分析后补传。",
+        },
         "capture_required": True,
         "capture_fields": ["refresh_token", "access_token", "authorization"],
         "bridge": {
@@ -147,6 +225,19 @@ MAINSTREAM_SOURCE_PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "onedrive": {
         "preferred_hashes": ["sha1", "md5"],
+        "throttle_defaults": {
+            "rate_mode": "safe",
+            "page_size": 120,
+            "request_interval_ms": 1200,
+            "directory_interval_ms": 2500,
+            "small_batch_only": False,
+        },
+        "fallback_policy": {
+            "allow_auto_download": False,
+            "download_selected_only": True,
+            "pending_only_when_hash_missing": True,
+            "summary": "OneDrive 优先 sha1；在 content hash 仍待真实 enrich 时，建议先记录缺口再按目录补传。",
+        },
         "capture_required": True,
         "capture_fields": ["refresh_token", "access_token", "authorization"],
         "bridge": {
