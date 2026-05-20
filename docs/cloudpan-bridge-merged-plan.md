@@ -27,6 +27,15 @@
 - [ ] 页面主流程完全切到“连接 -> 源端 -> 目标端 -> 任务 -> 执行”
 - [ ] 已支持连接网盘统一纳入互传与秒传优先框架
 
+### 里程碑 3：前端入口拆分与主流程重排（进行中）
+
+- [x] `index.html` 拆为入口壳 + `assets/app.css` + `assets/app.js`
+- [x] 补齐 `/assets/*` 静态资源路由，入口页与拆分资源可独立请求
+- [x] 当前标签页顺序重排为“总览 / 连接 / 源端 / 目标端 / 任务执行 / 补传 / 快传能力 / 能力与关于”
+- [x] `source_path / target_key / target_path` 收拢到“任务执行”主区域
+- [ ] Source / Target / Task 的文案、状态摘要和能力面板继续细化
+- [x] 本地验证通过：`/`、`/assets/app.css`、`/assets/app.js` 请求 200，`pytest -q` 通过
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

@@ -9,7 +9,7 @@ from threading import Lock, Thread
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 
 from .config import AppConfig, write_example_config
 from .guangya_direct import GuangyaMiaochuanImporter, normalize_guangya_authorization
@@ -922,6 +922,22 @@ def create_app(config_path: Path) -> FastAPI:
     def index() -> str:
         html_path = Path(__file__).with_name("web").joinpath("index.html")
         return html_path.read_text(encoding="utf-8")
+
+    @app.get("/assets/{asset_path:path}")
+    def web_asset(asset_path: str) -> FileResponse:
+        assets_root = Path(__file__).with_name("web").joinpath("assets").resolve()
+        candidate = (assets_root / asset_path).resolve()
+        if not str(candidate).startswith(str(assets_root)) or not candidate.is_file():
+            raise HTTPException(status_code=404, detail="asset not found")
+        media_type = "text/plain"
+        suffix = candidate.suffix.lower()
+        if suffix == ".css":
+            media_type = "text/css"
+        elif suffix == ".js":
+            media_type = "application/javascript"
+        elif suffix == ".json":
+            media_type = "application/json"
+        return FileResponse(candidate, media_type=media_type)
 
     @app.get("/api/auth/status")
     def auth_status(request: Request) -> dict[str, Any]:
