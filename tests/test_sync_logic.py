@@ -1243,6 +1243,47 @@ def test_source_enrichment_derives_slice_md5_from_tagged_hash_string(tmp_path: P
     assert "slice_md5" in report["candidate_hashes"]
 
 
+def test_source_enrichment_reads_algorithm_list_hash_payloads(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/quark-hash-list.bin",
+        md5="",
+        size=10,
+        provider="Quark",
+        raw_hash_info={
+            "hashes": [
+                {"algorithm": "sha1", "value": "abcdef0123456789abcdef0123456789abcdef01"},
+                {"algorithm": "slice_md5", "value": "abcdef0123456789abcdef0123456789"},
+            ]
+        },
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.sha1 == "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+    assert enriched.slice_md5 == "ABCDEF0123456789ABCDEF0123456789"
+    assert "sha1" in report["candidate_hashes"]
+    assert "slice_md5" in report["candidate_hashes"]
+
+
+def test_source_enrichment_reads_stringified_algorithm_list_hash_payloads(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    entry = SourceEntry(
+        path="/src/thunder-stringified-hash-list.bin",
+        md5="",
+        size=10,
+        provider="Thunder",
+        provider_specific={
+            "metadata": "{\"hashes\":[{\"name\":\"gcid\",\"hash\":\"abcdef0123456789abcdef0123456789abcdef01\"},{\"name\":\"md5\",\"hash\":\"abcdef0123456789abcdef0123456789\"}]}"
+        },
+    )
+    enriched, report = enrich_entry(entry, AppConfig.load(path))
+    assert enriched.gcid == "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+    assert enriched.md5 == "ABCDEF0123456789ABCDEF0123456789"
+    assert "gcid" in report["candidate_hashes"]
+    assert "md5" in report["candidate_hashes"]
+
+
 def test_source_enrichment_runtime_reports_bridge_status_for_aliyundriveopen(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text(

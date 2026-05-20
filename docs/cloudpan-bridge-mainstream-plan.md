@@ -34,6 +34,15 @@
 - [ ] 继续拆分前端与过大的 Python/JS 文件，优先压到单文件 `100 KB` 左右，并按统一分级阈值治理
 - [ ] 完成更多主流 provider 的互传能力验证与 UI 诚实提示收口
 
+### 最近推进记录
+
+- 已补齐 `source_bridge_executor.py` 对 `hashes[] / file_hashes[] / algorithm-value` 类结构的识别
+- 现在支持从以下额外结构补指纹：
+  - `[{algorithm:\"sha1\",value:\"...\"}]`
+  - `[{name:\"gcid\",hash:\"...\"}]`
+  - 字符串化 JSON 的同类 `hashes` 数组
+- 已新增对应回归，确保 `Quark / Thunder` 这类主流 provider 的嵌套哈希载荷可进入统一 enrich 流水线
+
 ## 摘要
 
 这版计划只聚焦首批主流网盘，范围固定为：

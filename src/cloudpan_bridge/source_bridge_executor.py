@@ -34,6 +34,47 @@ NESTED_HASH_CONTAINER_KEYS = {
     "metadata",
 }
 
+HASH_LABEL_ALIASES = {
+    "file_md5": "md5",
+    "content_md5": "md5",
+    "file_gcid": "gcid",
+    "content_hash": "content_hash",
+    "contenthash": "content_hash",
+    "prehash": "pre_hash",
+    "slice-md5": "slice_md5",
+    "slicehash": "slice_md5",
+    "sha-1": "sha1",
+    "sha-256": "sha256",
+}
+
+HASH_ITEM_LABEL_KEYS = ("algorithm", "alg", "name", "type", "hash_type", "kind", "label", "key")
+HASH_ITEM_VALUE_KEYS = ("value", "hash", "digest", "checksum", "content", "content_hash", "etag", "md5", "sha1", "sha256", "gcid", "crc64", "pre_hash", "slice_md5")
+
+
+def _normalize_hash_label(value: Any) -> str:
+    text = str(value or "").strip().lower().replace(" ", "_")
+    if not text:
+        return ""
+    normalized = HASH_LABEL_ALIASES.get(text, text)
+    if normalized in HEX_LENGTHS or normalized in {"content_hash", "pickcode", "etag"}:
+        return normalized
+    return ""
+
+
+def _build_hash_payload_from_item(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    normalized = {str(key): item for key, item in value.items()}
+    for label_key in HASH_ITEM_LABEL_KEYS:
+        label = _normalize_hash_label(normalized.get(label_key))
+        if not label:
+            continue
+        for value_key in HASH_ITEM_VALUE_KEYS:
+            raw_value = normalized.get(value_key)
+            if str(raw_value or "").strip():
+                return {label: raw_value}
+    return None
+
 
 def _collect_nested_payloads(value: Any, *, depth: int = 0) -> list[dict[str, Any]]:
     if depth > 3:
@@ -42,6 +83,9 @@ def _collect_nested_payloads(value: Any, *, depth: int = 0) -> list[dict[str, An
     if isinstance(value, dict):
         normalized = {str(key): item for key, item in value.items()}
         payloads.append(normalized)
+        derived_payload = _build_hash_payload_from_item(normalized)
+        if derived_payload:
+            payloads.append(derived_payload)
         for key, item in normalized.items():
             key_lower = str(key).strip().lower()
             if isinstance(item, dict) and (key_lower in NESTED_HASH_CONTAINER_KEYS or depth == 0):
@@ -53,6 +97,9 @@ def _collect_nested_payloads(value: Any, *, depth: int = 0) -> list[dict[str, An
                 payloads.extend(_collect_nested_payloads(_try_parse_json(item), depth=depth + 1))
     elif isinstance(value, list):
         for item in value:
+            derived_payload = _build_hash_payload_from_item(item)
+            if derived_payload:
+                payloads.append(derived_payload)
             payloads.extend(_collect_nested_payloads(item, depth=depth + 1))
     elif isinstance(value, str):
         parsed = _try_parse_json(value)
