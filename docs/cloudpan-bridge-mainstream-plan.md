@@ -109,6 +109,9 @@
 - collection 容器内部的“嵌套 dict records”也继续补强了：
   - 现在不仅支持 `records: []`，也支持 `records: {id1: {...}, id2: {...}}`
   - 这类结构在部分目录接口或浏览器抓包转换结果里更常见，补上后 `capture_cache_summary` 与 `execute_source_bridge` 都能继续吃到对应条目
+- collection 条目里的 identity 字段也继续向真实开放平台返回体靠拢：
+  - 现在 `id / name / path` 不只支持顶层字段，也支持藏在子对象里再递归读取
+  - 例如 `file.id / file.name / parentReference.path` 这类 OneDrive 风格结构，当前也能用于命中对应 `SourceEntry`
 - 统一体积分级阈值这轮也已落到实处：
   - 当前生产源码里最大的 Python / JS 文件是 `webapp.py`，约 `94.2 KB`
   - 前端主入口 `app.js` 约 `88.8 KB`

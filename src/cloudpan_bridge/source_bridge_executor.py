@@ -225,6 +225,28 @@ def _resolve_payload_value(payload: dict[str, Any], key: str) -> Any:
     for candidate_key, value in payload.items():
         if _canonicalize_capture_key(candidate_key) == normalized_key:
             return value
+    nested_value = _resolve_payload_value_nested(payload, normalized_key)
+    if nested_value is not None:
+        return nested_value
+    return None
+
+
+def _resolve_payload_value_nested(payload: Any, normalized_key: str, *, depth: int = 0) -> Any:
+    if depth > 4:
+        return None
+    if isinstance(payload, dict):
+        for candidate_key, value in payload.items():
+            if _canonicalize_capture_key(candidate_key) == normalized_key and not isinstance(value, (dict, list)):
+                return value
+        for value in payload.values():
+            nested = _resolve_payload_value_nested(value, normalized_key, depth=depth + 1)
+            if nested is not None:
+                return nested
+    elif isinstance(payload, list):
+        for item in payload:
+            nested = _resolve_payload_value_nested(item, normalized_key, depth=depth + 1)
+            if nested is not None:
+                return nested
     return None
 
 

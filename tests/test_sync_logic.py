@@ -1975,6 +1975,51 @@ def test_execute_source_bridge_matches_nested_dict_style_collection_entries(tmp_
     assert report["bridge_execution_state"] == "api_capture_cache_normalized"
 
 
+def test_execute_source_bridge_matches_collection_entries_with_nested_identity_fields(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "onedrive": {
+                            "status": "captured",
+                            "captured": {
+                                "refresh_token": "demo-refresh",
+                                "entries": [
+                                    {
+                                        "file": {
+                                            "id": "item-9",
+                                            "name": "nested.docx",
+                                        },
+                                        "parentReference": {
+                                            "path": "/src/docs",
+                                        },
+                                        "hashes": {
+                                            "sha1Hash": "a" * 40,
+                                        },
+                                        "contentHash": "sha1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                    }
+                                ],
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "onedrive")
+    enriched, report = execute_source_bridge(
+        SourceEntry(path="/src/docs/nested.docx", md5="", size=10, provider="OneDrive", source_id="item-9"),
+        runtime,
+    )
+    assert enriched.sha1 == "A" * 40
+    assert enriched.content_hash == "SHA1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    assert report["bridge_execution_state"] == "api_capture_cache_normalized"
+
+
 def test_execute_source_bridge_reads_api_capture_cache_list_for_onedrive(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text(
