@@ -43,7 +43,7 @@
 - [x] 将 `provider_registry.py` 内的大型静态常量拆到 `provider_registry_data/` 子模块
 - [x] 将主逻辑文件 `provider_registry.py` 压缩到 100 KB 以内（当前约 60.6 KB）
 - [x] 拆分后编译与测试通过：`python -m compileall src tests`、`pytest -q -x`、`pytest -q`
-- [ ] 继续评估是否还需要对 `webapp.py`、`provider_capture.py`、`target_adapter.py` 做进一步细拆
+- [x] 继续评估并落地首轮细拆：已把 `webapp.py` 的运行时节流/待补传分组工具提到独立模块，主文件继续维持在 100 KB 内
 
 ### 里程碑 6：挂载驱动到 Source Profile 映射层（起步）
 
@@ -136,6 +136,13 @@
 - [x] `SyncRunner` 已改为优先走统一 source helper，不再直接散落 `hasattr` 分支
 - [x] 新增 source provider helper / compat mixin 回归，确认 legacy source 与真实 mixin provider 都能走统一入口
 - [ ] 后续继续把更多直连源 provider 纳入该抽象，而不是只停留在 OpenList 首个实现
+
+### 里程碑 17：`webapp.py` 运行时工具首轮拆分（起步）
+
+- [x] 新增 `web_runtime_utils.py`，承接风控节流判定、冷却时间计算、待补传目录分组等纯工具逻辑
+- [x] `webapp.py` 改为引用独立运行时工具模块，避免继续把非路由逻辑堆在主入口里
+- [x] 原有回归测试已改为直接覆盖新模块，接口语义保持不变
+- [x] 相关回归通过：`python -m compileall src tests`、`node --check src/cloudpan_bridge/web/assets/app.js`、`pytest -q tests/test_sync_logic.py -k "pending_selected_execution_groups_run_deepest_directories_first or source_provider_helpers_fall_back_to_legacy_methods or rate_limit_cooldown"`、`pytest -q tests/test_sync_logic.py -x`
 
 ## 摘要
 

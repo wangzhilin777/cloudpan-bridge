@@ -42,7 +42,7 @@ from cloudpan_bridge.syncer import (
     summarize_source_entries,
 )
 from cloudpan_bridge.target_adapter import AzureBlobTargetAdapter, FtpTargetAdapter, GuangyaTargetAdapter, LocalFsTargetAdapter, OpenListTargetAdapter, S3TargetAdapter, SeafileTargetAdapter, SftpTargetAdapter, SmbTargetAdapter, WebDavTargetAdapter, target_delete_if_enabled, target_upload_stream
-from cloudpan_bridge.webapp import (
+from cloudpan_bridge.web_runtime_utils import (
     build_pending_selected_execution_groups,
     compute_rate_limit_cooldown_ms,
     is_rate_limit_error_message,
