@@ -75,9 +75,14 @@ def serialize_source_entry(entry: SourceEntry) -> dict[str, object]:
         "hashType": entry.hash_type,
         "gcid": entry.gcid,
         "sha1": entry.sha1,
+        "sha256": entry.sha256,
         "crc64": entry.crc64,
+        "preHash": entry.pre_hash,
+        "sliceMd5": entry.slice_md5,
         "pickcode": entry.pickcode,
+        "contentHash": entry.content_hash,
         "extraHashes": dict(entry.extra_hashes or {}),
+        "providerSpecific": dict(entry.provider_specific or {}),
         "rawHashInfo": dict(entry.raw_hash_info or {}),
     }
 
@@ -88,6 +93,10 @@ def summarize_source_entries(entries: list[SourceEntry]) -> dict[str, object]:
     gcid_ready = 0
     md5_ready = 0
     sha1_ready = 0
+    sha256_ready = 0
+    pre_hash_ready = 0
+    slice_md5_ready = 0
+    content_hash_ready = 0
     missing_md5 = 0
     missing_fast_upload = 0
     fast_upload_ready = 0
@@ -104,6 +113,14 @@ def summarize_source_entries(entries: list[SourceEntry]) -> dict[str, object]:
             missing_md5 += 1
         if entry.sha1:
             sha1_ready += 1
+        if entry.sha256:
+            sha256_ready += 1
+        if entry.pre_hash:
+            pre_hash_ready += 1
+        if entry.slice_md5:
+            slice_md5_ready += 1
+        if entry.content_hash:
+            content_hash_ready += 1
         if entry.has_fast_upload_fingerprint:
             fast_upload_ready += 1
         else:
@@ -116,6 +133,10 @@ def summarize_source_entries(entries: list[SourceEntry]) -> dict[str, object]:
         "md5_ready": md5_ready,
         "gcid_ready": gcid_ready,
         "sha1_ready": sha1_ready,
+        "sha256_ready": sha256_ready,
+        "pre_hash_ready": pre_hash_ready,
+        "slice_md5_ready": slice_md5_ready,
+        "content_hash_ready": content_hash_ready,
         "fast_upload_ready": fast_upload_ready,
         "missing_md5": missing_md5,
         "missing_fast_upload": missing_fast_upload,
@@ -145,12 +166,22 @@ def build_source_miaochuan_payload(
             record["gcid"] = entry.gcid
         if entry.sha1:
             record["sha1"] = entry.sha1
+        if entry.sha256:
+            record["sha256"] = entry.sha256
         if entry.crc64:
             record["crc64"] = entry.crc64
+        if entry.pre_hash:
+            record["preHash"] = entry.pre_hash
+        if entry.slice_md5:
+            record["sliceMd5"] = entry.slice_md5
         if entry.pickcode:
             record["pickcode"] = entry.pickcode
+        if entry.content_hash:
+            record["contentHash"] = entry.content_hash
         if entry.extra_hashes:
             record["extraHashes"] = dict(entry.extra_hashes)
+        if entry.provider_specific:
+            record["providerSpecific"] = dict(entry.provider_specific)
         if entry.md5 or entry.gcid:
             files.append(record)
         else:
@@ -432,6 +463,16 @@ class SyncRunner:
                     provider=pending.provider,
                     hash_type=pending.hash_type,
                     gcid=pending.gcid,
+                    etag=pending.etag,
+                    sha1=pending.sha1,
+                    sha256=pending.sha256,
+                    crc64=pending.crc64,
+                    pre_hash=pending.pre_hash,
+                    slice_md5=pending.slice_md5,
+                    pickcode=pending.pickcode,
+                    content_hash=pending.content_hash,
+                    extra_hashes=dict(pending.extra_hashes or {}),
+                    provider_specific=dict(pending.provider_specific or {}),
                 )
                 item = SyncPlanItem(source=entry, action="update", reason="手动补传")
                 try:
@@ -531,9 +572,14 @@ class SyncRunner:
             gcid=entry.gcid,
             etag=entry.etag,
             sha1=entry.sha1,
+            sha256=entry.sha256,
             crc64=entry.crc64,
+            pre_hash=entry.pre_hash,
+            slice_md5=entry.slice_md5,
             pickcode=entry.pickcode,
             extra_hashes=dict(entry.extra_hashes or {}),
+            content_hash=entry.content_hash,
+            provider_specific=dict(entry.provider_specific or {}),
         )
         state.pending_files.pop(entry.path, None)
 
@@ -554,6 +600,16 @@ class SyncRunner:
             provider=item.source.provider,
             hash_type=item.source.hash_type,
             gcid=item.source.gcid,
+            etag=item.source.etag,
+            sha1=item.source.sha1,
+            sha256=item.source.sha256,
+            crc64=item.source.crc64,
+            pre_hash=item.source.pre_hash,
+            slice_md5=item.source.slice_md5,
+            pickcode=item.source.pickcode,
+            extra_hashes=dict(item.source.extra_hashes or {}),
+            content_hash=item.source.content_hash,
+            provider_specific=dict(item.source.provider_specific or {}),
         )
 
     @staticmethod

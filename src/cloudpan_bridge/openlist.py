@@ -236,9 +236,14 @@ class OpenListClient:
                         gcid=hash_fields["gcid"],
                         etag=hash_fields["etag"],
                         sha1=hash_fields["sha1"],
+                        sha256=hash_fields["sha256"],
                         crc64=hash_fields["crc64"],
+                        pre_hash=hash_fields["pre_hash"],
+                        slice_md5=hash_fields["slice_md5"],
                         pickcode=hash_fields["pickcode"],
+                        content_hash=hash_fields["content_hash"],
                         extra_hashes=dict(hash_fields["extra_hashes"] or {}),
+                        provider_specific=dict(hash_fields["provider_specific"] or {}),
                         raw_hash_info=dict(hash_fields["raw_hash_info"] or {}),
                     )
                 )
@@ -439,9 +444,14 @@ class OpenListClient:
         gcid = ""
         etag = ""
         sha1 = ""
+        sha256 = ""
         crc64 = ""
+        pre_hash = ""
+        slice_md5 = ""
         pickcode = ""
+        content_hash = ""
         extra_hashes: dict[str, str] = {}
+        provider_specific: dict[str, str] = {}
         raw_hash_info: dict[str, Any] = {}
         hash_info = item.get("hash_info") or {}
         if isinstance(hash_info, dict):
@@ -456,10 +466,18 @@ class OpenListClient:
                     etag = str(value).upper()
                 elif key_lower == "sha1" and value:
                     sha1 = str(value).upper()
+                elif key_lower == "sha256" and value:
+                    sha256 = str(value).upper()
                 elif key_lower == "crc64" and value:
                     crc64 = str(value).upper()
+                elif key_lower in {"pre_hash", "prehash"} and value:
+                    pre_hash = str(value).upper()
+                elif key_lower in {"slice_md5", "slicemd5"} and value:
+                    slice_md5 = str(value).upper()
                 elif key_lower == "pickcode" and value:
                     pickcode = str(value)
+                elif key_lower in {"content_hash", "contenthash"} and value:
+                    content_hash = str(value).upper()
                 elif value not in ("", None):
                     extra_hashes[key_lower] = str(value)
         hash_info_str = str(item.get("hashinfo") or "").strip()
@@ -478,10 +496,18 @@ class OpenListClient:
                             etag = str(value).upper()
                         elif key_lower == "sha1" and value and not sha1:
                             sha1 = str(value).upper()
+                        elif key_lower == "sha256" and value and not sha256:
+                            sha256 = str(value).upper()
                         elif key_lower == "crc64" and value and not crc64:
                             crc64 = str(value).upper()
+                        elif key_lower in {"pre_hash", "prehash"} and value and not pre_hash:
+                            pre_hash = str(value).upper()
+                        elif key_lower in {"slice_md5", "slicemd5"} and value and not slice_md5:
+                            slice_md5 = str(value).upper()
                         elif key_lower == "pickcode" and value and not pickcode:
                             pickcode = str(value)
+                        elif key_lower in {"content_hash", "contenthash"} and value and not content_hash:
+                            content_hash = str(value).upper()
                         elif value not in ("", None):
                             extra_hashes.setdefault(key_lower, str(value))
             except json.JSONDecodeError:
@@ -506,30 +532,54 @@ class OpenListClient:
             value = item.get("sha1")
             if value:
                 sha1 = str(value).upper()
+        if not sha256:
+            value = item.get("sha256")
+            if value:
+                sha256 = str(value).upper()
         if not crc64:
             value = item.get("crc64")
             if value:
                 crc64 = str(value).upper()
+        if not pre_hash:
+            value = item.get("pre_hash") or item.get("prehash")
+            if value:
+                pre_hash = str(value).upper()
+        if not slice_md5:
+            value = item.get("slice_md5") or item.get("slicemd5")
+            if value:
+                slice_md5 = str(value).upper()
         if not pickcode:
             value = item.get("pickcode")
             if value:
                 pickcode = str(value)
+        if not content_hash:
+            value = item.get("content_hash") or item.get("contenthash")
+            if value:
+                content_hash = str(value).upper()
+        for key in ("sha256", "pre_hash", "slice_md5", "content_hash", "prehash", "slicemd5", "contenthash"):
+            if key in item and item.get(key) not in ("", None):
+                provider_specific[key] = str(item.get(key))
         hash_type = "md5" if md5_hex else "gcid" if gcid else "sha1" if sha1 else "none"
         if md5_hex and not etag:
             etag = md5_hex
         extra_hashes = {
             key: value
             for key, value in extra_hashes.items()
-            if key not in {"md5", "gcid", "etag", "sha1", "crc64", "pickcode"}
+            if key not in {"md5", "gcid", "etag", "sha1", "sha256", "crc64", "pickcode", "pre_hash", "prehash", "slice_md5", "slicemd5", "content_hash", "contenthash"}
         }
         return {
             "md5": md5_hex,
             "gcid": gcid,
             "etag": etag,
             "sha1": sha1,
+            "sha256": sha256,
             "crc64": crc64,
+            "pre_hash": pre_hash,
+            "slice_md5": slice_md5,
             "pickcode": pickcode,
+            "content_hash": content_hash,
             "extra_hashes": extra_hashes,
+            "provider_specific": provider_specific,
             "raw_hash_info": raw_hash_info,
             "hash_type": hash_type,
         }

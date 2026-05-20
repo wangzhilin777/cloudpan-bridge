@@ -20,6 +20,11 @@ def normalize_posix_path(value: str) -> str:
     return "/" + "/".join(parts)
 
 
+def normalize_fingerprint_value(value: Any, *, uppercase: bool = True) -> str:
+    text = str(value or "").strip()
+    return text.upper() if uppercase else text
+
+
 @dataclass(slots=True)
 class SourceEntry:
     path: str
@@ -32,19 +37,31 @@ class SourceEntry:
     gcid: str = ""
     etag: str = ""
     sha1: str = ""
+    sha256: str = ""
     crc64: str = ""
+    pre_hash: str = ""
+    slice_md5: str = ""
     pickcode: str = ""
+    content_hash: str = ""
     extra_hashes: dict[str, str] = field(default_factory=dict)
+    provider_specific: dict[str, str] = field(default_factory=dict)
     raw_hash_info: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.path = normalize_posix_path(self.path)
-        self.md5 = self.md5.upper()
-        self.etag = self.etag.upper()
-        self.sha1 = self.sha1.upper()
-        self.crc64 = self.crc64.upper()
-        self.gcid = self.gcid.upper()
+        self.md5 = normalize_fingerprint_value(self.md5)
+        self.etag = normalize_fingerprint_value(self.etag)
+        self.sha1 = normalize_fingerprint_value(self.sha1)
+        self.sha256 = normalize_fingerprint_value(self.sha256)
+        self.crc64 = normalize_fingerprint_value(self.crc64)
+        self.gcid = normalize_fingerprint_value(self.gcid)
+        self.pre_hash = normalize_fingerprint_value(self.pre_hash)
+        self.slice_md5 = normalize_fingerprint_value(self.slice_md5)
+        self.content_hash = normalize_fingerprint_value(self.content_hash)
+        self.pickcode = normalize_fingerprint_value(self.pickcode, uppercase=False)
         self.size = int(self.size)
+        self.extra_hashes = {str(key): normalize_fingerprint_value(value, uppercase=False) for key, value in dict(self.extra_hashes or {}).items() if str(value or "").strip()}
+        self.provider_specific = {str(key): normalize_fingerprint_value(value, uppercase=False) for key, value in dict(self.provider_specific or {}).items() if str(value or "").strip()}
 
     @property
     def parent_path(self) -> str:
@@ -69,6 +86,22 @@ class SourceEntry:
     def has_fast_upload_fingerprint(self) -> bool:
         return bool(self.md5 or self.gcid)
 
+    def to_fingerprint_dict(self) -> dict[str, Any]:
+        return {
+            "size": self.size,
+            "md5": self.md5,
+            "sha1": self.sha1,
+            "sha256": self.sha256,
+            "gcid": self.gcid,
+            "etag": self.etag,
+            "crc64": self.crc64,
+            "pre_hash": self.pre_hash,
+            "slice_md5": self.slice_md5,
+            "pickcode": self.pickcode,
+            "content_hash": self.content_hash,
+            "provider_specific": dict(self.provider_specific or {}),
+        }
+
 
 @dataclass(slots=True)
 class DirectImportResult:
@@ -92,9 +125,14 @@ class SyncFileState:
     gcid: str = ""
     etag: str = ""
     sha1: str = ""
+    sha256: str = ""
     crc64: str = ""
+    pre_hash: str = ""
+    slice_md5: str = ""
     pickcode: str = ""
     extra_hashes: dict[str, str] = field(default_factory=dict)
+    content_hash: str = ""
+    provider_specific: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -117,9 +155,14 @@ class PendingFileState:
     gcid: str = ""
     etag: str = ""
     sha1: str = ""
+    sha256: str = ""
     crc64: str = ""
+    pre_hash: str = ""
+    slice_md5: str = ""
     pickcode: str = ""
     extra_hashes: dict[str, str] = field(default_factory=dict)
+    content_hash: str = ""
+    provider_specific: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

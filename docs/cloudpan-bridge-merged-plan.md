@@ -74,6 +74,14 @@
 - [x] 新增 Source Provider 基础测试，验证 provider key / auth state / factory / SyncRunner 注入链路
 - [x] 相关回归通过：`python -m compileall src tests`、`pytest -q tests/test_sync_logic.py -x`
 
+### 里程碑 9：统一文件指纹模型第一层落地（起步）
+
+- [x] `SourceEntry / SyncFileState / PendingFileState` 扩充为统一指纹字段集合：`sha256 / pre_hash / slice_md5 / content_hash / provider_specific`
+- [x] `OpenListClient._extract_hash_fields()` 已统一提取扩展指纹字段，并将底层特有值归入 `provider_specific`
+- [x] 源分析序列化、秒传 JSON 预览、状态持久化、待补传恢复链路已统一携带扩展指纹字段
+- [x] 源摘要统计已补充 `sha256 / pre_hash / slice_md5 / content_hash` 覆盖率
+- [x] 相关回归通过：`python -m compileall src tests`、`pytest -q tests/test_sync_logic.py -x`
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

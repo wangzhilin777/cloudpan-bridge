@@ -3129,6 +3129,26 @@ def test_openlist_extract_hash_fields_allows_non_fast_upload_fingerprint_only() 
     assert result["hash_type"] == "sha1"
 
 
+def test_openlist_extract_hash_fields_supports_extended_fingerprint_fields() -> None:
+    result = OpenListClient._extract_hash_fields(
+        {
+            "name": "demo.bin",
+            "hash_info": {
+                "sha256": "E" * 64,
+                "pre_hash": "F" * 32,
+                "slice_md5": "1" * 32,
+                "content_hash": "2" * 64,
+            },
+            "contenthash": "3" * 64,
+        }
+    )
+    assert result["sha256"] == "E" * 64
+    assert result["pre_hash"] == "F" * 32
+    assert result["slice_md5"] == "1" * 32
+    assert result["content_hash"] == "2" * 64
+    assert result["provider_specific"]["contenthash"] == "3333333333333333333333333333333333333333333333333333333333333333"
+
+
 def test_build_driver_prefill_values_matches_common_tokens() -> None:
     fields = [
         OpenListDriverField(name="cookie"),
@@ -5235,15 +5255,23 @@ def test_miaochuan_diagnose_accepts_grouped_payload(tmp_path: Path) -> None:
 def test_serialize_and_summarize_source_entries() -> None:
     entries = [
         SourceEntry(path="/a.bin", md5="abc", size=10, provider="openlist", hash_type="md5"),
-        SourceEntry(path="/b.bin", md5="", size=20, provider="Thunder", hash_type="gcid", gcid="C" * 40),
-        SourceEntry(path="/c.bin", md5="", size=30, provider="Quark", hash_type="sha1", sha1="D" * 40, pickcode="pc-3"),
+        SourceEntry(path="/b.bin", md5="", size=20, provider="Thunder", hash_type="gcid", gcid="C" * 40, sha256="E" * 64, pre_hash="F" * 32),
+        SourceEntry(path="/c.bin", md5="", size=30, provider="Quark", hash_type="sha1", sha1="D" * 40, slice_md5="1" * 32, pickcode="pc-3", content_hash="2" * 64),
     ]
     assert serialize_source_entry(entries[1])["gcid"] == "C" * 40
     assert serialize_source_entry(entries[2])["sha1"] == "D" * 40
+    assert serialize_source_entry(entries[1])["sha256"] == "E" * 64
+    assert serialize_source_entry(entries[1])["preHash"] == "F" * 32
+    assert serialize_source_entry(entries[2])["sliceMd5"] == "1" * 32
+    assert serialize_source_entry(entries[2])["contentHash"] == "2" * 64
     summary = summarize_source_entries(entries)
     assert summary["total"] == 3
     assert summary["gcid_ready"] == 1
     assert summary["sha1_ready"] == 1
+    assert summary["sha256_ready"] == 1
+    assert summary["pre_hash_ready"] == 1
+    assert summary["slice_md5_ready"] == 1
+    assert summary["content_hash_ready"] == 1
     assert summary["fast_upload_ready"] == 2
     assert summary["missing_md5"] == 2
     assert summary["missing_fast_upload"] == 1
@@ -5253,8 +5281,8 @@ def test_serialize_and_summarize_source_entries() -> None:
 def test_build_source_miaochuan_payload_uses_relative_paths() -> None:
     entries = [
         SourceEntry(path="/root/a.bin", md5="ABCDEF0123456789ABCDEF0123456789", size=10, provider="openlist", hash_type="md5"),
-        SourceEntry(path="/root/sub/b.bin", md5="", size=20, provider="Thunder", hash_type="gcid", gcid="E" * 40),
-        SourceEntry(path="/root/sub/c.bin", md5="", size=30, provider="Quark", hash_type="sha1", sha1="F" * 40, pickcode="pc-9"),
+        SourceEntry(path="/root/sub/b.bin", md5="", size=20, provider="Thunder", hash_type="gcid", gcid="E" * 40, sha256="1" * 64, pre_hash="2" * 32),
+        SourceEntry(path="/root/sub/c.bin", md5="", size=30, provider="Quark", hash_type="sha1", sha1="F" * 40, slice_md5="3" * 32, pickcode="pc-9", content_hash="4" * 64),
     ]
     payload = build_source_miaochuan_payload(entries, "/root")
     assert payload["totalFilesCount"] == 2
@@ -5262,7 +5290,45 @@ def test_build_source_miaochuan_payload_uses_relative_paths() -> None:
     assert payload["files"][1]["path"] == "/sub/b.bin"
     assert payload["files"][0]["etag"] == "abcdef0123456789abcdef0123456789"
     assert payload["files"][1]["gcid"] == "E" * 40
+    assert payload["files"][1]["sha256"] == "1" * 64
+    assert payload["files"][1]["preHash"] == "2" * 32
     assert payload["skipped"][0]["path"] == "/root/sub/c.bin"
+
+
+def test_sync_state_roundtrip_preserves_extended_fingerprint_fields() -> None:
+    state = SyncState(
+        files={
+            "/a.bin": SyncFileState(
+                path="/a.bin",
+                md5="ABC",
+                size=10,
+                sha1="D" * 40,
+                sha256="E" * 64,
+                pre_hash="F" * 32,
+                slice_md5="1" * 32,
+                content_hash="2" * 64,
+                provider_specific={"contenthash": "raw-content"},
+            )
+        },
+        pending_files={
+            "/b.bin": PendingFileState(
+                path="/b.bin",
+                md5="",
+                size=20,
+                gcid="C" * 40,
+                sha256="3" * 64,
+                provider_specific={"driver_token": "abc"},
+            )
+        },
+    )
+    restored = SyncState.from_dict(state.to_dict())
+    assert restored.files["/a.bin"].sha256 == "E" * 64
+    assert restored.files["/a.bin"].pre_hash == "F" * 32
+    assert restored.files["/a.bin"].slice_md5 == "1" * 32
+    assert restored.files["/a.bin"].content_hash == "2" * 64
+    assert restored.files["/a.bin"].provider_specific["contenthash"] == "raw-content"
+    assert restored.pending_files["/b.bin"].sha256 == "3" * 64
+    assert restored.pending_files["/b.bin"].provider_specific["driver_token"] == "abc"
 
 
 def test_app_config_roundtrip_supports_console_admin_credentials() -> None:
