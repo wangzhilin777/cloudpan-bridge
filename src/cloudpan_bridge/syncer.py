@@ -335,6 +335,17 @@ class SyncRunner:
                 f"capture_ready={enrich_runtime.get('capture_ready', False)} "
                 f"preferred_hashes={','.join(list(enrich_runtime.get('preferred_hashes') or [])) or '-'}"
             )
+            bridge_runtime = dict(enrich_runtime.get("bridge_runtime") or {})
+            bridge_preparation = dict(bridge_runtime.get("preparation") or {})
+            self.log(
+                "[源端桥接] "
+                f"status={bridge_runtime.get('status', '-')} "
+                f"next={bridge_runtime.get('next_action', '-')} "
+                f"hook_registered={bridge_runtime.get('hook_registered', False)} "
+                f"transport={bridge_preparation.get('transport_hint', '-')} "
+                f"fingerprints={','.join(list(bridge_preparation.get('fingerprint_expectation') or [])) or '-'} "
+                f"missing={','.join(list(bridge_runtime.get('missing_keys') or [])) or '-'}"
+            )
             entries = self._walk_source_tree(self.config.source_path)
             self.config.export_file.write_text(
                 "\n".join(

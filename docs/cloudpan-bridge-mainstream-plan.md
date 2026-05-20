@@ -8,6 +8,7 @@
 - [x] 把补指纹运行态与目标能力摘要接入 `/api/status` 和任务摘要区
 - [x] 拆出前端工作流摘要脚本 `app.workflow.js`，降低 `app.js` 耦合
 - [x] 建立首批主流源端的 `bridge_runtime` / hook 结构，明确缺失字段、桥接成熟度和下一步动作
+- [x] 建立 `source_bridge_registry.py`，把首批主流源端桥接入口收敛为统一 registry / preparation 结果
 - [ ] 深化首批主流源端的真实直连补指纹桥接实现
 - [ ] 继续拆分前端与过大的 Python/JS 文件，尽量压到单文件 100 KB 以内
 - [ ] 完成更多主流 provider 的互传能力验证与 UI 诚实提示收口

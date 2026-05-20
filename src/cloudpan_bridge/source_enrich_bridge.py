@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .source_bridge_registry import has_source_bridge, prepare_source_bridge
 from .source_enrich_rules import build_provider_rule
 
 
@@ -39,6 +40,8 @@ def build_bridge_runtime(provider_key: str, captured: dict[str, Any] | None = No
     implemented = bool(bridge.get("implemented"))
     ready = bool(matched) if groups else False
     mode = str(bridge.get("mode") or "")
+    preparation = prepare_source_bridge(provider_key, captured)
+    hook_registered = has_source_bridge(provider_key)
 
     if not mode:
         status = "bridge_not_declared"
@@ -60,6 +63,7 @@ def build_bridge_runtime(provider_key: str, captured: dict[str, Any] | None = No
         "provider_key": str(provider_key or "").strip().lower(),
         "mode": mode or "none",
         "implemented": implemented,
+        "hook_registered": hook_registered,
         "hook_name": hook_name,
         "required_groups": groups,
         "matched_groups": matched,
@@ -67,4 +71,5 @@ def build_bridge_runtime(provider_key: str, captured: dict[str, Any] | None = No
         "status": status,
         "next_action": next_action,
         "missing_keys": _flatten_missing_keys(groups, matched),
+        "preparation": preparation,
     }

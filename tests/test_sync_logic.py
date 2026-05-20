@@ -25,6 +25,7 @@ from cloudpan_bridge.provider_capture import (
     resolve_capture_spec_for_driver,
 )
 from cloudpan_bridge.source_adapter import OpenListSourceProvider, create_source_provider
+from cloudpan_bridge.source_bridge_registry import prepare_source_bridge
 from cloudpan_bridge.source_enrich_bridge import build_bridge_runtime
 from cloudpan_bridge.source_enrich import build_source_enrichment_runtime, enrich_entry
 from cloudpan_bridge.source_adapter import (
@@ -794,6 +795,8 @@ def test_build_source_runtime_status_exposes_provider_runtime_shape(tmp_path: Pa
     assert runtime["direct_provider_candidate"] is True
     assert runtime["source_enrichment"]["provider_key"] == "quark"
     assert runtime["source_enrichment"]["capture_ready"] is False
+    assert runtime["bridge_preparation"]["hook_registered"] is True
+    assert runtime["bridge_preparation"]["execution_state"] == "missing_capture"
 
 
 def test_source_provider_resolution_prefers_direct_candidate_but_falls_back_honestly(tmp_path: Path) -> None:
@@ -837,6 +840,8 @@ def test_source_provider_resolution_prefers_direct_candidate_but_falls_back_hone
     assert resolution["direct_provider_ready"] is True
     assert resolution["source_enrichment"]["provider_key"] == "quark"
     assert resolution["source_enrichment"]["capture_ready"] is True
+    assert resolution["bridge_preparation"]["transport_hint"] == "cookie_snapshot"
+    assert resolution["bridge_preparation"]["selected_field_names"] == ["cookie_header"]
     assert resolution["selected_source_mode"] == "direct_provider_bridge_pending"
     assert resolution["selected_provider_key"] == "quark"
     assert "回退 OpenList" in resolution["fallback_reason"]
@@ -999,6 +1004,15 @@ def test_bridge_runtime_accepts_refresh_token_for_onedrive() -> None:
     assert runtime["ready"] is True
     assert runtime["status"] == "bridge_ready_but_api_pending"
     assert runtime["matched_groups"] == [["refresh_token"]]
+
+
+def test_prepare_source_bridge_reports_transport_hint_for_quark() -> None:
+    prepared = prepare_source_bridge("quark", {"cookie_header": "sid=1; token=2"})
+    assert prepared["hook_registered"] is True
+    assert prepared["available"] is True
+    assert prepared["transport_hint"] == "cookie_snapshot"
+    assert prepared["selected_field_names"] == ["cookie_header"]
+    assert "md5" in prepared["fingerprint_expectation"]
 
 
 def test_transfer_planner_prefers_fast_upload_when_target_hash_matches() -> None:

@@ -86,6 +86,8 @@ def build_source_provider_resolution(
         and source_enrichment.get("supported")
         and source_enrichment.get("capture_ready")
     )
+    bridge_runtime = dict(source_enrichment.get("bridge_runtime") or {})
+    bridge_preparation = dict(bridge_runtime.get("preparation") or {})
     selected_source_mode = "openlist_mount"
     selected_provider_key = "openlist"
     fallback_reason = ""
@@ -114,6 +116,7 @@ def build_source_provider_resolution(
         "direct_provider_candidate": direct_candidate,
         "direct_provider_ready": direct_provider_ready,
         "source_enrichment": source_enrichment,
+        "bridge_preparation": bridge_preparation,
         "fallback_reason": fallback_reason,
         "selection_reason": selection_reason,
     }
