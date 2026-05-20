@@ -152,6 +152,14 @@
                 <select id="mounted_source_select"></select>
               </div>
               <div>
+                <label class="help-anchor" data-i18n="label.source_provider_preference" data-help-key="source_provider_preference">源端执行偏好</label>
+                <select id="source_provider_preference">
+                  <option value="auto" data-i18n="option.source_provider_preference.auto">自动</option>
+                  <option value="openlist_only" data-i18n="option.source_provider_preference.openlist_only">只走 OpenList</option>
+                  <option value="direct_preferred" data-i18n="option.source_provider_preference.direct_preferred">优先直连 Provider</option>
+                </select>
+              </div>
+              <div>
                 <label class="help-anchor" data-i18n="label.auto_download_threshold_mb" data-help-key="auto_download_threshold_mb">小文件自动补传阈值(MB，0=只记录)</label>
                 <input id="auto_download_threshold_mb" type="number" min="0">
               </div>

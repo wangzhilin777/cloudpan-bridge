@@ -192,6 +192,14 @@
 - [x] 相关回归覆盖了 preference round-trip 与 `direct_preferred` 的真实回退链路
 - [ ] 后续仍需把 `direct_provider_bridge_pending` 真正落成可执行的直连 source provider，而不是只停留在诚实分流与回退
 
+### 里程碑 24：任务区与执行上下文接入 Source Provider 选路
+
+- [x] `create_source_provider()` 已改为注入完整 source runtime status，不再只把 provider mapping 裸塞进 runtime context
+- [x] `SyncRunner` 日志已显式打印 `selected_source_mode / selected_provider_key / selection_reason / fallback_reason`
+- [x] 任务配置区已加入 `source_provider_preference`，并纳入配置持久化与任务摘要
+- [x] 总览/源端摘要/任务摘要都能直接看到当前源端选路结果，不再只能翻 `/api/status` JSON
+- [ ] 后续继续把这个选择结果真正作用到“直连 source provider 执行链路”，而不是当前先统一落回 OpenList provider
+
 ## 摘要
 
 把现有 `cloudpan-bridge-next-stage-plan.md` 的“控制台重构 / OpenList 模式拆分 / 托管闭环 / 多目标端框架”与新的“已支持连接或可手动补到 OpenList 的网盘，统一互传且秒传优先”要求合并为一份总计划。

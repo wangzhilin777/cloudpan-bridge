@@ -133,6 +133,8 @@ def build_source_runtime_status(
         **resolution,
         "provider_class": "OpenListSourceProvider",
         "provider_factory": "create_source_provider",
+        "execution_provider_class": "OpenListSourceProvider",
+        "execution_provider_factory": "create_source_provider",
         "auth_state": {
             "base_url": str(config.openlist_url or ""),
             "username": str(config.openlist_username or ""),
@@ -276,7 +278,7 @@ def create_source_provider(
     on_progress: Any | None = None,
 ) -> SourceProvider:
     _ = state
-    runtime_context = build_source_provider_context(config)
+    runtime_context = build_source_runtime_status(config)
     return OpenListSourceProvider(
         base_url=config.openlist_url,
         token=config.openlist_token,

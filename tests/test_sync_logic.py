@@ -780,6 +780,8 @@ def test_build_source_runtime_status_exposes_provider_runtime_shape(tmp_path: Pa
     runtime = build_source_runtime_status(AppConfig.load(path))
     assert runtime["provider_class"] == "OpenListSourceProvider"
     assert runtime["provider_factory"] == "create_source_provider"
+    assert runtime["execution_provider_class"] == "OpenListSourceProvider"
+    assert runtime["execution_provider_factory"] == "create_source_provider"
     assert runtime["provider_key"] == "quark"
     assert runtime["requested_provider_preference"] == "auto"
     assert runtime["selected_source_mode"] == "openlist_mount"
@@ -831,6 +833,48 @@ def test_source_provider_resolution_prefers_direct_candidate_but_falls_back_hone
     assert resolution["selected_source_mode"] == "direct_provider_bridge_pending"
     assert resolution["selected_provider_key"] == "quark"
     assert "回退 OpenList" in resolution["fallback_reason"]
+
+
+def test_create_source_provider_runtime_context_includes_resolution(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sync": {
+                    "source_path": "/alist/quark/demo",
+                    "target_path": "/dst",
+                },
+                "openlist": {
+                    "url": "http://127.0.0.1:5244",
+                    "token": "token-1",
+                    "username": "admin",
+                },
+                "source_session": {
+                    "provider_preference": "direct_preferred",
+                    "mount_provider_mapping": {
+                        "/alist/quark": "quark",
+                    },
+                    "provider_captures": {
+                        "quark": {
+                            "status": "captured",
+                            "captured": {
+                                "cookie_header": "sid=1; token=2",
+                            },
+                        }
+                    },
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    provider = create_source_provider(AppConfig.load(path))
+    runtime = provider.get_runtime_context()
+    assert runtime["selected_source_mode"] == "direct_provider_bridge_pending"
+    assert runtime["selected_provider_key"] == "quark"
+    assert runtime["execution_provider_class"] == "OpenListSourceProvider"
+    assert "回退 OpenList" in runtime["fallback_reason"]
+    provider.close()
 
 
 def test_sync_runner_uses_source_provider_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

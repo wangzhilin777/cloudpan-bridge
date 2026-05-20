@@ -3,7 +3,7 @@
       "managed_openlist_port", "managed_openlist_docker_image", "managed_openlist_docker_container_name",
       "openlist_url", "openlist_token", "openlist_username", "openlist_password",
       "managed_openlist_init_username", "managed_openlist_init_password",
-      "target_key", "guangya_phone", "guangya_authorization", "guangya_access_token", "guangya_refresh_token",
+      "target_key", "source_provider_preference", "guangya_phone", "guangya_authorization", "guangya_access_token", "guangya_refresh_token",
       "guangya_device_id", "local_target_root", "webdav_target_url", "webdav_target_username", "webdav_target_password", "s3_target_endpoint", "s3_target_bucket", "s3_target_prefix", "s3_target_access_key", "s3_target_secret_key", "s3_target_region", "seafile_target_url", "seafile_target_token", "seafile_target_username", "seafile_target_password", "seafile_target_repo_id", "seafile_target_repo_name", "azureblob_target_account_url", "azureblob_target_container", "azureblob_target_prefix", "azureblob_target_account_name", "azureblob_target_account_key", "smb_target_url", "smb_target_username", "smb_target_password", "ftp_target_url", "ftp_target_username", "ftp_target_password", "sftp_target_url", "sftp_target_username", "sftp_target_password", "delete_removed", "target_delete_removed", "openlist_page_size", "openlist_request_interval_ms", "queue_interval_ms",
       "auto_download_threshold_mb", "rate_limit_mode", "log_file", "temp_dir", "state_file",
       "app_admin_username", "app_admin_password"
@@ -24,6 +24,7 @@
       managed_openlist_init_username: ["openlist", "managed_init_admin", "username"],
       managed_openlist_init_password: ["openlist", "managed_init_admin", "password"],
       target_key: ["targets", "active_target"],
+      source_provider_preference: ["source_session", "provider_preference"],
       guangya_phone: ["targets", "guangya", "phone"],
       guangya_authorization: ["targets", "guangya", "authorization"],
       guangya_access_token: ["targets", "guangya", "access_token"],
@@ -79,6 +80,7 @@
       managed_openlist_docker_container_name: "cloudpan-bridge-openlist",
       managed_openlist_init_username: "admin",
       target_key: "guangya",
+      source_provider_preference: "auto",
       delete_removed: false,
       target_delete_removed: false,
       rate_limit_mode: "safe",
@@ -2261,12 +2263,14 @@
       const queueSize = Array.isArray(syncState?.source_queue) ? syncState.source_queue.length : 0;
       const pendingSize = Array.isArray(syncState?.persistent_pending) ? syncState.persistent_pending.length : 0;
       const activeUrl = String(document.getElementById("effective_openlist_url")?.value || runtimeState?.active_url || configCache?.openlist_url || "-").trim() || "-";
+      const sourceRuntime = window.__cpbStatusCache?.source_runtime || {};
       root.innerHTML = `
         <div class="mono">OpenList Mode: ${escapeHtml(getOpenListModeLabel(mode))}</div>
         <div class="mono">OpenList URL: ${escapeHtml(activeUrl)}</div>
         <div class="mono">Source: ${escapeHtml(sourcePath)}</div>
         <div class="mono">Target: ${escapeHtml(targetKey)} -> ${escapeHtml(targetPath)}</div>
         <div class="mono">Source Mapping: mount=${escapeHtml(currentSourceContext.mount_path || "-")} | effective=${escapeHtml(currentSourceContext.effective_driver || "-")}</div>
+        <div class="mono">Source Route: pref=${escapeHtml(sourceRuntime.requested_provider_preference || "-")} | selected=${escapeHtml(sourceRuntime.selected_source_mode || "-")} | provider=${escapeHtml(sourceRuntime.selected_provider_key || "-")}</div>
         <div class="mono">Queue: ${queueSize} | Pending: ${pendingSize}</div>
       `;
     }
@@ -2282,12 +2286,16 @@
       const browsingPath = String(currentDirectoryPath || "/").trim() || "/";
       const selectedMount = String(document.getElementById("mounted_source_select")?.value || "").trim();
       const rateMode = String(document.getElementById("rate_limit_mode")?.value || configCache?.rate_limit_mode || "safe").trim() || "safe";
+      const sourceRuntime = window.__cpbStatusCache?.source_runtime || {};
       root.innerHTML = `
         <div class="mono">driver=${escapeHtml(context.driver || "-")} | mount=${escapeHtml(selectedMount || "-")} | rate=${escapeHtml(rateMode)}</div>
         <div class="mono">mounted_driver=${escapeHtml(context.mountedDriver || "-")} | override=${escapeHtml(context.overrideProfile || "-")}</div>
         <div class="mono">backend_effective=${escapeHtml(assessedContext.effective_driver || backendContext.effective_driver || "-")} | backend_override=${escapeHtml(assessedContext.source_profile_override || backendContext.source_profile_override || "-")}</div>
         <div class="mono">runtime_mount=${escapeHtml(runtimeContext.mount_path || "-")} | runtime_effective=${escapeHtml(runtimeContext.effective_driver || "-")}</div>
+        <div class="mono">route_pref=${escapeHtml(sourceRuntime.requested_provider_preference || "-")} | route_selected=${escapeHtml(sourceRuntime.selected_source_mode || "-")} | route_provider=${escapeHtml(sourceRuntime.selected_provider_key || "-")}</div>
         <div class="mono">source_path=${escapeHtml(sourcePath)} | browsing=${escapeHtml(browsingPath)}</div>
+        ${sourceRuntime.selection_reason ? `<div>${escapeHtml(sourceRuntime.selection_reason)}</div>` : ""}
+        ${sourceRuntime.fallback_reason ? `<div>${escapeHtml(sourceRuntime.fallback_reason)}</div>` : ""}
       `;
     }
 
@@ -2300,15 +2308,20 @@
       const autoThreshold = String(document.getElementById("auto_download_threshold_mb")?.value || configCache?.auto_download_threshold_mb || "0").trim() || "0";
       const deleteRemoved = Boolean(document.getElementById("delete_removed")?.checked);
       const deleteRealTarget = Boolean(document.getElementById("target_delete_removed")?.checked);
+      const sourcePreference = String(document.getElementById("source_provider_preference")?.value || configCache?.source_provider_preference || "auto").trim() || "auto";
       const recommendedMode = String(capabilityAssessmentCache?.strategy?.recommendedMode || "-");
       const assessedLevel = capabilityLevelText(capabilityAssessmentCache?.assessedLevel || capabilityAssessmentCache?.level || "unsupported");
       const rationale = capabilityAssessmentCache?.rationale
         ? translateDriverText(capabilityAssessmentCache.rationale.zh || "", capabilityAssessmentCache.rationale.en || "")
         : "";
+      const sourceRuntime = window.__cpbStatusCache?.source_runtime || {};
       root.innerHTML = `
         <div class="mono">source=${escapeHtml(sourcePath)} -> target=${escapeHtml(targetKey)}:${escapeHtml(targetPath)}</div>
         <div class="mono">recommended=${escapeHtml(recommendedMode)} | level=${escapeHtml(assessedLevel)} | auto_small_mb=${escapeHtml(autoThreshold)}</div>
+        <div class="mono">source_route_pref=${escapeHtml(sourcePreference)} | selected=${escapeHtml(sourceRuntime.selected_source_mode || "-")} | provider=${escapeHtml(sourceRuntime.selected_provider_key || "-")}</div>
         <div class="mono">delete_state=${deleteRemoved ? "on" : "off"} | delete_target=${deleteRealTarget ? "on" : "off"}</div>
+        ${sourceRuntime.selection_reason ? `<div>${escapeHtml(sourceRuntime.selection_reason)}</div>` : ""}
+        ${sourceRuntime.fallback_reason ? `<div>${escapeHtml(sourceRuntime.fallback_reason)}</div>` : ""}
         ${rationale ? `<div>${escapeHtml(rationale)}</div>` : ""}
       `;
     }
@@ -2540,6 +2553,16 @@
       document.getElementById("rate_limit_mode").addEventListener("change", () => {
         const selected = document.getElementById("mounted_source_select").value || document.getElementById("source_path").value || "/";
         applyRatePresetForMount(selected);
+      });
+      ["source_path", "target_path", "auto_download_threshold_mb", "source_provider_preference"].forEach((fieldId) => {
+        document.getElementById(fieldId)?.addEventListener("change", () => {
+          renderWorkflowSummaries(window.__cpbStatusCache?.sync || {}, window.__cpbStatusCache?.openlist_runtime || {});
+        });
+      });
+      ["delete_removed", "target_delete_removed"].forEach((fieldId) => {
+        document.getElementById(fieldId)?.addEventListener("change", () => {
+          renderTaskModeSummary();
+        });
       });
       document.getElementById("openlist_mode").addEventListener("change", async (event) => {
         const nextMode = normalizeOpenListMode(event.target.value || "external_local");

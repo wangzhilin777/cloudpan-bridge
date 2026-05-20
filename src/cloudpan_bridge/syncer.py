@@ -311,8 +311,16 @@ class SyncRunner:
                     "[源端 Provider] "
                     f"provider_key={self.source_context.get('provider_key', '-')} "
                     f"source_mode={self.source_context.get('source_mode', '-')} "
+                    f"selected_mode={self.source_context.get('selected_source_mode', '-')} "
+                    f"selected_provider={self.source_context.get('selected_provider_key', '-')} "
                     f"effective_driver={self.source_context.get('effective_driver', '-')}"
                 )
+                fallback_reason = str(self.source_context.get("fallback_reason") or "").strip()
+                selection_reason = str(self.source_context.get("selection_reason") or "").strip()
+                if selection_reason:
+                    self.log(f"[源端选路] {selection_reason}")
+                if fallback_reason:
+                    self.log(f"[源端回退] {fallback_reason}")
             entries = self._walk_source_tree(self.config.source_path)
             self.config.export_file.write_text(
                 "\n".join(
