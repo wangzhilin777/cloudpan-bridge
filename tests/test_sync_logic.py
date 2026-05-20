@@ -1144,6 +1144,36 @@ def test_execute_source_bridge_marks_api_bridge_placeholder_for_onedrive(tmp_pat
     assert report["fast_upload_ready_after_bridge"] is False
 
 
+def test_execute_source_bridge_skips_api_pending_reason_when_fast_hash_already_present(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_session": {
+                    "provider_captures": {
+                        "thunder": {
+                            "status": "captured",
+                            "captured": {
+                                "authorization": "Bearer demo",
+                                "device_id": "dev-1",
+                            },
+                        }
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    entry = SourceEntry(path="/src/a.bin", md5="", size=10, provider="Thunder", raw_hash_info={"file_gcid": "GCID-123"})
+    runtime = build_source_enrichment_runtime(AppConfig.load(path), "thunder")
+    enriched, report = execute_source_bridge(entry, runtime)
+    assert enriched.gcid == "GCID-123"
+    assert report["candidate_hashes"] == ["gcid"]
+    assert report["pending_reason"] == ""
+    assert report["fast_upload_ready_after_bridge"] is True
+
+
 def test_execute_source_bridge_marks_non_fast_candidates_for_quark(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text(

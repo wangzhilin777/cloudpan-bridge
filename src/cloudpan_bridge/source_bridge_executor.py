@@ -214,7 +214,10 @@ def _normalize_session_snapshot(entry: SourceEntry, runtime: dict[str, Any], *, 
 def _normalize_api_placeholder(entry: SourceEntry, runtime: dict[str, Any], *, executor_name: str) -> tuple[SourceEntry, dict[str, Any]]:
     aliases_map = dict(runtime.get("hash_aliases") or {})
     merged = _merge_entry_from_aliases(entry, aliases_map)
-    pending_reason = "provider_api_bridge_not_executed_yet"
+    candidate_hashes = _candidate_hashes(merged)
+    pending_reason = ""
+    if not (merged.md5 or merged.gcid):
+        pending_reason = "provider_api_bridge_not_executed_yet"
     report = _build_report(
         entry,
         merged,

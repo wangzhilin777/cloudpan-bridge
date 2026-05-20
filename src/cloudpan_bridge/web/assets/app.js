@@ -106,8 +106,11 @@
     };
     const { I18N, HELP_TEXT, DRIVER_FIELD_I18N, DRIVER_HELP_PATTERNS, DRIVER_OPTIONS_I18N, PROVIDER_DRIVER_HINTS } = window.CloudPanBridgeData || {};
     const workflowView = window.CloudPanBridgeWorkflow || {};
+    const capabilityView = window.CloudPanBridgeCapabilityView || {};
     const driverCaptureView = window.CloudPanBridgeDriverCapture || {};
     const pendingView = window.CloudPanBridgePendingUi || {};
+    const registryView = window.CloudPanBridgeRegistryView || {};
+    const statusView = window.CloudPanBridgeStatusView || {};
     let configCache = {};
     let providerRegistryPayload = null;
     let driverGuideRegistry = {};
@@ -206,6 +209,28 @@
       };
     }
 
+    function registryViewContext() {
+      return {
+        currentLang,
+        escapeHtml,
+        capabilityLevelText,
+        coverageNextActionText,
+        currentCoverageFilters,
+        getProviderRegistryPayload: () => providerRegistryPayload,
+        getCoverageAuditCache: () => coverageAuditCache,
+      };
+    }
+
+    function statusViewContext() {
+      return {
+        escapeHtml,
+        getConfigCache: () => configCache,
+        getCurrentDirectoryPath: () => currentDirectoryPath,
+        normalizeOpenListMode,
+        getOpenListModeLabel,
+      };
+    }
+
     const getDriverGuide = (driver) => driverCaptureView.getDriverGuide(driverCaptureContext(), driver);
     const getGuideForProviderDefinition = (definition) => driverCaptureView.getGuideForProviderDefinition(driverCaptureContext(), definition);
     const guideDocCandidates = (guide) => driverCaptureView.guideDocCandidates(driverCaptureContext(), guide);
@@ -221,6 +246,9 @@
     const applyCapturedProviderFields = () => driverCaptureView.applyCapturedProviderFields(driverCaptureContext());
     const applyRatePresetForMount = (mountPath) => driverCaptureView.applyRatePresetForMount(driverCaptureContext(), mountPath);
     const renderPendingTree = (items) => pendingView.renderPendingTree(pendingUiContext(), items);
+    const renderAboutRegistry = () => registryView.renderAboutRegistry(registryViewContext());
+    const renderLogs = (records) => statusView.renderLogs(statusViewContext(), records);
+    const renderOverviewRouteSummary = (syncState = {}, runtimeState = {}) => statusView.renderOverviewRouteSummary(statusViewContext(), syncState, runtimeState);
     let authState = { enabled: false, authenticated: true, username: "" };
     let appBootstrapped = false;
     let autoRefreshTimer = null;
@@ -892,104 +920,19 @@
       return currentLang() === "en" ? text.en : currentLang() === "mix" ? `${text.zh} / ${text.en}` : text.zh;
     }
 
-    function strategyModeText(mode) {
-      const mapping = {
-        analyze_first: {
-          zh: "先分析再决定",
-          en: "Analyze first",
-        },
-        direct_metadata_first: {
-          zh: "优先直接秒传/元数据导入",
-          en: "Direct metadata-first sync",
-        },
-        leaf_metadata_then_pending: {
-          zh: "最底层边扫边秒传，再进待补传树",
-          en: "Leaf sync first, pending tree next",
-        },
-        stream_relay_first: {
-          zh: "优先中转流传输",
-          en: "Relay streaming first",
-        },
-        pending_tree_first: {
-          zh: "优先待补传树分目录补传",
-          en: "Pending-tree-first reupload",
-        },
-        manual_verify_first: {
-          zh: "先人工核对能力与登录态",
-          en: "Manual verification first",
-        },
-      };
-      const text = mapping[String(mode || "").toLowerCase()] || mapping.analyze_first;
-      return currentLang() === "en" ? text.en : currentLang() === "mix" ? `${text.zh} / ${text.en}` : text.zh;
-    }
-
-    function coverageNextActionText(action) {
-      const mapping = {
-        add_profile_first: { zh: "先补 source profile", en: "Add source profile first" },
-        add_guide: { zh: "补接入流程说明", en: "Add setup guide" },
-        add_capture_spec: { zh: "补登录抓取定义", en: "Add capture spec" },
-        assess_target_capability: { zh: "补目标能力判断", en: "Assess target capability" },
-        covered: { zh: "当前已覆盖", en: "Already covered" },
-      };
-      const text = mapping[String(action || "").toLowerCase()] || mapping.add_profile_first;
-      return currentLang() === "en" ? text.en : currentLang() === "mix" ? `${text.zh} / ${text.en}` : text.zh;
-    }
-
-    function strategyQuickActions(mode, strategy) {
-      const actions = [];
-      const isGuangya = activeTargetKey() === "guangya";
-      const push = (key, labelZh, labelEn) => actions.push({
-        key,
-        label: currentLang() === "en" ? labelEn : currentLang() === "mix" ? `${labelZh} / ${labelEn}` : labelZh,
-      });
-      if (strategy?.shouldAnalyzeFirst) push("analyze", "先分析当前目录", "Analyze current directory");
-      if (mode === "direct_metadata_first") {
-        if (isGuangya) push("to-miaochuan", "去秒传页", "Open flash-upload tab");
-        else push("to-execute", "去执行页", "Open execution tab");
-        push("run-direct", "直接同步当前目录", "Run direct sync");
-      } else if (mode === "leaf_metadata_then_pending") {
-        push("run-leaf-direct", "最底层边扫边秒传", "Run leaf scan sync");
-        push("to-pending", "查看待补传树", "Open pending tree");
-      } else if (mode === "pending_tree_first") {
-        push("to-pending", "去补传页", "Open pending tab");
-        push("run-leaf-full", "最底层边扫边同步+补传", "Run leaf sync with fallback");
-      } else if (mode === "stream_relay_first") {
-        push("to-execute", "去执行页", "Open execution tab");
-        push("run-direct", "直接同步当前目录", "Run direct sync");
-      } else if (mode === "manual_verify_first") {
-        push("to-mounts", "去挂载与驱动说明", "Open mounts and guides");
-        push("to-about", "查看能力矩阵说明", "Open capability reference");
-      }
-      return actions;
-    }
-
-    function performCapabilityQuickAction(actionKey) {
-      const actions = {
-        analyze: () => {
-          activateTab("source");
-          document.getElementById("analyze-source")?.click();
-        },
-        "to-miaochuan": () => activateTab("miaochuan"),
-        "to-pending": () => activateTab("pending"),
-        "to-task": () => activateTab("task"),
-        "to-execute": () => activateTab("execute"),
-        "to-mounts": () => activateTab("mounts"),
-        "to-about": () => activateTab("about"),
-        "run-direct": () => {
-          activateTab("execute");
-          document.getElementById("run-direct")?.click();
-        },
-        "run-leaf-direct": () => {
-          activateTab("execute");
-          document.getElementById("run-leaf-direct")?.click();
-        },
-        "run-leaf-full": () => {
-          activateTab("execute");
-          document.getElementById("run-leaf-full")?.click();
-        },
-      };
-      actions[actionKey]?.();
-    }
+    const strategyModeText = (mode) => capabilityView.strategyModeText({
+      currentLang,
+    }, mode);
+    const coverageNextActionText = (action) => capabilityView.coverageNextActionText({
+      currentLang,
+    }, action);
+    const strategyQuickActions = (mode, strategy) => capabilityView.strategyQuickActions({
+      currentLang,
+      activeTargetKey,
+    }, mode, strategy);
+    const performCapabilityQuickAction = (actionKey) => capabilityView.performCapabilityQuickAction({
+      activateTab,
+    }, actionKey);
 
     function renderCapabilitySummary() {
       workflowView.renderCapabilitySummary?.({
@@ -997,233 +940,6 @@
         root: document.getElementById("capability-summary"),
         quickActionsRoot: document.getElementById("capability-quick-actions"),
       });
-    }
-
-    function renderAboutRegistry() {
-      const summaryRoot = document.getElementById("about-summary");
-      const sourceRoot = document.getElementById("about-source-profiles");
-      const targetRoot = document.getElementById("about-target-profiles");
-      const matrixRoot = document.getElementById("about-driver-matrix");
-      const coverageRoot = document.getElementById("about-coverage-audit");
-      const coverageBacklogRoot = document.getElementById("about-coverage-backlog");
-      const coverageActionStatsRoot = document.getElementById("about-coverage-action-stats");
-      const coveragePlanRoot = document.getElementById("about-coverage-plan");
-      if (!summaryRoot || !sourceRoot || !targetRoot || !matrixRoot || !coverageRoot || !coverageBacklogRoot || !coverageActionStatsRoot || !coveragePlanRoot) return;
-      const sourceProfiles = Object.values(providerRegistryPayload?.source_profiles || {});
-      const targetProfiles = Object.values(providerRegistryPayload?.target_profiles || {});
-      const driverMatrix = Object.values(providerRegistryPayload?.driver_matrix || {});
-      summaryRoot.innerHTML = `
-        <div><strong>CloudPan Bridge</strong></div>
-        <div class="mono">${currentLang() === "en" ? "Master plan" : currentLang() === "mix" ? "主计划 / Master plan" : "主计划"}: docs/cloudpan-bridge-master-plan.md</div>
-        <div class="mono">${currentLang() === "en" ? "Research plan" : currentLang() === "mix" ? "调研计划 / Research plan" : "调研计划"}: docs/cloudpan-bridge-research-plan.md</div>
-        <div class="mono">${currentLang() === "en" ? "Source profiles" : currentLang() === "mix" ? "源端 profiles / Source profiles" : "源端 profiles"}: ${sourceProfiles.length}</div>
-        <div class="mono">${currentLang() === "en" ? "Target profiles" : currentLang() === "mix" ? "目标端 profiles / Target profiles" : "目标端 profiles"}: ${targetProfiles.length}</div>
-        <div class="mono">${currentLang() === "en" ? "Driver matrix rows" : currentLang() === "mix" ? "矩阵条目 / Driver matrix rows" : "矩阵条目"}: ${driverMatrix.length}</div>
-      `;
-
-      if (!sourceProfiles.length) {
-        sourceRoot.textContent = currentLang() === "en" ? "No source profiles loaded." : currentLang() === "mix" ? "暂无源端 profiles / No source profiles loaded." : "暂无源端 profiles";
-      } else {
-        sourceRoot.innerHTML = sourceProfiles.map((item) => `
-          <div class="row-item">
-            <div>
-              <div>${escapeHtml(item.labelZh || item.label || item.key || "-")}</div>
-              <div class="mono">key=${escapeHtml(item.key || "-")} | ${currentLang() === "en" ? "rate" : currentLang() === "mix" ? "频率 / rate" : "频率"}=${escapeHtml(item.recommendedRateProfile || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "login mode" : currentLang() === "mix" ? "登录模式 / login mode" : "登录模式"}=${escapeHtml(item.loginMode || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "hashes" : currentLang() === "mix" ? "哈希 / hashes" : "哈希"}=${escapeHtml((item.likelyHashes || []).join(", ") || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "supported hash fields" : currentLang() === "mix" ? "支持哈希字段 / supported hash fields" : "支持哈希字段"}=${escapeHtml((item.hashFieldsSupported || []).join(", ") || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "fingerprint enrichment" : currentLang() === "mix" ? "补指纹能力 / fingerprint enrichment" : "补指纹能力"}=${item.supportsFingerprintEnrichment ? (currentLang() === "en" ? "declared" : currentLang() === "mix" ? "已声明 / declared" : "已声明") : (currentLang() === "en" ? "unknown" : currentLang() === "mix" ? "未知 / unknown" : "未知")}</div>
-              <div class="mono">${currentLang() === "en" ? "download links" : currentLang() === "mix" ? "下载链路 / download links" : "下载链路"}=${escapeHtml(item.downloadLinkSupported || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "aliases" : currentLang() === "mix" ? "驱动别名 / aliases" : "驱动别名"}=${escapeHtml((item.driverAliases || []).join(", ") || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "capture strategy" : currentLang() === "mix" ? "抓取策略 / capture strategy" : "抓取策略"}=${escapeHtml((currentLang() === "en" ? item.captureStrategyEn : currentLang() === "mix" ? `${item.captureStrategy || ""} / ${item.captureStrategyEn || ""}`.trim() : item.captureStrategy) || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "default mount values" : currentLang() === "mix" ? "默认挂载值 / default mount values" : "默认挂载值"}=${escapeHtml(JSON.stringify(item.defaultMountValues || {}))}</div>
-              <div class="mono">${currentLang() === "en" ? "doc links" : currentLang() === "mix" ? "文档链接 / doc links" : "文档链接"}=${escapeHtml((item.docLinks || []).join(", ") || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "risk notes" : currentLang() === "mix" ? "风险说明 / risk notes" : "风险说明"}=${escapeHtml((currentLang() === "en" ? item.riskNotes?.en : currentLang() === "mix" ? `${item.riskNotes?.zh || ""} / ${item.riskNotes?.en || ""}`.trim() : item.riskNotes?.zh) || "-")}</div>
-            </div>
-          </div>
-        `).join("");
-      }
-
-      if (!targetProfiles.length) {
-        targetRoot.textContent = currentLang() === "en" ? "No target profiles loaded." : currentLang() === "mix" ? "暂无目标端 profiles / No target profiles loaded." : "暂无目标端 profiles";
-      } else {
-        const targetImplementationStatus = providerRegistryPayload?.target_implementation_status || {};
-        targetRoot.innerHTML = targetProfiles.map((item) => `
-          <div class="row-item">
-            <div>
-              <div>${escapeHtml(item.labelZh || item.label || item.key || "-")}</div>
-              <div class="mono">key=${escapeHtml(item.key || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "implemented" : currentLang() === "mix" ? "已实现 / implemented" : "已实现"}=${targetImplementationStatus?.[item.key || ""]?.implemented ? "true" : "false"} | ${currentLang() === "en" ? "selectable" : currentLang() === "mix" ? "可选 / selectable" : "可选"}=${targetImplementationStatus?.[item.key || ""]?.selectable ? "true" : "false"}</div>
-              <div class="mono">${currentLang() === "en" ? "auth mode" : currentLang() === "mix" ? "鉴权模式 / auth mode" : "鉴权模式"}=${escapeHtml(item.authMode || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "token refresh" : currentLang() === "mix" ? "刷新方式 / token refresh" : "刷新方式"}=${escapeHtml(item.tokenRefresh || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "auto create dir" : currentLang() === "mix" ? "自动建目录 / auto create dir" : "自动建目录"}=${item.autoCreateDir ? "true" : "false"}</div>
-              <div class="mono">${currentLang() === "en" ? "fast hashes" : currentLang() === "mix" ? "快传指纹 / fast hashes" : "快传指纹"}=${escapeHtml((item.fastUploadHashes || []).join(", ") || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "fallback" : currentLang() === "mix" ? "降级方式 / fallback" : "降级方式"}=${escapeHtml((item.fallbackModes || []).join(", ") || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "research notes" : currentLang() === "mix" ? "调研备注 / research notes" : "调研备注"}=${escapeHtml((currentLang() === "en" ? item.researchNotes?.en : currentLang() === "mix" ? `${item.researchNotes?.zh || ""} / ${item.researchNotes?.en || ""}`.trim() : item.researchNotes?.zh) || "-")}</div>
-            </div>
-          </div>
-        `).join("");
-      }
-
-      if (!driverMatrix.length) {
-        matrixRoot.textContent = currentLang() === "en" ? "No matrix rows loaded." : currentLang() === "mix" ? "暂无矩阵条目 / No matrix rows loaded." : "暂无矩阵条目";
-      } else {
-        matrixRoot.innerHTML = driverMatrix
-          .sort((a, b) => String(a.driver || "").localeCompare(String(b.driver || ""), "zh-CN"))
-          .map((item) => {
-            const sourceProfile = item.sourceProfile || {};
-            const flow = currentLang() === "en"
-              ? (item.recommendedFlowEn || item.recommendedFlow || "")
-              : currentLang() === "mix"
-                ? `${item.recommendedFlow || ""} / ${item.recommendedFlowEn || ""}`.trim()
-                : (item.recommendedFlow || "");
-            return `
-              <div class="row-item">
-                <div>
-                  <div>${escapeHtml(item.driver || "-")}</div>
-                  <div class="mono">${currentLang() === "en" ? "profile" : currentLang() === "mix" ? "profile / 档案" : "档案"}=${escapeHtml(sourceProfile.key || "-")} | ${currentLang() === "en" ? "level" : currentLang() === "mix" ? "等级 / level" : "等级"}=${escapeHtml(capabilityLevelText(item.level))}</div>
-                  <div class="mono">${currentLang() === "en" ? "suggested path" : currentLang() === "mix" ? "建议路径 / suggested path" : "建议路径"}=${escapeHtml(flow || "-")}</div>
-                </div>
-              </div>
-            `;
-          }).join("");
-      }
-
-      const auditRows = Array.isArray(coverageAuditCache?.rows) ? coverageAuditCache.rows : [];
-      const auditTotals = coverageAuditCache?.totals || {};
-      const gapBuckets = coverageAuditCache?.gapBuckets || {};
-      const backlog = Array.isArray(coverageAuditCache?.backlog) ? coverageAuditCache.backlog : [];
-      const executionPlan = coverageAuditCache?.executionPlan || {};
-      const filters = currentCoverageFilters();
-      const filteredAuditRows = auditRows.filter((item) => {
-        if (filters.onlyGaps && (!Array.isArray(item.missingItems) || !item.missingItems.length)) return false;
-        if (filters.onlyOnboardingReady && !item.onboardingReady) return false;
-        if (filters.nextAction && String(item.nextAction || "") !== filters.nextAction) return false;
-        if (filters.missingItem && (!Array.isArray(item.missingItems) || !item.missingItems.includes(filters.missingItem))) return false;
-        if (filters.capabilityLevel && String(item.capabilityLevel || "") !== filters.capabilityLevel) return false;
-        if (filters.profileKey && String(item.profileKey || "") !== filters.profileKey) return false;
-        if (filters.onboardingStage && String(item.onboardingStage || "") !== filters.onboardingStage) return false;
-        return true;
-      });
-      const filteredBacklog = backlog.filter((item) => {
-        if (filters.onlyGaps && (!Array.isArray(item.missingItems) || !item.missingItems.length)) return false;
-        if (filters.onlyOnboardingReady && !item.onboardingReady) return false;
-        if (filters.nextAction && String(item.nextAction || "") !== filters.nextAction) return false;
-        if (filters.missingItem && (!Array.isArray(item.missingItems) || !item.missingItems.includes(filters.missingItem))) return false;
-        if (filters.capabilityLevel && String(item.capabilityLevel || "") !== filters.capabilityLevel) return false;
-        if (filters.profileKey && String(item.profileKey || "") !== filters.profileKey) return false;
-        if (filters.onboardingStage && String(item.onboardingStage || "") !== filters.onboardingStage) return false;
-        return true;
-      });
-      const planWaves = Array.isArray(executionPlan?.waves) ? executionPlan.waves.filter((item) => {
-        if (filters.nextAction && String(item.nextAction || "") !== filters.nextAction) return false;
-        if (filters.onboardingStage && String(item.onboardingStage || "") !== filters.onboardingStage) return false;
-        if (filters.capabilityLevel && Array.isArray(item.capabilityLevels) && item.capabilityLevels.length && !item.capabilityLevels.includes(filters.capabilityLevel)) return false;
-        if (filters.profileKey && Array.isArray(item.profileKeys) && item.profileKeys.length && !item.profileKeys.includes(filters.profileKey)) return false;
-        if (filters.missingItem && Array.isArray(item.missingItems) && item.missingItems.length && !item.missingItems.includes(filters.missingItem)) return false;
-        return true;
-      }) : [];
-      if (!auditRows.length) {
-        coverageBacklogRoot.textContent = currentLang() === "en"
-          ? "The prioritized backlog will appear after OpenList driver coverage is available."
-          : currentLang() === "mix"
-            ? "OpenList 驱动覆盖可用后，这里会显示优先级 backlog。 / The prioritized backlog will appear after driver coverage is available."
-            : "OpenList 驱动覆盖可用后，这里会显示优先级 backlog。";
-        coverageActionStatsRoot.textContent = currentLang() === "en"
-          ? "The next-action stats will appear after OpenList driver coverage is available."
-          : currentLang() === "mix"
-            ? "OpenList 驱动覆盖可用后，这里会显示下一步动作统计。 / The next-action stats will appear after driver coverage is available."
-            : "OpenList 驱动覆盖可用后，这里会显示下一步动作统计。";
-        coverageRoot.textContent = currentLang() === "en"
-          ? "Coverage audit will appear after OpenList driver coverage is available."
-          : currentLang() === "mix"
-            ? "OpenList 驱动覆盖可用后，这里会显示覆盖审计结果。 / Coverage audit will appear after driver coverage is available."
-            : "OpenList 驱动覆盖可用后，这里会显示覆盖审计结果。";
-        coveragePlanRoot.textContent = currentLang() === "en"
-          ? "Execution waves will appear after OpenList driver coverage is available."
-          : currentLang() === "mix"
-            ? "OpenList 驱动覆盖可用后，这里会显示执行波次建议。 / Execution waves will appear after driver coverage is available."
-            : "OpenList 驱动覆盖可用后，这里会显示执行波次建议。";
-      } else {
-        const actionCounts = filteredAuditRows.reduce((acc, item) => {
-          const key = String(item.nextAction || "unknown");
-          acc[key] = (acc[key] || 0) + 1;
-          return acc;
-        }, {});
-        coverageBacklogRoot.innerHTML = filteredBacklog.length
-          ? filteredBacklog.slice(0, 12).map((item, index) => `
-              <div class="mono">${index + 1}. ${escapeHtml(item.driver || "-")} | P${item.priorityRank ?? "-"} | ${escapeHtml(coverageNextActionText(item.nextAction || ""))} | ${escapeHtml((item.missingItems || []).join(", ") || "-")}</div>
-            `).join("")
-          : (currentLang() === "en"
-            ? "No backlog items match the current filter."
-            : currentLang() === "mix"
-              ? "当前筛选条件下没有 backlog 项。 / No backlog items match the current filter."
-              : "当前筛选条件下没有 backlog 项。");
-        coverageActionStatsRoot.innerHTML = Object.keys(actionCounts).length
-          ? Object.entries(actionCounts).map(([key, count]) => (
-              `<div class="mono">${escapeHtml(coverageNextActionText(key))}: ${count}</div>`
-            )).join("")
-          : (currentLang() === "en"
-            ? "No next-action stats match the current filter."
-            : currentLang() === "mix"
-              ? "当前筛选条件下没有下一步动作统计。 / No next-action stats match the current filter."
-              : "当前筛选条件下没有下一步动作统计。");
-        coveragePlanRoot.innerHTML = planWaves.length
-          ? planWaves.map((wave, index) => `
-              <div class="mono">${index + 1}. P${wave.priorityRank ?? "-"} | ${escapeHtml(coverageNextActionText(wave.nextAction || ""))} | ${escapeHtml(wave.onboardingStage || "-")} | ${currentLang() === "en" ? "count" : currentLang() === "mix" ? "数量 / count" : "数量"}=${wave.count ?? 0}</div>
-              <div class="mono">${currentLang() === "en" ? "drivers" : currentLang() === "mix" ? "驱动 / drivers" : "驱动"}=${escapeHtml((wave.drivers || []).join(", ") || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "missing items" : currentLang() === "mix" ? "缺口 / missing items" : "缺口"}=${escapeHtml((wave.missingItems || []).join(", ") || "-")}</div>
-              <div class="mono">${currentLang() === "en" ? "profiles" : currentLang() === "mix" ? "profiles / 档案" : "档案"}=${escapeHtml((wave.profileKeys || []).join(", ") || "-")}</div>
-            `).join("")
-          : (currentLang() === "en"
-            ? "No execution waves match the current filter."
-            : currentLang() === "mix"
-              ? "当前筛选条件下没有执行波次建议。 / No execution waves match the current filter."
-              : "当前筛选条件下没有执行波次建议。");
-        coverageRoot.innerHTML = `
-          <div class="subtle" style="margin-bottom:10px;">
-            ${currentLang() === "en"
-              ? `Total=${auditTotals.total ?? 0}, profile=${auditTotals.profile ?? 0}, guide=${auditTotals.guide ?? 0}, capture=${auditTotals.capture ?? 0}, capability=${auditTotals.capability ?? 0}`
-              : currentLang() === "mix"
-                ? `总数 / Total=${auditTotals.total ?? 0}, profile=${auditTotals.profile ?? 0}, guide=${auditTotals.guide ?? 0}, capture=${auditTotals.capture ?? 0}, capability=${auditTotals.capability ?? 0}`
-                : `总数=${auditTotals.total ?? 0}，profile=${auditTotals.profile ?? 0}，guide=${auditTotals.guide ?? 0}，capture=${auditTotals.capture ?? 0}，capability=${auditTotals.capability ?? 0}`}
-          </div>
-          <div class="subtle" style="margin-bottom:10px;">
-            ${currentLang() === "en"
-              ? `fully covered=${gapBuckets.fullyCovered ?? 0}, missing profile=${gapBuckets.missingProfile ?? 0}, missing guide=${gapBuckets.missingGuide ?? 0}, missing capture=${gapBuckets.missingCapture ?? 0}, missing capability=${gapBuckets.missingCapability ?? 0}`
-              : currentLang() === "mix"
-                ? `完全覆盖 / fully covered=${gapBuckets.fullyCovered ?? 0}, 缺 profile / missing profile=${gapBuckets.missingProfile ?? 0}, 缺 guide / missing guide=${gapBuckets.missingGuide ?? 0}, 缺 capture / missing capture=${gapBuckets.missingCapture ?? 0}, 缺 capability / missing capability=${gapBuckets.missingCapability ?? 0}`
-                : `完全覆盖=${gapBuckets.fullyCovered ?? 0}，缺 profile=${gapBuckets.missingProfile ?? 0}，缺 guide=${gapBuckets.missingGuide ?? 0}，缺 capture=${gapBuckets.missingCapture ?? 0}，缺 capability=${gapBuckets.missingCapability ?? 0}`}
-          </div>
-          <div class="subtle" style="margin-bottom:10px;">
-            ${currentLang() === "en"
-              ? `Visible rows=${filteredAuditRows.length}`
-              : currentLang() === "mix"
-                ? `当前可见条目 / Visible rows=${filteredAuditRows.length}`
-                : `当前可见条目=${filteredAuditRows.length}`}
-          </div>
-          ${filteredAuditRows.map((item) => `
-            <div class="row-item">
-              <div>
-                <div>${escapeHtml(item.driver || "-")}</div>
-                <div class="mono">profile=${item.hasProfile ? "yes" : "no"} | guide=${item.hasGuide ? "yes" : "no"} | capture=${item.hasCapture ? "yes" : "no"} | capability=${item.hasCapability ? "yes" : "no"}</div>
-                <div class="mono">${currentLang() === "en" ? "inference" : currentLang() === "mix" ? "推断状态 / inference" : "推断状态"}=profile:${item.profileIsDynamic ? "dynamic" : "static"} | capture:${item.captureIsDynamic ? "dynamic" : "static"} | capability:${item.capabilityIsDynamic ? "dynamic" : "static"}</div>
-                <div class="mono">${currentLang() === "en" ? "level" : currentLang() === "mix" ? "等级 / level" : "等级"}=${escapeHtml(capabilityLevelText(item.capabilityLevel || "unsupported"))} | score=${item.coverageScore ?? 0}/4 | P${item.priorityRank ?? "-"}</div>
-                <div class="mono">onboardingReady=${item.onboardingReady ? "yes" : "no"} | onboardingStage=${escapeHtml(item.onboardingStage || "-")}</div>
-                <div class="mono">canonicalDriver=${escapeHtml(item.canonicalDriverKey || "generic")} | matchedGuide=${escapeHtml(item.matchedGuideKey || "-")}</div>
-                <div class="mono">profileKey=${escapeHtml(item.profileKey || "generic")}</div>
-                <div class="mono">${currentLang() === "en" ? "dynamic required keys" : currentLang() === "mix" ? "动态必需键 / dynamic required keys" : "动态必需键"}=${escapeHtml((item.dynamicRequiredKeys || []).join(", ") || "-")}</div>
-                <div class="mono">${currentLang() === "en" ? "dynamic matched fields" : currentLang() === "mix" ? "动态字段命中 / dynamic matched fields" : "动态字段命中"}=${escapeHtml((item.dynamicMatchedFields || []).join(", ") || "-")}</div>
-                <div class="mono">guideDoc=${escapeHtml(item.guideDocUrl || "-")}</div>
-                <div class="mono">captureSpec=${escapeHtml(item.captureSpecKey || "-")} | alias=${escapeHtml(item.captureMatchedAlias || "-")}</div>
-                <div class="mono">captureLogin=${escapeHtml(item.captureLoginUrl || "-")}</div>
-                <div class="mono">${currentLang() === "en" ? "missing items" : currentLang() === "mix" ? "缺口 / missing items" : "缺口"}=${escapeHtml((item.missingItems || []).join(", ") || "-")}</div>
-                <div class="mono">${currentLang() === "en" ? "next step" : currentLang() === "mix" ? "下一步 / next step" : "下一步"}=${escapeHtml(coverageNextActionText(item.nextAction || ""))}</div>
-              </div>
-            </div>
-          `).join("")}
-        `;
-      }
     }
 
     function toggleDrawer(forceVisible = null) {
@@ -1705,36 +1421,6 @@
         setNotice("sync-notice", `自动启动光鸭抓取失败: ${error.message}`);
         return false;
       }
-    }
-
-    function renderLogs(records) {
-      const root = document.getElementById("logs");
-      root.textContent = (records || []).map((row) => `[${row.ts}] [${row.level}] ${row.message}`).join("\n");
-      root.scrollTop = root.scrollHeight;
-    }
-
-    function renderOverviewRouteSummary(syncState = {}, runtimeState = {}) {
-      const root = document.getElementById("overview-route-summary");
-      if (!root) return;
-      const currentTask = syncState?.current_task || {};
-      const currentSourceContext = syncState?.current_source_context || {};
-      const sourcePath = String(currentTask.source_path || document.getElementById("source_path")?.value || configCache?.source_path || currentDirectoryPath || "/").trim() || "/";
-      const targetKey = String(currentTask.target_key || document.getElementById("target_key")?.value || configCache?.target_key || "guangya").trim() || "guangya";
-      const targetPath = String(currentTask.target_path || document.getElementById("target_path")?.value || configCache?.target_path || "/").trim() || "/";
-      const mode = normalizeOpenListMode(document.getElementById("openlist_mode")?.value || configCache?.openlist_mode || "external_local");
-      const queueSize = Array.isArray(syncState?.source_queue) ? syncState.source_queue.length : 0;
-      const pendingSize = Array.isArray(syncState?.persistent_pending) ? syncState.persistent_pending.length : 0;
-      const activeUrl = String(document.getElementById("effective_openlist_url")?.value || runtimeState?.active_url || configCache?.openlist_url || "-").trim() || "-";
-      const sourceRuntime = window.__cpbStatusCache?.source_runtime || {};
-      root.innerHTML = `
-        <div class="mono">OpenList Mode: ${escapeHtml(getOpenListModeLabel(mode))}</div>
-        <div class="mono">OpenList URL: ${escapeHtml(activeUrl)}</div>
-        <div class="mono">Source: ${escapeHtml(sourcePath)}</div>
-        <div class="mono">Target: ${escapeHtml(targetKey)} -> ${escapeHtml(targetPath)}</div>
-        <div class="mono">Source Mapping: mount=${escapeHtml(currentSourceContext.mount_path || "-")} | effective=${escapeHtml(currentSourceContext.effective_driver || "-")}</div>
-        <div class="mono">Source Route: pref=${escapeHtml(sourceRuntime.requested_provider_preference || "-")} | selected=${escapeHtml(sourceRuntime.selected_source_mode || "-")} | provider=${escapeHtml(sourceRuntime.selected_provider_key || "-")}</div>
-        <div class="mono">Queue: ${queueSize} | Pending: ${pendingSize}</div>
-      `;
     }
 
     function renderSourceDriverSummary() {
