@@ -1289,6 +1289,8 @@ def test_execute_source_bridge_marks_api_bridge_placeholder_for_onedrive(tmp_pat
     assert report["bridge_executor"] == "prepare_onedrive_api_bridge"
     assert report["bridge_transport_hint"] == "refresh_token_or_authorization"
     assert report["candidate_hashes"] == ["sha1"]
+    assert report["bridge_expected_hashes"] == ["sha1", "md5", "content_hash"]
+    assert report["bridge_missing_expected_hashes"] == ["md5", "content_hash"]
     assert report["pending_reason"] == "provider_api_bridge_not_executed_yet"
     assert report["fast_upload_ready_after_bridge"] is False
 
@@ -1385,6 +1387,8 @@ def test_transfer_planner_explains_api_bridge_pending_with_candidate_hashes() ->
             "__bridge_candidate_hashes": "sha1",
             "__bridge_pending_reason": "provider_api_bridge_not_executed_yet",
             "__bridge_execution_state": "api_bridge_prepared_but_not_executed",
+            "__bridge_expected_hashes": "sha1,md5,content_hash",
+            "__bridge_missing_expected_hashes": "md5,content_hash",
         },
     )
     plan = plan_transfer_mode(
@@ -1395,7 +1399,8 @@ def test_transfer_planner_explains_api_bridge_pending_with_candidate_hashes() ->
     assert plan["mode"] == "record_pending_only"
     assert plan["bridge_candidate_hashes"] == ["sha1"]
     assert plan["bridge_pending_reason"] == "provider_api_bridge_not_executed_yet"
-    assert "API" in plan["reason"]
+    assert "理论预期哈希" in plan["reason"]
+    assert plan["bridge_missing_expected_hashes"] == ["md5", "content_hash"]
 
 
 def test_transfer_planner_explains_non_fast_session_snapshot_candidates() -> None:
@@ -1452,6 +1457,8 @@ def test_transfer_planner_summary_collects_bridge_candidate_counts() -> None:
                 "__bridge_transport_hint": "refresh_token_or_authorization",
                 "__bridge_maturity_level": "api_capture_ready_pending_provider_enrich",
                 "__bridge_maturity_honesty": "api_prepared_not_executed",
+                "__bridge_expected_hashes": "sha1,md5,content_hash",
+                "__bridge_missing_expected_hashes": "md5,content_hash",
             },
         ),
         SourceEntry(
@@ -1486,6 +1493,8 @@ def test_transfer_planner_summary_collects_bridge_candidate_counts() -> None:
     assert summary["bridge_transport_hint_counts"]["refresh_token_or_authorization"] == 1
     assert summary["bridge_maturity_level_counts"]["api_capture_ready_pending_provider_enrich"] == 1
     assert summary["bridge_maturity_honesty_counts"]["api_prepared_not_executed"] == 1
+    assert summary["bridge_missing_expected_hash_counts"]["md5"] == 1
+    assert summary["bridge_missing_expected_hash_counts"]["content_hash"] == 1
 
 
 def test_sync_runner_uses_source_provider_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

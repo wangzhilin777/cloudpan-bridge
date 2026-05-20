@@ -30,6 +30,16 @@ def _entry_bridge_metadata(entry: SourceEntry) -> dict[str, Any]:
         "transport_hint": str(provider_specific.get("__bridge_transport_hint") or "").strip(),
         "maturity_level": str(provider_specific.get("__bridge_maturity_level") or "").strip(),
         "maturity_honesty": str(provider_specific.get("__bridge_maturity_honesty") or "").strip(),
+        "expected_hashes": [
+            str(item).strip().lower()
+            for item in str(provider_specific.get("__bridge_expected_hashes") or "").split(",")
+            if str(item).strip()
+        ],
+        "missing_expected_hashes": [
+            str(item).strip().lower()
+            for item in str(provider_specific.get("__bridge_missing_expected_hashes") or "").split(",")
+            if str(item).strip()
+        ],
     }
 
 
@@ -52,6 +62,8 @@ def plan_transfer_mode(
     fast_hash_hits = compute_fast_upload_hits(entry, capability)
     bridge_meta = _entry_bridge_metadata(entry)
     bridge_candidates = list(bridge_meta.get("candidate_hashes") or [])
+    bridge_expected_hashes = list(bridge_meta.get("expected_hashes") or [])
+    bridge_missing_expected_hashes = list(bridge_meta.get("missing_expected_hashes") or [])
     threshold_bytes = max(0, int(auto_download_threshold_mb or 0)) * 1024 * 1024
     small_file_auto = bool(threshold_bytes > 0 and int(entry.size) <= threshold_bytes)
     mode = "record_pending_only"
@@ -82,10 +94,16 @@ def plan_transfer_mode(
         supported_fast = [str(item or "").strip().lower() for item in list(capability.get("fast_upload_hashes") or capability.get("fastUploadHashes") or []) if str(item or "").strip()]
         if pending_reason == "provider_api_bridge_not_executed_yet":
             reason_code = "provider_api_bridge_not_executed_yet"
-            reason = (
-                "源端 bridge 已进入 API 准备态，但当前版本还没有执行真实 provider enrich；"
-                f"目前仅看到候选哈希: {', '.join(bridge_candidates)}"
-            )
+            if bridge_missing_expected_hashes:
+                reason = (
+                    "源端 bridge 已进入 API 准备态，但当前版本还没有执行真实 provider enrich；"
+                    f"理论预期哈希={', '.join(bridge_expected_hashes or ['-'])}，当前仍缺={', '.join(bridge_missing_expected_hashes)}"
+                )
+            else:
+                reason = (
+                    "源端 bridge 已进入 API 准备态，但当前版本还没有执行真实 provider enrich；"
+                    f"目前仅看到候选哈希: {', '.join(bridge_candidates)}"
+                )
         elif pending_reason == "non_fast_hashes_only_after_session_snapshot":
             reason_code = "non_fast_hashes_only_after_session_snapshot"
             reason = (
@@ -113,6 +131,8 @@ def plan_transfer_mode(
         "bridge_transport_hint": str(bridge_meta.get("transport_hint") or ""),
         "bridge_maturity_level": str(bridge_meta.get("maturity_level") or ""),
         "bridge_maturity_honesty": str(bridge_meta.get("maturity_honesty") or ""),
+        "bridge_expected_hashes": bridge_expected_hashes,
+        "bridge_missing_expected_hashes": bridge_missing_expected_hashes,
         "supports_fast_upload": bool(capability.get("supports_fast_upload") or capability.get("fast_upload_hashes") or capability.get("fastUploadHashes")),
         "fallback_modes": fallback_modes,
         "auto_download_threshold_mb": max(0, int(auto_download_threshold_mb or 0)),
@@ -136,6 +156,7 @@ def summarize_transfer_plan(
     bridge_transport_hint_counts: dict[str, int] = {}
     bridge_maturity_level_counts: dict[str, int] = {}
     bridge_maturity_honesty_counts: dict[str, int] = {}
+    bridge_missing_expected_hash_counts: dict[str, int] = {}
     for entry in entries:
         plan = plan_transfer_mode(
             entry,
@@ -170,6 +191,8 @@ def summarize_transfer_plan(
         bridge_maturity_honesty = str(plan.get("bridge_maturity_honesty") or "").strip()
         if bridge_maturity_honesty:
             bridge_maturity_honesty_counts[bridge_maturity_honesty] = bridge_maturity_honesty_counts.get(bridge_maturity_honesty, 0) + 1
+        for key in list(plan.get("bridge_missing_expected_hashes") or []):
+            bridge_missing_expected_hash_counts[key] = bridge_missing_expected_hash_counts.get(key, 0) + 1
     return {
         "total": len(entries),
         "mode_counts": counts,
@@ -182,6 +205,7 @@ def summarize_transfer_plan(
         "bridge_transport_hint_counts": bridge_transport_hint_counts,
         "bridge_maturity_level_counts": bridge_maturity_level_counts,
         "bridge_maturity_honesty_counts": bridge_maturity_honesty_counts,
+        "bridge_missing_expected_hash_counts": bridge_missing_expected_hash_counts,
         "auto_download_threshold_mb": max(0, int(auto_download_threshold_mb or 0)),
         "allow_full_fallback": bool(allow_full_fallback),
     }

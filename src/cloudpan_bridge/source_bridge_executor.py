@@ -138,6 +138,12 @@ def _attach_bridge_metadata(entry: SourceEntry, report: dict[str, Any]) -> None:
     maturity_honesty = str(report.get("bridge_maturity_honesty") or "").strip()
     if maturity_honesty:
         provider_specific["__bridge_maturity_honesty"] = maturity_honesty
+    expected_hashes = [str(item).strip() for item in list(report.get("bridge_expected_hashes") or []) if str(item).strip()]
+    if expected_hashes:
+        provider_specific["__bridge_expected_hashes"] = ",".join(expected_hashes)
+    missing_expected_hashes = [str(item).strip() for item in list(report.get("bridge_missing_expected_hashes") or []) if str(item).strip()]
+    if missing_expected_hashes:
+        provider_specific["__bridge_missing_expected_hashes"] = ",".join(missing_expected_hashes)
     entry.provider_specific = provider_specific
 
 
@@ -180,6 +186,8 @@ def _build_report(
     preparation = dict(bridge_runtime.get("preparation") or {})
     merged_presence = _fingerprint_presence(merged)
     bridge_maturity = dict(runtime.get("bridge_maturity_summary") or {})
+    expected_hashes = [str(item).strip().lower() for item in list(preparation.get("fingerprint_expectation") or []) if str(item).strip()]
+    missing_expected_hashes = [key for key in expected_hashes if not merged_presence.get(key)]
     return {
         "changed": bool(added_hashes),
         "added_hashes": added_hashes,
@@ -189,6 +197,8 @@ def _build_report(
         "bridge_transport_hint": str(preparation.get("transport_hint") or "-"),
         "bridge_maturity_level": str(bridge_maturity.get("level") or ""),
         "bridge_maturity_honesty": str(bridge_maturity.get("honesty") or ""),
+        "bridge_expected_hashes": expected_hashes,
+        "bridge_missing_expected_hashes": missing_expected_hashes,
         "bridge_selected_group": list(preparation.get("selected_group") or []),
         "bridge_hook_registered": bool(bridge_runtime.get("hook_registered")),
         "candidate_hashes": _candidate_hashes(merged),
