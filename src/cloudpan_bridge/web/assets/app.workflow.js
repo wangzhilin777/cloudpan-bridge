@@ -97,6 +97,8 @@
     const transferStageText = bridgeView.formatCountMap(ctx, sourceAnalyzeCache?.transferPlanPreview?.bridge_provider_stage_counts || {}, bridgeView.bridgeProviderStageText);
     const transferMaturityText = bridgeView.formatCountMap(ctx, sourceAnalyzeCache?.transferPlanPreview?.bridge_maturity_level_counts || {}, bridgeView.bridgeMaturityText);
     const transferExpectedGapText = Object.entries(sourceAnalyzeCache?.transferPlanPreview?.bridge_missing_expected_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
+    const transferTargetFastGapText = Object.entries(sourceAnalyzeCache?.transferPlanPreview?.missing_target_fast_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
+    const transferRecoverableFastGapText = Object.entries(sourceAnalyzeCache?.transferPlanPreview?.bridge_missing_recoverable_fast_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
     const quickActions = strategyQuickActions(strategy?.recommendedMode || "analyze_first", strategy);
     quickActionsRoot.innerHTML = quickActions.map((item) => (
       `<button class="secondary" type="button" data-capability-action="${escapeHtml(item.key)}">${escapeHtml(item.label)}</button>`
@@ -124,6 +126,8 @@
       <div class="mono">${currentLang() === "en" ? "Bridge provider stages" : currentLang() === "mix" ? "桥接阶段分桶 / Bridge provider stages" : "桥接阶段分桶"}: ${escapeHtml(transferStageText)}</div>
       <div class="mono">${currentLang() === "en" ? "Bridge maturity buckets" : currentLang() === "mix" ? "桥接成熟度分桶 / Bridge maturity buckets" : "桥接成熟度分桶"}: ${escapeHtml(transferMaturityText)}</div>
       <div class="mono">${currentLang() === "en" ? "Missing expected hashes" : currentLang() === "mix" ? "仍缺预期哈希 / Missing expected hashes" : "仍缺预期哈希"}: ${escapeHtml(transferExpectedGapText)}</div>
+      <div class="mono">${currentLang() === "en" ? "Target fast-hash gaps" : currentLang() === "mix" ? "目标端快传缺口 / Target fast-hash gaps" : "目标端快传缺口"}: ${escapeHtml(transferTargetFastGapText)}</div>
+      <div class="mono">${currentLang() === "en" ? "Recoverable fast-hash gaps" : currentLang() === "mix" ? "可补齐快传缺口 / Recoverable fast-hash gaps" : "可补齐快传缺口"}: ${escapeHtml(transferRecoverableFastGapText)}</div>
       <div class="mono">${currentLang() === "en" ? "Suggested path" : currentLang() === "mix" ? "建议路径 / Suggested path" : "建议路径"}: ${escapeHtml(recommendedFlow || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Runtime rationale" : currentLang() === "mix" ? "动态理由 / Runtime rationale" : "动态理由"}: ${escapeHtml(rationaleText || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Throttle hint" : currentLang() === "mix" ? "节奏建议 / Throttle hint" : "节奏建议"}: ${escapeHtml(throttleHintText || "-")}</div>
@@ -161,6 +165,8 @@
     const previewNextActionCounts = bridgeView.formatCountMap(ctx, transferPreview.next_action_hint_counts || {}, bridgeView.nextActionHintText);
     const previewMaturityCounts = bridgeView.formatCountMap(ctx, transferPreview.bridge_maturity_level_counts || {}, bridgeView.bridgeMaturityText);
     const previewExpectedGapText = Object.entries(transferPreview.bridge_missing_expected_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
+    const previewTargetFastGapText = Object.entries(transferPreview.missing_target_fast_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
+    const previewRecoverableFastGapText = Object.entries(transferPreview.bridge_missing_recoverable_fast_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
     const recommendation = summary.missing_md5 > 0
       ? (summary.gcid_ready > 0
         ? (currentLang() === "en"
@@ -199,6 +205,8 @@
           <div class="mono">${currentLang() === "en" ? "Next action buckets" : currentLang() === "mix" ? "下一步动作分桶 / Next action buckets" : "下一步动作分桶"}: ${escapeHtml(previewNextActionCounts)}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge maturity buckets" : currentLang() === "mix" ? "桥接成熟度分桶 / Bridge maturity buckets" : "桥接成熟度分桶"}: ${escapeHtml(previewMaturityCounts)}</div>
           <div class="mono">${currentLang() === "en" ? "Missing expected hashes" : currentLang() === "mix" ? "仍缺预期哈希 / Missing expected hashes" : "仍缺预期哈希"}: ${escapeHtml(previewExpectedGapText)}</div>
+          <div class="mono">${currentLang() === "en" ? "Target fast-hash gaps" : currentLang() === "mix" ? "目标端快传缺口 / Target fast-hash gaps" : "目标端快传缺口"}: ${escapeHtml(previewTargetFastGapText)}</div>
+          <div class="mono">${currentLang() === "en" ? "Recoverable fast-hash gaps" : currentLang() === "mix" ? "可补齐快传缺口 / Recoverable fast-hash gaps" : "可补齐快传缺口"}: ${escapeHtml(previewRecoverableFastGapText)}</div>
           <div class="mono">provider: ${escapeHtml(providerCounts)}</div>
           <div class="mono">hash: ${escapeHtml(hashCounts)}</div>
           <div class="mono">${escapeHtml((currentLang() === "en" ? decision?.rationale?.en : currentLang() === "mix" ? `${decision?.rationale?.zh || ""} / ${decision?.rationale?.en || ""}`.trim() : decision?.rationale?.zh) || "-")}</div>
@@ -216,6 +224,8 @@
             <div class="mono">${currentLang() === "en" ? "bridge stage" : currentLang() === "mix" ? "桥接阶段 / bridge stage" : "桥接阶段"}=${escapeHtml(bridgeView.bridgeProviderStageText(ctx, item.transferPlan?.bridge_provider_stage || "-"))} | ${currentLang() === "en" ? "maturity" : currentLang() === "mix" ? "成熟度 / maturity" : "成熟度"}=${escapeHtml(bridgeView.bridgeMaturityText(ctx, item.transferPlan?.bridge_maturity_level || "-"))}</div>
             <div class="mono">${currentLang() === "en" ? "pending" : currentLang() === "mix" ? "挂起 / pending" : "挂起"}=${escapeHtml(bridgeView.bridgePendingReasonText(ctx, item.transferPlan?.bridge_pending_reason || "-"))} | ${currentLang() === "en" ? "honesty" : currentLang() === "mix" ? "边界 / honesty" : "边界"}=${escapeHtml(bridgeView.bridgeHonestyText(ctx, item.transferPlan?.bridge_maturity_honesty || "-"))}</div>
             <div class="mono">${currentLang() === "en" ? "expected" : currentLang() === "mix" ? "预期哈希 / expected" : "预期哈希"}=${escapeHtml((item.transferPlan?.bridge_expected_hashes || []).join(", ") || "-")} | ${currentLang() === "en" ? "missing" : currentLang() === "mix" ? "仍缺 / missing" : "仍缺"}=${escapeHtml((item.transferPlan?.bridge_missing_expected_hashes || []).join(", ") || "-")}</div>
+            <div class="mono">${currentLang() === "en" ? "target fast" : currentLang() === "mix" ? "目标快传 / target fast" : "目标快传"}=${escapeHtml((item.transferPlan?.target_fast_hashes || []).join(", ") || "-")} | ${currentLang() === "en" ? "fast gap" : currentLang() === "mix" ? "快传缺口 / fast gap" : "快传缺口"}=${escapeHtml((item.transferPlan?.missing_target_fast_hashes || []).join(", ") || "-")}</div>
+            <div class="mono">${currentLang() === "en" ? "recoverable fast" : currentLang() === "mix" ? "可补快传 / recoverable fast" : "可补快传"}=${escapeHtml((item.transferPlan?.bridge_recoverable_fast_hashes || []).join(", ") || "-")} | ${currentLang() === "en" ? "recoverable gap" : currentLang() === "mix" ? "可补缺口 / recoverable gap" : "可补缺口"}=${escapeHtml((item.transferPlan?.bridge_missing_recoverable_fast_hashes || []).join(", ") || "-")}</div>
           </div>
         </div>
       `).join("")}
@@ -302,6 +312,9 @@
     const previewNextActionText = sourceAnalyzeCache?.transferPlanPreview
       ? bridgeView.formatCountMap(ctx, sourceAnalyzeCache.transferPlanPreview.next_action_hint_counts || {}, bridgeView.nextActionHintText)
       : "-";
+    const previewTargetFastGapText = sourceAnalyzeCache?.transferPlanPreview
+      ? Object.entries(sourceAnalyzeCache.transferPlanPreview.missing_target_fast_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-"
+      : "-";
     root.innerHTML = `
       <div class="mono">source=${escapeHtml(sourcePath)} -> target=${escapeHtml(targetKey)}:${escapeHtml(targetPath)}</div>
       <div class="mono">recommended=${escapeHtml(recommendedMode)} | level=${escapeHtml(assessedLevel)} | auto_small_mb=${escapeHtml(autoThreshold)}</div>
@@ -310,6 +323,7 @@
       <div class="mono">transfer_preview=${escapeHtml(transferPreviewText)}</div>
       <div class="mono">transfer_reason=${escapeHtml(previewReasonText)}</div>
       <div class="mono">transfer_next=${escapeHtml(previewNextActionText)}</div>
+      <div class="mono">transfer_fast_gap=${escapeHtml(previewTargetFastGapText)}</div>
       <div class="mono">delete_state=${deleteRemoved ? "on" : "off"} | delete_target=${deleteRealTarget ? "on" : "off"}</div>
       ${sourceRuntime.selection_reason ? `<div>${escapeHtml(sourceRuntime.selection_reason)}</div>` : ""}
       ${sourceRuntime.fallback_reason ? `<div>${escapeHtml(sourceRuntime.fallback_reason)}</div>` : ""}

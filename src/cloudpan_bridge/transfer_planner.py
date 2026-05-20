@@ -50,6 +50,15 @@ def compute_fast_upload_hits(entry: SourceEntry, target_capability: dict[str, An
     return [key for key in supported if values.get(key)]
 
 
+def _supported_fast_hashes(target_capability: dict[str, Any] | None = None) -> list[str]:
+    capability = dict(target_capability or {})
+    return [
+        str(item or "").strip().lower()
+        for item in list(capability.get("fast_upload_hashes") or capability.get("fastUploadHashes") or [])
+        if str(item or "").strip()
+    ]
+
+
 def plan_transfer_mode(
     entry: SourceEntry,
     target_capability: dict[str, Any] | None = None,
@@ -59,11 +68,16 @@ def plan_transfer_mode(
 ) -> dict[str, Any]:
     capability = dict(target_capability or {})
     fallback_modes = [str(item or "").strip().lower() for item in list(capability.get("fallback_modes") or capability.get("fallbackModes") or []) if str(item or "").strip()]
+    supported_fast_hashes = _supported_fast_hashes(capability)
     fast_hash_hits = compute_fast_upload_hits(entry, capability)
     bridge_meta = _entry_bridge_metadata(entry)
     bridge_candidates = list(bridge_meta.get("candidate_hashes") or [])
     bridge_expected_hashes = list(bridge_meta.get("expected_hashes") or [])
     bridge_missing_expected_hashes = list(bridge_meta.get("missing_expected_hashes") or [])
+    entry_hash_values = _entry_hash_map(entry)
+    missing_target_fast_hashes = [key for key in supported_fast_hashes if not entry_hash_values.get(key)]
+    bridge_recoverable_fast_hashes = [key for key in supported_fast_hashes if key in bridge_expected_hashes]
+    bridge_missing_recoverable_fast_hashes = [key for key in bridge_recoverable_fast_hashes if key in bridge_missing_expected_hashes]
     threshold_bytes = max(0, int(auto_download_threshold_mb or 0)) * 1024 * 1024
     small_file_auto = bool(threshold_bytes > 0 and int(entry.size) <= threshold_bytes)
     mode = "record_pending_only"
@@ -97,17 +111,18 @@ def plan_transfer_mode(
         reason = "当前目标端可降级上传，但本轮建议先记录到待补传。"
     if not fast_hash_hits and bridge_candidates:
         pending_reason = str(bridge_meta.get("pending_reason") or "")
-        supported_fast = [str(item or "").strip().lower() for item in list(capability.get("fast_upload_hashes") or capability.get("fastUploadHashes") or []) if str(item or "").strip()]
         if pending_reason == "provider_api_bridge_not_executed_yet":
             reason_code = "provider_api_bridge_not_executed_yet"
             next_action_hint = "execute_provider_api_enrich"
-            if any(key in {"md5", "gcid"} for key in bridge_missing_expected_hashes):
+            if bridge_missing_recoverable_fast_hashes:
                 next_action_hint = "execute_provider_api_for_fast_hashes"
             if bridge_missing_expected_hashes:
                 reason = (
                     "源端 bridge 已进入 API 准备态，但当前版本还没有执行真实 provider enrich；"
                     f"理论预期哈希={', '.join(bridge_expected_hashes or ['-'])}，当前仍缺={', '.join(bridge_missing_expected_hashes)}"
                 )
+                if bridge_missing_recoverable_fast_hashes:
+                    reason += f"；其中目标端当前最关键的是 {', '.join(bridge_missing_recoverable_fast_hashes)}"
             else:
                 reason = (
                     "源端 bridge 已进入 API 准备态，但当前版本还没有执行真实 provider enrich；"
@@ -120,12 +135,14 @@ def plan_transfer_mode(
                 "源端 session snapshot 已补出候选哈希，但当前仍缺少目标端可直接快传的指纹；"
                 f"候选哈希: {', '.join(bridge_candidates)}"
             )
-        elif supported_fast:
+            if missing_target_fast_hashes:
+                reason += f"；目标端仍缺={', '.join(missing_target_fast_hashes)}"
+        elif supported_fast_hashes:
             reason_code = "target_hash_not_supported"
             next_action_hint = "fallback_target_does_not_accept_hashes"
             reason = (
                 "源端已补出候选哈希，但当前目标端不认这些快传指纹；"
-                f"源端候选={', '.join(bridge_candidates)}，目标端支持={', '.join(supported_fast)}"
+                f"源端候选={', '.join(bridge_candidates)}，目标端支持={', '.join(supported_fast_hashes)}"
             )
     elif not fast_hash_hits and not capability.get("supports_fast_upload") and not capability.get("fast_upload_hashes") and ("download_upload" in fallback_modes or "stream_upload" in fallback_modes):
         reason_code = "target_no_fast_capability"
@@ -137,6 +154,8 @@ def plan_transfer_mode(
         "next_action_hint": next_action_hint,
         "reason": reason,
         "fast_hash_hits": fast_hash_hits,
+        "target_fast_hashes": supported_fast_hashes,
+        "missing_target_fast_hashes": missing_target_fast_hashes,
         "bridge_candidate_hashes": bridge_candidates,
         "bridge_pending_reason": str(bridge_meta.get("pending_reason") or ""),
         "bridge_execution_state": str(bridge_meta.get("execution_state") or ""),
@@ -146,6 +165,8 @@ def plan_transfer_mode(
         "bridge_maturity_honesty": str(bridge_meta.get("maturity_honesty") or ""),
         "bridge_expected_hashes": bridge_expected_hashes,
         "bridge_missing_expected_hashes": bridge_missing_expected_hashes,
+        "bridge_recoverable_fast_hashes": bridge_recoverable_fast_hashes,
+        "bridge_missing_recoverable_fast_hashes": bridge_missing_recoverable_fast_hashes,
         "supports_fast_upload": bool(capability.get("supports_fast_upload") or capability.get("fast_upload_hashes") or capability.get("fastUploadHashes")),
         "fallback_modes": fallback_modes,
         "auto_download_threshold_mb": max(0, int(auto_download_threshold_mb or 0)),
@@ -170,6 +191,8 @@ def summarize_transfer_plan(
     bridge_maturity_level_counts: dict[str, int] = {}
     bridge_maturity_honesty_counts: dict[str, int] = {}
     bridge_missing_expected_hash_counts: dict[str, int] = {}
+    missing_target_fast_hash_counts: dict[str, int] = {}
+    bridge_missing_recoverable_fast_hash_counts: dict[str, int] = {}
     next_action_hint_counts: dict[str, int] = {}
     for entry in entries:
         plan = plan_transfer_mode(
@@ -210,6 +233,10 @@ def summarize_transfer_plan(
             bridge_maturity_honesty_counts[bridge_maturity_honesty] = bridge_maturity_honesty_counts.get(bridge_maturity_honesty, 0) + 1
         for key in list(plan.get("bridge_missing_expected_hashes") or []):
             bridge_missing_expected_hash_counts[key] = bridge_missing_expected_hash_counts.get(key, 0) + 1
+        for key in list(plan.get("missing_target_fast_hashes") or []):
+            missing_target_fast_hash_counts[key] = missing_target_fast_hash_counts.get(key, 0) + 1
+        for key in list(plan.get("bridge_missing_recoverable_fast_hashes") or []):
+            bridge_missing_recoverable_fast_hash_counts[key] = bridge_missing_recoverable_fast_hash_counts.get(key, 0) + 1
     return {
         "total": len(entries),
         "mode_counts": counts,
@@ -223,6 +250,8 @@ def summarize_transfer_plan(
         "bridge_maturity_level_counts": bridge_maturity_level_counts,
         "bridge_maturity_honesty_counts": bridge_maturity_honesty_counts,
         "bridge_missing_expected_hash_counts": bridge_missing_expected_hash_counts,
+        "missing_target_fast_hash_counts": missing_target_fast_hash_counts,
+        "bridge_missing_recoverable_fast_hash_counts": bridge_missing_recoverable_fast_hash_counts,
         "next_action_hint_counts": next_action_hint_counts,
         "auto_download_threshold_mb": max(0, int(auto_download_threshold_mb or 0)),
         "allow_full_fallback": bool(allow_full_fallback),

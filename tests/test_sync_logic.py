@@ -1402,7 +1402,12 @@ def test_transfer_planner_explains_api_bridge_pending_with_candidate_hashes() ->
     assert plan["bridge_candidate_hashes"] == ["sha1"]
     assert plan["bridge_pending_reason"] == "provider_api_bridge_not_executed_yet"
     assert "理论预期哈希" in plan["reason"]
+    assert "目标端当前最关键的是 md5" in plan["reason"]
     assert plan["bridge_missing_expected_hashes"] == ["md5", "content_hash"]
+    assert plan["target_fast_hashes"] == ["md5", "gcid"]
+    assert plan["missing_target_fast_hashes"] == ["md5", "gcid"]
+    assert plan["bridge_recoverable_fast_hashes"] == ["md5"]
+    assert plan["bridge_missing_recoverable_fast_hashes"] == ["md5"]
     assert plan["next_action_hint"] == "execute_provider_api_for_fast_hashes"
 
 
@@ -1452,6 +1457,8 @@ def test_transfer_planner_explains_non_fast_session_snapshot_candidates() -> Non
     assert plan["bridge_candidate_hashes"] == ["sha1", "slice_md5"]
     assert plan["bridge_pending_reason"] == "non_fast_hashes_only_after_session_snapshot"
     assert "session snapshot" in plan["reason"]
+    assert "目标端仍缺=md5, gcid" in plan["reason"]
+    assert plan["missing_target_fast_hashes"] == ["md5", "gcid"]
     assert plan["next_action_hint"] == "wait_for_fast_hash_or_fallback"
 
 
@@ -1556,6 +1563,9 @@ def test_transfer_planner_summary_collects_bridge_candidate_counts() -> None:
     assert summary["bridge_maturity_honesty_counts"]["api_prepared_not_executed"] == 1
     assert summary["bridge_missing_expected_hash_counts"]["md5"] == 1
     assert summary["bridge_missing_expected_hash_counts"]["content_hash"] == 1
+    assert summary["missing_target_fast_hash_counts"]["md5"] == 2
+    assert summary["missing_target_fast_hash_counts"]["gcid"] == 2
+    assert summary["bridge_missing_recoverable_fast_hash_counts"]["md5"] == 1
     assert summary["next_action_hint_counts"]["execute_provider_api_for_fast_hashes"] == 1
     assert summary["next_action_hint_counts"]["wait_for_fast_hash_or_fallback"] == 1
 
@@ -6404,9 +6414,11 @@ def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
     assert payload["transferPlanPreview"]["bridge_maturity_level_counts"]["capture_missing"] == 1
     assert payload["transferPlanPreview"]["bridge_missing_expected_hash_counts"]["md5"] == 1
     assert payload["transferPlanPreview"]["bridge_missing_expected_hash_counts"]["sha1"] == 1
+    assert payload["transferPlanPreview"]["missing_target_fast_hash_counts"]["md5"] == 1
     assert payload["entries"][0]["transferPlan"]["mode"] == "fast_upload"
     assert payload["entries"][0]["transferPlan"]["reason_code"] == "fast_hash_ready"
     assert payload["entries"][0]["transferPlan"]["next_action_hint"] == "direct_fast_upload_ready"
+    assert payload["entries"][0]["transferPlan"]["target_fast_hashes"] == ["md5", "gcid"]
     assert payload["truncated"] is True
 
 
