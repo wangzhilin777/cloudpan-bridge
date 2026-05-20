@@ -31,7 +31,7 @@
 - [x] API 型 provider 的文件级规划会继续暴露“理论预期哈希 / 当前仍缺哈希”，不再只停留在笼统的 pending 原因
 - [x] 页面摘要与目录分析样本已显示 API provider 的预期哈希缺口，目录级也会统计当前最缺哪些预期哈希
 - [ ] 深化首批主流源端的真实直连补指纹桥接实现
-- [ ] 继续拆分前端与过大的 Python/JS 文件，优先压到单文件 `100 KB` 左右，并按统一分级阈值治理
+- [x] 继续拆分前端与过大的 Python/JS 文件，优先压到单文件 `100 KB` 左右，并按统一分级阈值治理
 - [x] 完成更多主流 provider 的互传能力验证与 UI 诚实提示收口
 
 ### 最近推进记录
@@ -96,6 +96,10 @@
   - 现在兼容 `fileHashesByPath / entryHashesById` 这类驼峰缓存容器键
   - 条目匹配时也兼容 `filePath / sourceId / fileId / resourceId / fsId` 等真实字段名
   - 这让 `OneDrive / Thunder / AliyunDriveOpen` 一类浏览器抓取快照，即使不是仓库内部理想的 snake_case 结构，也能进入统一 enrich 流水线
+- 统一体积分级阈值这轮也已落到实处：
+  - 当前生产源码里最大的 Python / JS 文件是 `webapp.py`，约 `94.2 KB`
+  - 前端主入口 `app.js` 约 `88.8 KB`
+  - 当前没有超过 `100 KB` 的生产源码文件，说明“优先压到 100 KB 左右并按阈值治理”这一项已达到当前阶段目标
 
 ## 摘要
 
