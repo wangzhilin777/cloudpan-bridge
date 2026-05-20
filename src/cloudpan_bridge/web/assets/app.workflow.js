@@ -95,6 +95,7 @@
     const transferReasonText = bridgeView.formatCountMap(ctx, sourceAnalyzeCache?.transferPlanPreview?.reason_code_counts || {}, bridgeView.transferReasonCodeText);
     const transferStageText = bridgeView.formatCountMap(ctx, sourceAnalyzeCache?.transferPlanPreview?.bridge_provider_stage_counts || {}, bridgeView.bridgeProviderStageText);
     const transferMaturityText = bridgeView.formatCountMap(ctx, sourceAnalyzeCache?.transferPlanPreview?.bridge_maturity_level_counts || {}, bridgeView.bridgeMaturityText);
+    const transferExpectedGapText = Object.entries(sourceAnalyzeCache?.transferPlanPreview?.bridge_missing_expected_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
     const quickActions = strategyQuickActions(strategy?.recommendedMode || "analyze_first", strategy);
     quickActionsRoot.innerHTML = quickActions.map((item) => (
       `<button class="secondary" type="button" data-capability-action="${escapeHtml(item.key)}">${escapeHtml(item.label)}</button>`
@@ -120,6 +121,7 @@
       <div class="mono">${currentLang() === "en" ? "Transfer reason buckets" : currentLang() === "mix" ? "传输原因分桶 / Transfer reason buckets" : "传输原因分桶"}: ${escapeHtml(transferReasonText)}</div>
       <div class="mono">${currentLang() === "en" ? "Bridge provider stages" : currentLang() === "mix" ? "桥接阶段分桶 / Bridge provider stages" : "桥接阶段分桶"}: ${escapeHtml(transferStageText)}</div>
       <div class="mono">${currentLang() === "en" ? "Bridge maturity buckets" : currentLang() === "mix" ? "桥接成熟度分桶 / Bridge maturity buckets" : "桥接成熟度分桶"}: ${escapeHtml(transferMaturityText)}</div>
+      <div class="mono">${currentLang() === "en" ? "Missing expected hashes" : currentLang() === "mix" ? "仍缺预期哈希 / Missing expected hashes" : "仍缺预期哈希"}: ${escapeHtml(transferExpectedGapText)}</div>
       <div class="mono">${currentLang() === "en" ? "Suggested path" : currentLang() === "mix" ? "建议路径 / Suggested path" : "建议路径"}: ${escapeHtml(recommendedFlow || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Runtime rationale" : currentLang() === "mix" ? "动态理由 / Runtime rationale" : "动态理由"}: ${escapeHtml(rationaleText || "-")}</div>
       <div class="mono">${currentLang() === "en" ? "Throttle hint" : currentLang() === "mix" ? "节奏建议 / Throttle hint" : "节奏建议"}: ${escapeHtml(throttleHintText || "-")}</div>
@@ -155,6 +157,7 @@
     const previewModeCounts = bridgeView.formatCountMap(ctx, transferPreview.mode_counts || {}, (_ctx, key) => bridgeView.transferModeText(ctx, key));
     const previewReasonCounts = bridgeView.formatCountMap(ctx, transferPreview.reason_code_counts || {}, bridgeView.transferReasonCodeText);
     const previewMaturityCounts = bridgeView.formatCountMap(ctx, transferPreview.bridge_maturity_level_counts || {}, bridgeView.bridgeMaturityText);
+    const previewExpectedGapText = Object.entries(transferPreview.bridge_missing_expected_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-";
     const recommendation = summary.missing_md5 > 0
       ? (summary.gcid_ready > 0
         ? (currentLang() === "en"
@@ -191,6 +194,7 @@
           <div class="mono">${currentLang() === "en" ? "Transfer preview" : currentLang() === "mix" ? "传输预览 / Transfer preview" : "传输预览"}: ${escapeHtml(previewModeCounts)}</div>
           <div class="mono">${currentLang() === "en" ? "Transfer reason buckets" : currentLang() === "mix" ? "传输原因分桶 / Transfer reason buckets" : "传输原因分桶"}: ${escapeHtml(previewReasonCounts)}</div>
           <div class="mono">${currentLang() === "en" ? "Bridge maturity buckets" : currentLang() === "mix" ? "桥接成熟度分桶 / Bridge maturity buckets" : "桥接成熟度分桶"}: ${escapeHtml(previewMaturityCounts)}</div>
+          <div class="mono">${currentLang() === "en" ? "Missing expected hashes" : currentLang() === "mix" ? "仍缺预期哈希 / Missing expected hashes" : "仍缺预期哈希"}: ${escapeHtml(previewExpectedGapText)}</div>
           <div class="mono">provider: ${escapeHtml(providerCounts)}</div>
           <div class="mono">hash: ${escapeHtml(hashCounts)}</div>
           <div class="mono">${escapeHtml((currentLang() === "en" ? decision?.rationale?.en : currentLang() === "mix" ? `${decision?.rationale?.zh || ""} / ${decision?.rationale?.en || ""}`.trim() : decision?.rationale?.zh) || "-")}</div>
@@ -206,6 +210,7 @@
             <div class="mono">${currentLang() === "en" ? "planned" : currentLang() === "mix" ? "计划模式 / planned" : "计划模式"}=${escapeHtml(bridgeView.transferModeText(ctx, item.transferPlan?.mode || "-"))} | ${currentLang() === "en" ? "reason" : currentLang() === "mix" ? "原因 / reason" : "原因"}=${escapeHtml(bridgeView.transferReasonCodeText(ctx, item.transferPlan?.reason_code || "-"))}</div>
             <div class="mono">${currentLang() === "en" ? "bridge stage" : currentLang() === "mix" ? "桥接阶段 / bridge stage" : "桥接阶段"}=${escapeHtml(bridgeView.bridgeProviderStageText(ctx, item.transferPlan?.bridge_provider_stage || "-"))} | ${currentLang() === "en" ? "maturity" : currentLang() === "mix" ? "成熟度 / maturity" : "成熟度"}=${escapeHtml(bridgeView.bridgeMaturityText(ctx, item.transferPlan?.bridge_maturity_level || "-"))}</div>
             <div class="mono">${currentLang() === "en" ? "pending" : currentLang() === "mix" ? "挂起 / pending" : "挂起"}=${escapeHtml(bridgeView.bridgePendingReasonText(ctx, item.transferPlan?.bridge_pending_reason || "-"))} | ${currentLang() === "en" ? "honesty" : currentLang() === "mix" ? "边界 / honesty" : "边界"}=${escapeHtml(bridgeView.bridgeHonestyText(ctx, item.transferPlan?.bridge_maturity_honesty || "-"))}</div>
+            <div class="mono">${currentLang() === "en" ? "expected" : currentLang() === "mix" ? "预期哈希 / expected" : "预期哈希"}=${escapeHtml((item.transferPlan?.bridge_expected_hashes || []).join(", ") || "-")} | ${currentLang() === "en" ? "missing" : currentLang() === "mix" ? "仍缺 / missing" : "仍缺"}=${escapeHtml((item.transferPlan?.bridge_missing_expected_hashes || []).join(", ") || "-")}</div>
           </div>
         </div>
       `).join("")}

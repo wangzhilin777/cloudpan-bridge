@@ -6338,6 +6338,8 @@ def test_source_analyze_endpoint_returns_summary(tmp_path: Path) -> None:
     assert payload["sourceEnrichmentBatch"]["bridge_execution_state_counts"]["api_bridge_prepared_but_not_executed"] == 1
     assert payload["transferPlanPreview"]["reason_code_counts"]["fast_hash_ready"] == 2
     assert payload["transferPlanPreview"]["bridge_maturity_level_counts"]["capture_missing"] == 1
+    assert payload["transferPlanPreview"]["bridge_missing_expected_hash_counts"]["md5"] == 1
+    assert payload["transferPlanPreview"]["bridge_missing_expected_hash_counts"]["sha1"] == 1
     assert payload["entries"][0]["transferPlan"]["mode"] == "fast_upload"
     assert payload["entries"][0]["transferPlan"]["reason_code"] == "fast_hash_ready"
     assert payload["truncated"] is True
