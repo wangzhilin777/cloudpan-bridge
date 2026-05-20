@@ -381,6 +381,11 @@ def _build_report(
     preparation = dict(bridge_runtime.get("preparation") or {})
     merged_presence = _fingerprint_presence(merged)
     bridge_maturity = dict(runtime.get("bridge_maturity_summary") or {})
+    maturity_level = str(bridge_maturity.get("level") or "")
+    maturity_honesty = str(bridge_maturity.get("honesty") or "")
+    if execution_state == "api_capture_cache_normalized":
+        maturity_level = "api_capture_cache_ready"
+        maturity_honesty = "capture_cache_snapshot_only"
     expected_hashes = [str(item).strip().lower() for item in list(preparation.get("fingerprint_expectation") or []) if str(item).strip()]
     missing_expected_hashes = [key for key in expected_hashes if not merged_presence.get(key)]
     return {
@@ -390,8 +395,8 @@ def _build_report(
         "bridge_executor": executor_name,
         "provider_stage": provider_stage,
         "bridge_transport_hint": str(preparation.get("transport_hint") or "-"),
-        "bridge_maturity_level": str(bridge_maturity.get("level") or ""),
-        "bridge_maturity_honesty": str(bridge_maturity.get("honesty") or ""),
+        "bridge_maturity_level": maturity_level,
+        "bridge_maturity_honesty": maturity_honesty,
         "bridge_expected_hashes": expected_hashes,
         "bridge_missing_expected_hashes": missing_expected_hashes,
         "bridge_selected_group": list(preparation.get("selected_group") or []),

@@ -48,6 +48,13 @@
   - `file_hashes_by_id / fingerprints_by_id`
   - `entries / items / file_hashes` 列表中的按 `path / source_id` 匹配条目
 - 这让 `AliyunDriveOpen / OneDrive / Thunder` 这类 API 型 provider 不再只能停留在“纯占位准备态”，而是可以先消费已抓到的文件级指纹快照
+- 页面与传输规划摘要已开始区分两种 API 型阶段：
+  - `api_bridge_prepared_but_not_executed`
+  - `api_capture_cache_normalized`
+- 当前如果只是吃到了抓取缓存，但还没补齐目标端真正可用的快传哈希，会在页面上诚实显示为：
+  - 抓取缓存补指纹已生效
+  - 仍不是在线直连 enrich
+  - 下一步应继续扩抓取缓存或再执行真实 provider API enrich
 
 ## 摘要
 

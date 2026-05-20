@@ -17,6 +17,7 @@
     const mapping = {
       session_snapshot_normalized: ["已按会话快照归并指纹", "Session snapshot normalized"],
       api_bridge_prepared_but_not_executed: ["已准备 API 桥接，但尚未真正执行", "API bridge prepared but not executed"],
+      api_capture_cache_normalized: ["已从抓取缓存归并文件级哈希", "File-level hashes were normalized from the capture cache"],
       bridge_not_registered: ["未注册桥接执行器", "Bridge executor not registered"],
     };
     const pair = mapping[String(key || "").trim()] || [key || "-", key || "-"];
@@ -27,6 +28,7 @@
     const mapping = {
       session_snapshot: ["会话快照阶段", "Session snapshot stage"],
       api_placeholder: ["API 占位阶段", "API placeholder stage"],
+      api_capture_cache: ["抓取缓存归并阶段", "Capture-cache normalization stage"],
       none: ["未进入桥接阶段", "No bridge stage"],
     };
     const pair = mapping[String(key || "").trim()] || [key || "-", key || "-"];
@@ -41,6 +43,7 @@
       full_stream_fallback_allowed: ["当前模式允许普通流式上传", "The current run mode allows normal stream upload"],
       fallback_available_but_deferred: ["目标端可降级上传，但本轮先只记录待补传", "Fallback upload is available, but this run keeps it as pending only"],
       provider_api_bridge_not_executed_yet: ["源端 API 桥接未真正执行，当前只看到候选哈希", "The source API bridge is not executed yet, so only candidate hashes are visible"],
+      api_capture_cache_partial: ["已吃到抓取缓存，但快传关键哈希仍未补齐", "The capture cache was consumed, but fast-upload hashes are still incomplete"],
       non_fast_hashes_only_after_session_snapshot: ["源端只补出非快传关键指纹", "Only non-fast fingerprints were recovered from the source"],
       target_hash_not_supported: ["源端候选哈希存在，但目标端不认这些哈希", "Candidate hashes exist, but the target does not recognize them"],
       target_no_fast_capability: ["当前目标端本身不支持元数据秒传", "The current target does not provide metadata-based fast upload"],
@@ -70,6 +73,8 @@
       defer_to_pending_tree: ["建议先进入待补传目录树", "Prefer deferring into the pending tree first"],
       execute_provider_api_enrich: ["应先执行源端 API 补指纹", "Run source-side API enrichment first"],
       execute_provider_api_for_fast_hashes: ["应优先补齐快传关键哈希", "Prioritize recovering fast-upload hashes first"],
+      extend_capture_cache_or_provider_api: ["应继续扩抓取缓存，或切到真实 API enrich", "Extend the capture cache or switch to real provider API enrichment"],
+      extend_capture_cache_for_fast_hashes: ["应优先扩抓取缓存里的快传关键哈希", "Prioritize extending fast-upload hashes inside the capture cache"],
       wait_for_fast_hash_or_fallback: ["等待快传关键哈希，或转降级上传", "Wait for fast hashes or fall back to normal upload"],
       fallback_target_does_not_accept_hashes: ["目标端不认这些哈希，应转普通上传", "The target does not accept these hashes, so fall back to normal upload"],
       fallback_target_has_no_fast_upload: ["目标端无秒传能力，应直接走普通上传", "The target has no fast-upload capability, so use normal upload"],
@@ -101,6 +106,7 @@
     const mapping = {
       session_snapshot_ready: ["会话快照已就绪", "Session snapshot ready"],
       api_capture_ready_pending_provider_enrich: ["API 准备态已就绪", "API preparation ready"],
+      api_capture_cache_ready: ["抓取缓存补指纹已生效", "Capture-cache enrichment is active"],
       capture_missing: ["仍缺关键登录态", "Missing required capture fields"],
       not_registered: ["未注册专用 bridge", "No dedicated bridge registered"],
       unknown: ["需要人工复核", "Needs manual review"],
@@ -113,6 +119,7 @@
     const mapping = {
       capture_ready_normalization_only: ["已具备归并能力，但仍只到补指纹层", "Normalization is ready, but still limited to enrichment only"],
       api_prepared_not_executed: ["API 准备态已满足，但真实 provider enrich 未执行", "API preparation is satisfied, but real provider enrich is not executed"],
+      capture_cache_snapshot_only: ["已消费抓取缓存，但仍不是在线直连 enrich", "The capture cache is consumed, but this is still not live direct enrichment"],
       waiting_capture: ["仍在等待关键登录态", "Still waiting for required capture fields"],
       openlist_only: ["当前只能依赖 OpenList 元数据", "Currently limited to OpenList metadata only"],
       manual_review: ["需要人工复核", "Needs manual review"],

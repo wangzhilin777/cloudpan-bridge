@@ -1518,6 +1518,8 @@ def test_execute_source_bridge_reads_api_capture_cache_by_path_for_aliyundriveop
     assert enriched.crc64 == "C" * 16
     assert report["bridge_execution_state"] == "api_capture_cache_normalized"
     assert report["provider_stage"] == "api_capture_cache"
+    assert report["bridge_maturity_level"] == "api_capture_cache_ready"
+    assert report["bridge_maturity_honesty"] == "capture_cache_snapshot_only"
     assert report["pending_reason"] == ""
     assert report["fast_upload_ready_after_bridge"] is True
 
@@ -1556,6 +1558,8 @@ def test_execute_source_bridge_reads_api_capture_cache_list_for_onedrive(tmp_pat
     assert enriched.content_hash == "SHA1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     assert report["bridge_execution_state"] == "api_capture_cache_normalized"
     assert report["provider_stage"] == "api_capture_cache"
+    assert report["bridge_maturity_level"] == "api_capture_cache_ready"
+    assert report["bridge_maturity_honesty"] == "capture_cache_snapshot_only"
     assert report["bridge_missing_expected_hashes"] == ["md5"]
     assert report["pending_reason"] == "provider_api_bridge_not_executed_yet"
 
@@ -1668,6 +1672,62 @@ def test_transfer_planner_marks_api_bridge_pending_without_fast_hash_gap() -> No
     )
     assert plan["reason_code"] == "provider_api_bridge_not_executed_yet"
     assert plan["next_action_hint"] == "execute_provider_api_enrich"
+
+
+def test_transfer_planner_marks_capture_cache_partial_for_fast_hash_gap() -> None:
+    entry = SourceEntry(
+        path="/src/cache-only.docx",
+        md5="",
+        size=10,
+        provider="OneDrive",
+        sha1="A" * 40,
+        provider_specific={
+            "__bridge_candidate_hashes": "sha1,content_hash",
+            "__bridge_pending_reason": "provider_api_bridge_not_executed_yet",
+            "__bridge_execution_state": "api_capture_cache_normalized",
+            "__bridge_provider_stage": "api_capture_cache",
+            "__bridge_maturity_level": "api_capture_cache_ready",
+            "__bridge_maturity_honesty": "capture_cache_snapshot_only",
+            "__bridge_expected_hashes": "sha1,md5,content_hash",
+            "__bridge_missing_expected_hashes": "md5",
+        },
+    )
+    plan = plan_transfer_mode(
+        entry,
+        {"supports_fast_upload": True, "fast_upload_hashes": ["md5", "gcid"], "fallback_modes": ["download_upload"]},
+        auto_download_threshold_mb=0,
+    )
+    assert plan["reason_code"] == "api_capture_cache_partial"
+    assert plan["next_action_hint"] == "extend_capture_cache_for_fast_hashes"
+    assert "抓取缓存里的文件级哈希" in plan["reason"]
+    assert "目标端当前最关键的是 md5" in plan["reason"]
+
+
+def test_transfer_planner_marks_capture_cache_partial_without_fast_hash_gap() -> None:
+    entry = SourceEntry(
+        path="/src/cache-meta.docx",
+        md5="",
+        size=10,
+        provider="OneDrive",
+        sha1="A" * 40,
+        provider_specific={
+            "__bridge_candidate_hashes": "sha1,content_hash",
+            "__bridge_pending_reason": "provider_api_bridge_not_executed_yet",
+            "__bridge_execution_state": "api_capture_cache_normalized",
+            "__bridge_provider_stage": "api_capture_cache",
+            "__bridge_maturity_level": "api_capture_cache_ready",
+            "__bridge_maturity_honesty": "capture_cache_snapshot_only",
+            "__bridge_expected_hashes": "sha1,content_hash",
+            "__bridge_missing_expected_hashes": "content_hash",
+        },
+    )
+    plan = plan_transfer_mode(
+        entry,
+        {"supports_fast_upload": True, "fast_upload_hashes": ["md5", "gcid"], "fallback_modes": ["download_upload"]},
+        auto_download_threshold_mb=0,
+    )
+    assert plan["reason_code"] == "api_capture_cache_partial"
+    assert plan["next_action_hint"] == "extend_capture_cache_or_provider_api"
 
 
 def test_transfer_planner_explains_non_fast_session_snapshot_candidates() -> None:
@@ -1803,6 +1863,39 @@ def test_transfer_planner_summary_collects_bridge_candidate_counts() -> None:
     assert summary["bridge_missing_recoverable_fast_hash_counts"]["md5"] == 1
     assert summary["next_action_hint_counts"]["execute_provider_api_for_fast_hashes"] == 1
     assert summary["next_action_hint_counts"]["wait_for_fast_hash_or_fallback"] == 1
+
+
+def test_transfer_planner_summary_collects_capture_cache_stage_counts() -> None:
+    entries = [
+        SourceEntry(
+            path="/src/cache.docx",
+            md5="",
+            size=10,
+            sha1="A" * 40,
+            provider_specific={
+                "__bridge_candidate_hashes": "sha1,content_hash",
+                "__bridge_pending_reason": "provider_api_bridge_not_executed_yet",
+                "__bridge_execution_state": "api_capture_cache_normalized",
+                "__bridge_provider_stage": "api_capture_cache",
+                "__bridge_transport_hint": "refresh_token_or_authorization",
+                "__bridge_maturity_level": "api_capture_cache_ready",
+                "__bridge_maturity_honesty": "capture_cache_snapshot_only",
+                "__bridge_expected_hashes": "sha1,md5,content_hash",
+                "__bridge_missing_expected_hashes": "md5",
+            },
+        )
+    ]
+    summary = summarize_transfer_plan(
+        entries,
+        {"supports_fast_upload": True, "fast_upload_hashes": ["md5", "gcid"], "fallback_modes": ["download_upload"]},
+        auto_download_threshold_mb=0,
+    )
+    assert summary["reason_code_counts"]["api_capture_cache_partial"] == 1
+    assert summary["bridge_execution_state_counts"]["api_capture_cache_normalized"] == 1
+    assert summary["bridge_provider_stage_counts"]["api_capture_cache"] == 1
+    assert summary["bridge_maturity_level_counts"]["api_capture_cache_ready"] == 1
+    assert summary["bridge_maturity_honesty_counts"]["capture_cache_snapshot_only"] == 1
+    assert summary["next_action_hint_counts"]["extend_capture_cache_for_fast_hashes"] == 1
 
 
 def test_sync_runner_uses_source_provider_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

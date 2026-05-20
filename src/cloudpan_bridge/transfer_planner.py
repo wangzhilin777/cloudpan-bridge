@@ -111,23 +111,35 @@ def plan_transfer_mode(
         reason = "当前目标端可降级上传，但本轮建议先记录到待补传。"
     if not fast_hash_hits and bridge_candidates:
         pending_reason = str(bridge_meta.get("pending_reason") or "")
+        execution_state = str(bridge_meta.get("execution_state") or "")
         if pending_reason == "provider_api_bridge_not_executed_yet":
             reason_code = "provider_api_bridge_not_executed_yet"
             next_action_hint = "execute_provider_api_enrich"
+            prepared_label = "源端 bridge 已进入 API 准备态"
+            next_step_label = "执行真实 provider enrich"
+            if execution_state == "api_capture_cache_normalized":
+                reason_code = "api_capture_cache_partial"
+                next_action_hint = "extend_capture_cache_or_provider_api"
+                prepared_label = "源端 bridge 已先吃到抓取缓存里的文件级哈希"
+                next_step_label = "继续扩抓取缓存或执行真实 provider enrich"
             if bridge_missing_recoverable_fast_hashes:
                 next_action_hint = "execute_provider_api_for_fast_hashes"
+                if execution_state == "api_capture_cache_normalized":
+                    next_action_hint = "extend_capture_cache_for_fast_hashes"
             if bridge_missing_expected_hashes:
                 reason = (
-                    "源端 bridge 已进入 API 准备态，但当前版本还没有执行真实 provider enrich；"
+                    f"{prepared_label}，但当前仍缺补齐目标端所需哈希的关键字段；"
                     f"理论预期哈希={', '.join(bridge_expected_hashes or ['-'])}，当前仍缺={', '.join(bridge_missing_expected_hashes)}"
                 )
                 if bridge_missing_recoverable_fast_hashes:
                     reason += f"；其中目标端当前最关键的是 {', '.join(bridge_missing_recoverable_fast_hashes)}"
+                reason += f"；下一步建议={next_step_label}"
             else:
                 reason = (
-                    "源端 bridge 已进入 API 准备态，但当前版本还没有执行真实 provider enrich；"
+                    f"{prepared_label}，但当前还没有补齐目标端真正可用的快传指纹；"
                     f"目前仅看到候选哈希: {', '.join(bridge_candidates)}"
                 )
+                reason += f"；下一步建议={next_step_label}"
         elif pending_reason == "non_fast_hashes_only_after_session_snapshot":
             reason_code = "non_fast_hashes_only_after_session_snapshot"
             next_action_hint = "wait_for_fast_hash_or_fallback"
