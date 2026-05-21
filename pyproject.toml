@@ -30,5 +30,12 @@ cloudpan-bridge = "cloudpan_bridge.cli:main"
 [tool.setuptools]
 package-dir = {"" = "src"}
 
+[tool.setuptools.package-data]
+cloudpan_bridge = [
+  "web/index.html",
+  "web/assets/*.js",
+  "web/assets/*.css",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
