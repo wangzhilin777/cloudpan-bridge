@@ -1521,18 +1521,31 @@
       const selectable = !!resolvedPayload?.selectable;
       const configured = !!resolvedPayload?.configured;
       const targetProfile = providerRegistryPayload?.target_profiles?.[targetKey] || { key: targetKey, label: targetKey, label_zh: targetKey };
-      const fastHashes = escapeHtml((capability?.fast_upload_hashes || []).join(", ") || "-");
-      const fallbackModes = escapeHtml((capability?.fallback_modes || []).join(", ") || "-");
+      const stateLabel = error
+        ? (currentLang() === "en" ? "Connection error" : currentLang() === "mix" ? "连接异常 / Connection error" : "连接异常")
+        : configured
+          ? (currentLang() === "en" ? "Connected" : currentLang() === "mix" ? "已连接 / Connected" : "已连接")
+          : missingFields.length
+            ? (currentLang() === "en" ? "Not ready" : currentLang() === "mix" ? "未就绪 / Not ready" : "未就绪")
+            : (currentLang() === "en" ? "Pending check" : currentLang() === "mix" ? "待检查 / Pending check" : "待检查");
       const statusText = configured
-        ? (currentLang() === "en" ? "Target is configured and writable." : currentLang() === "mix" ? "目标端已配置，可继续执行。 / Target is configured and writable." : "目标端已配置，可继续执行。")
-        : (currentLang() === "en" ? "Target fields are still incomplete." : currentLang() === "mix" ? "目标端字段还没填完整。 / Target fields are incomplete." : "目标端字段还没填完整。");
+        ? (currentLang() === "en" ? "This target is ready for execution." : currentLang() === "mix" ? "当前目标端已配置完成，可以继续执行。 / Ready for execution." : "当前目标端已配置完成，可以继续执行。")
+        : missingFields.length
+          ? (currentLang() === "en" ? `Still missing ${missingFields.length} required field(s).` : currentLang() === "mix" ? `还有 ${missingFields.length} 个必填项未完成。 / Missing ${missingFields.length} required field(s).` : `还有 ${missingFields.length} 个必填项未完成。`)
+          : (currentLang() === "en" ? "Target fields still need to be confirmed." : currentLang() === "mix" ? "目标端字段还需要确认。 / Target fields still need confirmation." : "目标端字段还需要确认。");
+      const nextHint = !implemented
+        ? (currentLang() === "en" ? "This target is still not implemented in the current build." : currentLang() === "mix" ? "当前版本还没真正实现这个目标端。 / Not implemented in this build." : "当前版本还没真正实现这个目标端。")
+        : !selectable
+          ? (currentLang() === "en" ? "This target is listed but not selectable yet." : currentLang() === "mix" ? "这个目标端已列出，但暂时还不能选择。 / Listed but not selectable yet." : "这个目标端已列出，但暂时还不能选择。")
+          : configured
+            ? (currentLang() === "en" ? "You can keep the details collapsed unless you need to update credentials." : currentLang() === "mix" ? "如果不需要改凭证，下面的连接字段可以继续保持收起。 / You can keep details collapsed." : "如果不需要改凭证，下面的连接字段可以继续保持收起。")
+            : (currentLang() === "en" ? "Expand the connection details below only when you need to complete the missing fields." : currentLang() === "mix" ? "只有补字段或排查连接问题时，才需要展开下面的连接详情。 / Expand details only when needed." : "只有补字段或排查连接问题时，才需要展开下面的连接详情。");
       root.innerHTML = `
         <div><strong>${escapeHtml(formatTargetProfileLabel(targetProfile))}</strong></div>
+        <div class="summary-pill ${configured ? "" : "warn"}">${escapeHtml(stateLabel)}</div>
         <div>${escapeHtml(statusText)}</div>
-        <div class="mono">${currentLang() === "en" ? "Write mode" : currentLang() === "mix" ? "写入方式 / Write mode" : "写入方式"}: ${escapeHtml(capability?.write_mode || "-")} | ${currentLang() === "en" ? "Fast hashes" : currentLang() === "mix" ? "快传指纹 / Fast hashes" : "快传指纹"}: ${fastHashes}</div>
-        <div class="mono">${currentLang() === "en" ? "Fallback" : currentLang() === "mix" ? "降级方式 / Fallback" : "降级方式"}: ${fallbackModes} | ${currentLang() === "en" ? "Missing" : currentLang() === "mix" ? "缺少字段 / Missing" : "缺少字段"}: ${escapeHtml(missingFields.join(", ") || "-")}</div>
-        <div class="mono">${currentLang() === "en" ? "Implemented" : currentLang() === "mix" ? "已实现 / Implemented" : "已实现"}: ${implemented ? "yes" : "no"} | ${currentLang() === "en" ? "Selectable" : currentLang() === "mix" ? "可选择 / Selectable" : "可选择"}: ${selectable ? "yes" : "no"} | ${currentLang() === "en" ? "Auto dir" : currentLang() === "mix" ? "自动建目录 / Auto dir" : "自动建目录"}: ${capability?.auto_create_dir ? "yes" : "no"}</div>
-        <div>${escapeHtml(resolvedPayload?.message || "")}</div>
+        <div class="mono">${currentLang() === "en" ? "Missing fields" : currentLang() === "mix" ? "缺少字段 / Missing fields" : "缺少字段"}: ${escapeHtml(missingFields.join(", ") || "-")}</div>
+        <div class="subtle">${escapeHtml(nextHint)}</div>
       `;
       setNoticeTone("target-preflight-notice", configured ? "success" : "warn");
     }
@@ -1745,16 +1758,23 @@
           <div><strong>${escapeHtml(targetName)}</strong></div>
           <div class="subtle">${escapeHtml(guideTextPair(targetProfile?.description) || "")}</div>
           <div class="mono">${currentLang() === "en" ? "Auth mode" : currentLang() === "mix" ? "鉴权 / Auth mode" : "鉴权"}: ${escapeHtml(authMode)}</div>
-          <div class="mono">${currentLang() === "en" ? "Auto dir" : currentLang() === "mix" ? "自动目录 / Auto dir" : "自动目录"}: ${preflight?.auto_create_dir ? "yes" : "no"}</div>
+          <div class="subtle">${preflight?.auto_create_dir
+            ? (currentLang() === "en" ? "Can create target directories automatically." : currentLang() === "mix" ? "支持自动建目录。 / Auto directory creation supported." : "支持自动建目录。")
+            : (currentLang() === "en" ? "Target directories may need to exist in advance." : currentLang() === "mix" ? "目标目录可能需要提前存在。 / Target directory may need to exist first." : "目标目录可能需要提前存在。")}</div>
         `;
       }
       const summary = document.getElementById("target-auth-summary");
       if (summary) {
         const missingFields = Array.isArray(preflight?.missing_fields) ? preflight.missing_fields : [];
+        const readyText = writable
+          ? (currentLang() === "en" ? "Ready to execute" : currentLang() === "mix" ? "可直接执行 / Ready to execute" : "可直接执行")
+          : (currentLang() === "en" ? "Needs configuration" : currentLang() === "mix" ? "还需配置 / Needs configuration" : "还需配置");
         summary.innerHTML = `
-          <div class="summary-pill ${writable ? "" : "warn"}">${escapeHtml(writable ? (currentLang() === "en" ? "writable" : currentLang() === "mix" ? "可写 / writable" : "可写") : (currentLang() === "en" ? "not ready" : currentLang() === "mix" ? "未就绪 / not ready" : "未就绪"))}</div>
-          <div class="mono">${currentLang() === "en" ? "Write" : currentLang() === "mix" ? "写入 / Write" : "写入"}=${escapeHtml(preflight?.write_mode || "-")} | ${currentLang() === "en" ? "Fast" : currentLang() === "mix" ? "快传 / Fast" : "快传"}=${escapeHtml(fastUploadHashes.join(", ") || "-")}</div>
-          <div class="mono">${currentLang() === "en" ? "Fallback" : currentLang() === "mix" ? "降级 / Fallback" : "降级"}=${escapeHtml(fallbackModes.join(", ") || "-")} | ${currentLang() === "en" ? "Missing" : currentLang() === "mix" ? "缺项 / Missing" : "缺项"}=${escapeHtml(String(missingFields.length || 0))}</div>
+          <div class="summary-pill ${writable ? "" : "warn"}">${escapeHtml(readyText)}</div>
+          <div>${writable
+            ? (currentLang() === "en" ? "Connection looks healthy and this target can continue into execution." : currentLang() === "mix" ? "连接状态正常，可以继续执行。 / Connection looks healthy." : "连接状态正常，可以继续执行。")
+            : (currentLang() === "en" ? `There are still ${missingFields.length || 0} required field(s) to complete.` : currentLang() === "mix" ? `还有 ${missingFields.length || 0} 个必填项需要补齐。 / Required fields are still missing.` : `还有 ${missingFields.length || 0} 个必填项需要补齐。`)}</div>
+          <div class="mono">${currentLang() === "en" ? "Write mode" : currentLang() === "mix" ? "写入方式 / Write mode" : "写入方式"}: ${escapeHtml(preflight?.write_mode || "-")}</div>
           <div class="subtle">${escapeHtml(preflight?.message || "")}</div>
         `;
       }

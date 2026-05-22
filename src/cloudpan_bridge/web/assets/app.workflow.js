@@ -291,6 +291,7 @@
       escapeHtml,
     } = ctx;
     const root = document.getElementById("source-driver-summary");
+    const humanRoot = document.getElementById("source-driver-human-summary");
     if (!root) return;
     const context = currentDriverContext();
     const backendContext = providerRegistryPayload?.current_source_context || {};
@@ -308,6 +309,41 @@
     const sourceTargetRoute = sourceRuntime.source_target_route || {};
     const bridgeThrottle = bridgePreparation.throttle_defaults || {};
     const bridgeFallbackPolicy = bridgePreparation.fallback_policy || {};
+    const humanLines = [];
+    const mountedDriverLabel = context.mountedDriver || context.driver || "-";
+    const routeMode = String(sourceRuntime.selected_source_mode || "-");
+    const enrichReady = !!sourceEnrichment.capture_ready;
+    const fastCandidate = Array.isArray(sourceTargetRoute.native_fast_candidate_hashes) && sourceTargetRoute.native_fast_candidate_hashes.length
+      ? sourceTargetRoute.native_fast_candidate_hashes.join(", ")
+      : Array.isArray(sourceTargetRoute.bridge_recoverable_fast_hashes) && sourceTargetRoute.bridge_recoverable_fast_hashes.length
+        ? sourceTargetRoute.bridge_recoverable_fast_hashes.join(", ")
+        : "-";
+    if (humanRoot) {
+      const lang = ctx.currentLang();
+      const mountText = selectedMount || browsingPath || sourcePath || "/";
+      const routeText = routeMode === "openlist_mount"
+        ? (lang === "en" ? "Currently browsing via OpenList mount." : lang === "mix" ? "当前通过 OpenList 挂载浏览。 / Browsing via OpenList mount." : "当前通过 OpenList 挂载浏览。")
+        : routeMode === "provider_direct"
+          ? (lang === "en" ? "Provider direct route is preferred for this source." : lang === "mix" ? "当前更偏向走网盘直连。 / Provider direct route is preferred." : "当前更偏向走网盘直连。")
+          : (lang === "en" ? "Source route will be chosen automatically." : lang === "mix" ? "当前会自动选择执行路线。 / Source route is selected automatically." : "当前会自动选择执行路线。");
+      const enrichText = enrichReady
+        ? (lang === "en" ? "Login capture cache is available for richer source metadata." : lang === "mix" ? "已具备登录抓取缓存，可补更多源端元数据。 / Capture cache is available." : "已具备登录抓取缓存，可补更多源端元数据。")
+        : (lang === "en" ? "No extra capture cache is active yet; normal mount browsing still works." : lang === "mix" ? "暂未启用额外抓取缓存，但普通挂载浏览不受影响。 / Normal browsing still works." : "暂未启用额外抓取缓存，但普通挂载浏览不受影响。");
+      const fastText = fastCandidate && fastCandidate !== "-"
+        ? (lang === "en" ? `Potential fast-upload hashes: ${fastCandidate}.` : lang === "mix" ? `当前可能可用的快传指纹：${fastCandidate}。 / Potential fast-upload hashes: ${fastCandidate}.` : `当前可能可用的快传指纹：${fastCandidate}。`)
+        : (lang === "en" ? "No fast-upload hash advantage has been identified yet." : lang === "mix" ? "当前还没识别到明显的快传指纹优势。 / No fast-upload hash advantage identified yet." : "当前还没识别到明显的快传指纹优势。");
+      humanLines.push(
+        lang === "en"
+          ? `Current source mount: ${mountText} | Driver: ${mountedDriverLabel} | Rate preset: ${rateMode}`
+          : lang === "mix"
+            ? `当前源挂载：${mountText} | 驱动：${mountedDriverLabel} | 节奏：${rateMode} / Current source mount: ${mountText}`
+            : `当前源挂载：${mountText} | 驱动：${mountedDriverLabel} | 节奏：${rateMode}`
+      );
+      humanLines.push(routeText);
+      humanLines.push(enrichText);
+      humanLines.push(fastText);
+      humanRoot.innerHTML = humanLines.map((line) => `<div>${escapeHtml(line)}</div>`).join("");
+    }
     const captureCacheAvailable = !!bridgePreparation.capture_cache_available;
     const captureCacheLookupModes = Array.isArray(bridgePreparation.capture_cache_lookup_modes) ? bridgePreparation.capture_cache_lookup_modes : [];
     const captureCacheHashFields = Array.isArray(bridgePreparation.capture_cache_hash_fields) ? bridgePreparation.capture_cache_hash_fields : [];

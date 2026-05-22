@@ -49,8 +49,8 @@
           <button class="tab" data-tab="mounts" data-i18n="tab.mounts">连接</button>
           <button class="tab" data-tab="source" data-i18n="tab.source">源目录</button>
           <button class="tab" data-tab="config" data-i18n="tab.config">目标端</button>
-          <button class="tab" data-tab="task" data-i18n="tab.task">任务</button>
           <button class="tab" data-tab="execute" data-i18n="tab.execute">执行</button>
+          <button class="tab" data-tab="task" data-i18n="tab.task">任务</button>
         </div>
 
         <section class="tab-panel active" data-panel="overview">
@@ -107,7 +107,14 @@
                 <div class="subtle" data-i18n="desc.source_mount_quick_pick">先在这里选一个已挂载源，再进入目录浏览，会更容易理解当前在操作哪个网盘。</div>
               </div>
             </div>
-            <div class="notice" id="source-driver-summary">等待源端上下文...</div>
+            <div class="notice" id="source-driver-human-summary">等待源端上下文...</div>
+            <details class="panel collapsible-panel">
+              <summary>
+                <span data-i18n="panel.source_driver_debug">源端技术详情</span>
+                <small data-i18n="desc.panel_source_driver_debug_summary">普通使用可以不看，只有排障时再展开。</small>
+              </summary>
+              <div class="notice" id="source-driver-summary">等待源端上下文...</div>
+            </details>
             <div class="actions">
               <button class="secondary" id="browse-mounted-source" data-i18n="btn.browse_mounted_source">从已挂载源开始浏览</button>
               <button class="secondary" id="browse-root" data-i18n="btn.browse_root" data-help-key="btn_browse_root">浏览挂载根目录</button>
@@ -156,6 +163,88 @@
             <div class="mount-list" id="source-analyze-summary">暂无分析结果</div>
           </details>
 
+        </section>
+
+        <section class="tab-panel" data-panel="execute">
+          <details class="panel collapsible-panel" open>
+            <summary>
+              <span data-i18n="panel.leaf_mode">最底层目录模式</span>
+              <small data-i18n="desc.panel_leaf_mode_summary">慢跑、防风控和队列准备放这里。</small>
+            </summary>
+            <h2 class="help-anchor" data-i18n="panel.leaf_mode" data-help-key="panel_leaf_mode">最底层目录模式</h2>
+            <div class="subtle" data-i18n="desc.leaf_mode">适合防风控慢跑。可以直接边扫边同步，也可以先把叶子目录加入队列后分批执行。</div>
+            <div class="actions">
+              <button class="secondary" id="add-current-queue" data-i18n="btn.add_current_queue" data-help-key="btn_add_current_queue">当前目录加入队列</button>
+              <button class="secondary" id="add-leaf-queue" data-i18n="btn.add_leaf_queue" data-help-key="btn_add_leaf_queue">当前目录最底层批量入队</button>
+              <button class="warn" id="run-leaf-direct" data-i18n="btn.run_leaf_direct" data-help-key="btn_run_leaf_direct">最底层边扫边秒传</button>
+              <button class="warn" id="run-leaf-full" data-i18n="btn.run_leaf_full" data-help-key="btn_run_leaf_full">最底层边扫边同步+补传</button>
+            </div>
+          </details>
+
+          <div class="panel">
+            <h2 class="help-anchor" data-i18n="panel.sync_actions" data-help-key="panel_sync_actions">同步执行</h2>
+            <div class="subtle" data-i18n="desc.execute_primary">先在这里完成主执行；补传、秒传和能力说明都在下方折叠区，按需展开即可。</div>
+            <div class="actions">
+              <button class="secondary" id="run-dry" data-i18n="btn.run_dry" data-help-key="btn_run_dry">只看计划 dry-run</button>
+              <button class="warn" id="run-direct" data-i18n="btn.direct_sync" data-help-key="btn_direct_sync">直接同步当前目录</button>
+              <button class="secondary" id="run-next-queue" data-i18n="btn.run_next_queue" data-help-key="btn_run_next_queue">执行队列下一个</button>
+              <button class="secondary" id="run-all-queue" data-i18n="btn.run_all_queue" data-help-key="btn_run_all_queue">连续执行整个队列</button>
+            </div>
+            <div class="notice" id="sync-notice" data-i18n="notice.sync_idle">等待操作</div>
+          </div>
+
+          <details class="panel collapsible-panel">
+            <summary>
+              <span data-i18n="panel.queue">目录队列</span>
+              <small data-i18n="desc.panel_queue_summary">当前目录队列与连续执行入口。</small>
+            </summary>
+            <h2 data-i18n="panel.queue">目录队列</h2>
+            <div class="queue-list" id="queue-list">暂无目录队列</div>
+          </details>
+
+          <details class="panel collapsible-panel" id="execute-pending-details">
+            <summary>
+              <span data-i18n="panel.pending_tree">待补传目录树</span>
+              <small data-i18n="desc.panel_pending_summary">执行失败后再展开这里处理补传。</small>
+            </summary>
+            <h2 class="help-anchor" data-i18n="panel.pending_tree" data-help-key="panel_pending_tree">待补传目录树</h2>
+            <div class="actions">
+              <button class="secondary" id="pending-select-all" data-i18n="btn.select_all">全选</button>
+              <button class="secondary" id="pending-clear-all" data-i18n="btn.clear_all">全不选</button>
+              <button class="warn" id="pending-run-selected" data-i18n="btn.pending_run_selected" data-help-key="btn_pending_run_selected">补传已勾选文件</button>
+              <button class="warn" id="pending-run-stream" data-i18n="btn.pending_run_stream" data-help-key="btn_pending_run_stream">按勾选目录最底层顺序补传</button>
+            </div>
+            <div class="subtle" data-i18n="desc.pending_tree">这里按真实目录树展示，父目录勾选会联动所有子目录和文件。</div>
+            <div class="tree-wrap" id="pending-tree">暂无待补传文件</div>
+          </details>
+
+          <details class="panel collapsible-panel" id="execute-capability-details">
+            <summary>
+              <span data-i18n="panel.capability">能力矩阵与建议</span>
+              <small data-i18n="desc.panel_capability_summary">是否能秒传、怎么降级，看这里。</small>
+            </summary>
+            <h2 data-i18n="panel.capability">能力矩阵与建议</h2>
+            <div class="subtle" id="capability-desc" data-i18n="desc.capability">根据当前选择的源驱动和现有目标端 Guangya，给出诚实降级后的推荐路径。这里不会把“只能补传”的组合误导成可秒传。</div>
+            <div class="notice" id="capability-summary">等待驱动信息...</div>
+            <div class="actions" id="capability-quick-actions"></div>
+          </details>
+
+          <details class="panel collapsible-panel" id="execute-miaochuan-details">
+            <summary>
+              <span id="tab-miaochuan-label" data-i18n="tab.miaochuan">秒传</span>
+              <small data-i18n="desc.panel_miaochuan_summary">增强入口，默认收起，支持时再用。</small>
+            </summary>
+            <h2 class="help-anchor" id="miaochuan-panel-title" data-i18n="panel.miaochuan" data-help-key="panel_miaochuan">秒传 JSON 直导</h2>
+            <div class="subtle" id="miaochuan-desc" data-i18n="desc.miaochuan">支持直接粘贴油猴或插件导出的 JSON。若你已自动抓取到光鸭 Authorization，会优先使用它。</div>
+            <label class="help-anchor" data-i18n="label.miaochuan_payload" data-help-key="miaochuan_payload">秒传 JSON</label>
+            <textarea id="miaochuan_payload" data-i18n-placeholder="placeholder.miaochuan_payload" placeholder='{"files":[{"path":"/demo.zip","size":"123","etag":"md5"}]}'></textarea>
+            <div class="actions">
+              <button class="secondary" id="diagnose-miaochuan" data-i18n="btn.diagnose_miaochuan" data-help-key="btn_diagnose_miaochuan">诊断当前秒传 JSON</button>
+              <button class="warn" id="run-miaochuan" data-i18n="btn.run_miaochuan" data-help-key="btn_run_miaochuan">直接导入光鸭</button>
+            </div>
+            <div class="notice" id="miaochuan-notice">等待操作</div>
+            <div class="mount-list" id="miaochuan-diagnosis">暂无诊断结果</div>
+          </details>
         </section>
 
         <section class="tab-panel" data-panel="task">
@@ -233,88 +322,6 @@
                 <div class="subtle" data-i18n="desc.target_delete_removed">默认只做新增 + 覆盖。只有同时开启这两个选项时，才会尝试删除目标端真实文件。</div>
               </div>
             </div>
-          </details>
-        </section>
-
-        <section class="tab-panel" data-panel="execute">
-          <div class="panel">
-            <h2 class="help-anchor" data-i18n="panel.sync_actions" data-help-key="panel_sync_actions">同步执行</h2>
-            <div class="subtle" data-i18n="desc.execute_primary">先在这里完成主执行；补传、秒传和能力说明都在下方折叠区，按需展开即可。</div>
-            <div class="actions">
-              <button class="secondary" id="run-dry" data-i18n="btn.run_dry" data-help-key="btn_run_dry">只看计划 dry-run</button>
-              <button class="warn" id="run-direct" data-i18n="btn.direct_sync" data-help-key="btn_direct_sync">直接同步当前目录</button>
-              <button class="secondary" id="run-next-queue" data-i18n="btn.run_next_queue" data-help-key="btn_run_next_queue">执行队列下一个</button>
-              <button class="secondary" id="run-all-queue" data-i18n="btn.run_all_queue" data-help-key="btn_run_all_queue">连续执行整个队列</button>
-            </div>
-            <div class="notice" id="sync-notice" data-i18n="notice.sync_idle">等待操作</div>
-          </div>
-
-          <details class="panel collapsible-panel">
-            <summary>
-              <span data-i18n="panel.leaf_mode">最底层目录模式</span>
-              <small data-i18n="desc.panel_leaf_mode_summary">慢跑、防风控和队列准备放这里。</small>
-            </summary>
-            <h2 class="help-anchor" data-i18n="panel.leaf_mode" data-help-key="panel_leaf_mode">最底层目录模式</h2>
-            <div class="subtle" data-i18n="desc.leaf_mode">适合防风控慢跑。可以直接边扫边同步，也可以先把叶子目录加入队列后分批执行。</div>
-            <div class="actions">
-              <button class="secondary" id="add-current-queue" data-i18n="btn.add_current_queue" data-help-key="btn_add_current_queue">当前目录加入队列</button>
-              <button class="secondary" id="add-leaf-queue" data-i18n="btn.add_leaf_queue" data-help-key="btn_add_leaf_queue">当前目录最底层批量入队</button>
-              <button class="warn" id="run-leaf-direct" data-i18n="btn.run_leaf_direct" data-help-key="btn_run_leaf_direct">最底层边扫边秒传</button>
-              <button class="warn" id="run-leaf-full" data-i18n="btn.run_leaf_full" data-help-key="btn_run_leaf_full">最底层边扫边同步+补传</button>
-            </div>
-          </details>
-
-          <details class="panel collapsible-panel">
-            <summary>
-              <span data-i18n="panel.queue">目录队列</span>
-              <small data-i18n="desc.panel_queue_summary">当前目录队列与连续执行入口。</small>
-            </summary>
-            <h2 data-i18n="panel.queue">目录队列</h2>
-            <div class="queue-list" id="queue-list">暂无目录队列</div>
-          </details>
-
-          <details class="panel collapsible-panel" id="execute-pending-details">
-            <summary>
-              <span data-i18n="panel.pending_tree">待补传目录树</span>
-              <small data-i18n="desc.panel_pending_summary">执行失败后再展开这里处理补传。</small>
-            </summary>
-            <h2 class="help-anchor" data-i18n="panel.pending_tree" data-help-key="panel_pending_tree">待补传目录树</h2>
-            <div class="actions">
-              <button class="secondary" id="pending-select-all" data-i18n="btn.select_all">全选</button>
-              <button class="secondary" id="pending-clear-all" data-i18n="btn.clear_all">全不选</button>
-              <button class="warn" id="pending-run-selected" data-i18n="btn.pending_run_selected" data-help-key="btn_pending_run_selected">补传已勾选文件</button>
-              <button class="warn" id="pending-run-stream" data-i18n="btn.pending_run_stream" data-help-key="btn_pending_run_stream">按勾选目录最底层顺序补传</button>
-            </div>
-            <div class="subtle" data-i18n="desc.pending_tree">这里按真实目录树展示，父目录勾选会联动所有子目录和文件。</div>
-            <div class="tree-wrap" id="pending-tree">暂无待补传文件</div>
-          </details>
-
-          <details class="panel collapsible-panel" id="execute-capability-details">
-            <summary>
-              <span data-i18n="panel.capability">能力矩阵与建议</span>
-              <small data-i18n="desc.panel_capability_summary">是否能秒传、怎么降级，看这里。</small>
-            </summary>
-            <h2 data-i18n="panel.capability">能力矩阵与建议</h2>
-            <div class="subtle" id="capability-desc" data-i18n="desc.capability">根据当前选择的源驱动和现有目标端 Guangya，给出诚实降级后的推荐路径。这里不会把“只能补传”的组合误导成可秒传。</div>
-            <div class="notice" id="capability-summary">等待驱动信息...</div>
-            <div class="actions" id="capability-quick-actions"></div>
-          </details>
-
-          <details class="panel collapsible-panel" id="execute-miaochuan-details">
-            <summary>
-              <span id="tab-miaochuan-label" data-i18n="tab.miaochuan">秒传</span>
-              <small data-i18n="desc.panel_miaochuan_summary">增强入口，默认收起，支持时再用。</small>
-            </summary>
-            <h2 class="help-anchor" id="miaochuan-panel-title" data-i18n="panel.miaochuan" data-help-key="panel_miaochuan">秒传 JSON 直导</h2>
-            <div class="subtle" id="miaochuan-desc" data-i18n="desc.miaochuan">支持直接粘贴油猴或插件导出的 JSON。若你已自动抓取到光鸭 Authorization，会优先使用它。</div>
-            <label class="help-anchor" data-i18n="label.miaochuan_payload" data-help-key="miaochuan_payload">秒传 JSON</label>
-            <textarea id="miaochuan_payload" data-i18n-placeholder="placeholder.miaochuan_payload" placeholder='{"files":[{"path":"/demo.zip","size":"123","etag":"md5"}]}'></textarea>
-            <div class="actions">
-              <button class="secondary" id="diagnose-miaochuan" data-i18n="btn.diagnose_miaochuan" data-help-key="btn_diagnose_miaochuan">诊断当前秒传 JSON</button>
-              <button class="warn" id="run-miaochuan" data-i18n="btn.run_miaochuan" data-help-key="btn_run_miaochuan">直接导入光鸭</button>
-            </div>
-            <div class="notice" id="miaochuan-notice">等待操作</div>
-            <div class="mount-list" id="miaochuan-diagnosis">暂无诊断结果</div>
           </details>
         </section>
 
@@ -601,6 +608,11 @@
               <div id="target-auth-summary" class="compact-summary-card">等待目标端能力摘要...</div>
               <div id="target-popular-summary" class="compact-summary-card">常用目标端会在这里显示说明。</div>
             </div>
+            <details class="panel collapsible-panel compact-inner-panel" id="target-connection-details">
+              <summary>
+                <span data-i18n="panel.target_connection_details">目标端连接与字段</span>
+                <small data-i18n="desc.panel_target_connection_details_summary">默认收起，只有填写凭证或排查连接问题时再展开。</small>
+              </summary>
             <div class="panel-grid">
               <section class="target-section col-span-2" data-target-section="guangya">
                 <h3 data-i18n="target.title.guangya">光鸭云盘</h3>
@@ -804,6 +816,7 @@
             <div class="actions">
               <button class="secondary" id="capture-guangya" data-i18n="btn.capture_guangya" data-target-only="guangya" data-help-key="btn_capture_guangya">打开光鸭登录并自动抓取</button>
             </div>
+            </details>
           </div>
         </section>
       </div>
