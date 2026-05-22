@@ -74,7 +74,11 @@
     if (!selects.length) return;
     if (!list.length) {
       selects.forEach((select) => {
-        select.innerHTML = `<option value="">${ctx.currentLang() === "en" ? "No mounts" : ctx.currentLang() === "mix" ? "暂无挂载 / No mounts" : "暂无挂载"}</option>`;
+        const text = ctx.storageRecordsLoaded
+          ? (ctx.currentLang() === "en" ? "No mounts" : ctx.currentLang() === "mix" ? "暂无挂载 / No mounts" : "暂无挂载")
+          : (ctx.currentLang() === "en" ? "Loading mounts..." : ctx.currentLang() === "mix" ? "正在载入挂载列表... / Loading mounts..." : "正在载入挂载列表...");
+        select.innerHTML = `<option value="">${text}</option>`;
+        select.disabled = true;
       });
       return;
     }
@@ -90,6 +94,7 @@
     }).join("");
     selects.forEach((select) => {
       select.innerHTML = html;
+      select.disabled = false;
     });
   }
 

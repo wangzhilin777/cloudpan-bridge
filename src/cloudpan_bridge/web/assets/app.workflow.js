@@ -288,10 +288,13 @@
       currentDirectoryPath,
       configCache,
       getGroupedConfigValue,
+      storageRecords,
+      storageRecordsLoaded,
       escapeHtml,
     } = ctx;
     const root = document.getElementById("source-driver-summary");
     const humanRoot = document.getElementById("source-driver-human-summary");
+    const mountInlineRoot = document.getElementById("source-mounted-inline-status");
     if (!root) return;
     const context = currentDriverContext();
     const backendContext = providerRegistryPayload?.current_source_context || {};
@@ -299,7 +302,11 @@
     const runtimeContext = window.__cpbStatusCache?.sync?.current_source_context || {};
     const sourcePath = String(document.getElementById("source_path")?.value || configCache?.source_path || "/").trim() || "/";
     const browsingPath = String(currentDirectoryPath || "/").trim() || "/";
-    const selectedMount = String(document.getElementById("mounted_source_select")?.value || "").trim();
+    const selectedMount = String(
+      document.getElementById("mounted_source_select_source")?.value
+      || document.getElementById("mounted_source_select")?.value
+      || ""
+    ).trim();
     const rateMode = String(document.getElementById("rate_limit_mode")?.value || configCache?.rate_limit_mode || "safe").trim() || "safe";
     const sourceRuntime = window.__cpbStatusCache?.source_runtime || {};
     const sourceEnrichment = window.__cpbStatusCache?.sourceEnrichment || {};
@@ -320,7 +327,13 @@
         : "-";
     if (humanRoot) {
       const lang = ctx.currentLang();
+      const mountedOptions = Array.from(document.querySelectorAll("#mounted_source_select_source option"))
+        .filter((option) => String(option.value || "").trim());
+      const mountedCount = mountedOptions.length;
+      const knownMountCount = Array.isArray(storageRecords) ? storageRecords.length : 0;
       const mountText = selectedMount || browsingPath || sourcePath || "/";
+      let mountInlineText = "";
+      let mountInlineTone = "";
       const routeText = routeMode === "openlist_mount"
         ? (lang === "en" ? "Currently browsing via OpenList mount." : lang === "mix" ? "当前通过 OpenList 挂载浏览。 / Browsing via OpenList mount." : "当前通过 OpenList 挂载浏览。")
         : routeMode === "provider_direct"
@@ -332,17 +345,111 @@
       const fastText = fastCandidate && fastCandidate !== "-"
         ? (lang === "en" ? `Potential fast-upload hashes: ${fastCandidate}.` : lang === "mix" ? `当前可能可用的快传指纹：${fastCandidate}。 / Potential fast-upload hashes: ${fastCandidate}.` : `当前可能可用的快传指纹：${fastCandidate}。`)
         : (lang === "en" ? "No fast-upload hash advantage has been identified yet." : lang === "mix" ? "当前还没识别到明显的快传指纹优势。 / No fast-upload hash advantage identified yet." : "当前还没识别到明显的快传指纹优势。");
+      if (!storageRecordsLoaded && mountedCount === 0 && knownMountCount === 0) {
+        mountInlineText = lang === "en"
+          ? "Mounted source list is loading. If the directory list below is already restored, you can browse first and choose the mount later."
+          : lang === "mix"
+            ? "挂载源下拉还在加载。如果下面目录已经恢复出来，可以先浏览，稍后再补选挂载源。 / Mounted source list is still loading."
+            : "挂载源下拉还在加载。如果下面目录已经恢复出来，可以先浏览，稍后再补选挂载源。";
+        mountInlineTone = "warn";
+        humanLines.push(
+          lang === "en"
+            ? "Mounted source list is still loading. You can keep browsing the restored directory first, or wait a moment for the mount selector to finish loading."
+            : lang === "mix"
+              ? "已挂载源列表还在加载。你可以先继续浏览当前已恢复目录，也可以等上方挂载下拉载入完成。 / Mounted source list is still loading."
+              : "已挂载源列表还在加载。你可以先继续浏览当前已恢复目录，也可以等上方挂载下拉载入完成。"
+        );
+      } else if (mountedCount === 0 && knownMountCount === 0) {
+        mountInlineText = lang === "en"
+          ? "There is no mounted source yet. Go to Connections first, log in to OpenList, then add or refresh a source mount."
+          : lang === "mix"
+            ? "当前还没有可选挂载源。请先去“连接”页登录 OpenList，并新增或刷新挂载。 / No mounted source yet."
+            : "当前还没有可选挂载源。请先去“连接”页登录 OpenList，并新增或刷新挂载。";
+        mountInlineTone = "warn";
+        humanLines.push(
+          lang === "en"
+            ? "No mounted source is available yet. Go to the Connect tab first, log in to OpenList, then add or refresh a source mount."
+            : lang === "mix"
+              ? "还没有可用的已挂载源。请先去“连接”页登录 OpenList，再新增或刷新源挂载。 / No mounted source is available yet."
+              : "还没有可用的已挂载源。请先去“连接”页登录 OpenList，再新增或刷新源挂载。"
+        );
+      } else if (sourcePath === "/" && (browsingPath === "/" || !selectedMount)) {
+        mountInlineText = lang === "en"
+          ? "Choose a mounted source first, then click 'Browse mounted source' to enter the folder tree."
+          : lang === "mix"
+            ? "先选上面的已挂载源，再点“从已挂载源开始浏览”进入目录树。 / Choose a mounted source first."
+            : "先选上面的已挂载源，再点“从已挂载源开始浏览”进入目录树。";
+        humanLines.push(
+          lang === "en"
+            ? "Step 1: choose a mounted source above. Step 2: click 'Browse mounted source'. Step 3: enter the folder you want to sync."
+            : lang === "mix"
+              ? "先在上面选一个已挂载源，再点“从已挂载源开始浏览”，最后进入你想同步的目录。 / Choose a mounted source first, then browse into it."
+              : "先在上面选一个已挂载源，再点“从已挂载源开始浏览”，最后进入你想同步的目录。"
+        );
+      } else if (sourcePath === "/" && browsingPath !== "/") {
+        mountInlineText = lang === "en"
+          ? "You already entered a concrete folder. If this is the right source, click 'Use current directory as source'."
+          : lang === "mix"
+            ? "你已经进入具体目录了。如果这就是要同步的源目录，直接点“把当前目录设为源目录”。 / Current folder can be used as source."
+            : "你已经进入具体目录了。如果这就是要同步的源目录，直接点“把当前目录设为源目录”。";
+        humanLines.push(
+          lang === "en"
+            ? `You are already browsing ${browsingPath}. If this is the folder you want, click 'Use current directory as source'.`
+            : lang === "mix"
+              ? `你已经进入 ${browsingPath}，如果这就是要同步的目录，点“把当前目录设为源目录”。 / You are already browsing ${browsingPath}.`
+              : `你已经进入 ${browsingPath}，如果这就是要同步的目录，点“把当前目录设为源目录”。`
+        );
+      } else if (browsingPath !== "/" && browsingPath !== sourcePath) {
+        mountInlineText = lang === "en"
+          ? "You are browsing another folder now. Click 'Use current directory as source' only when you want to replace the current task source."
+          : lang === "mix"
+            ? "你正在浏览另一个目录；只有想替换当前任务源目录时，再点“把当前目录设为源目录”。 / Browsing a different folder now."
+            : "你正在浏览另一个目录；只有想替换当前任务源目录时，再点“把当前目录设为源目录”。";
+        humanLines.push(
+          lang === "en"
+            ? `Current task source is ${sourcePath}, but you are browsing ${browsingPath}. Click 'Use current directory as source' if you want to switch.`
+            : lang === "mix"
+              ? `当前任务源目录是 ${sourcePath}，但你正在浏览 ${browsingPath}。如果要切换成当前目录，点“把当前目录设为源目录”。 / Current task source differs from the browsing folder.`
+              : `当前任务源目录是 ${sourcePath}，但你正在浏览 ${browsingPath}。如果要切换成当前目录，点“把当前目录设为源目录”。`
+        );
+      } else {
+        mountInlineText = lang === "en"
+          ? "Mounted source and source directory are ready. You can keep browsing, or move on to the Task / Run flow."
+          : lang === "mix"
+            ? "挂载源和源目录都已经就绪。可以继续浏览，也可以进入任务或执行流程。 / Source is ready."
+            : "挂载源和源目录都已经就绪。可以继续浏览，也可以进入任务或执行流程。";
+        mountInlineTone = "success";
+        humanLines.push(
+          lang === "en"
+            ? `Current source folder: ${sourcePath}. You can keep browsing deeper, or move to the Execute tab when ready.`
+            : lang === "mix"
+              ? `当前源目录已定为 ${sourcePath}。可以继续往下浏览，也可以直接去“执行”页开始同步。 / Current source folder is ready.`
+              : `当前源目录已定为 ${sourcePath}。可以继续往下浏览，也可以直接去“执行”页开始同步。`
+        );
+      }
       humanLines.push(
         lang === "en"
-          ? `Current source mount: ${mountText} | Driver: ${mountedDriverLabel} | Rate preset: ${rateMode}`
+          ? `Mounted source: ${mountText} | Driver: ${mountedDriverLabel} | Rate preset: ${rateMode}`
           : lang === "mix"
-            ? `当前源挂载：${mountText} | 驱动：${mountedDriverLabel} | 节奏：${rateMode} / Current source mount: ${mountText}`
-            : `当前源挂载：${mountText} | 驱动：${mountedDriverLabel} | 节奏：${rateMode}`
+            ? `当前挂载：${mountText} | 驱动：${mountedDriverLabel} | 节奏：${rateMode} / Mounted source: ${mountText}`
+            : `当前挂载：${mountText} | 驱动：${mountedDriverLabel} | 节奏：${rateMode}`
       );
       humanLines.push(routeText);
-      humanLines.push(enrichText);
-      humanLines.push(fastText);
+      if (sourcePath !== "/" || enrichReady || fastCandidate !== "-") {
+        humanLines.push(enrichText);
+        humanLines.push(fastText);
+      }
       humanRoot.innerHTML = humanLines.map((line) => `<div>${escapeHtml(line)}</div>`).join("");
+      if (mountInlineRoot) {
+        mountInlineRoot.textContent = mountInlineText || (lang === "en"
+          ? "Choose a mounted source first, then browse the folder tree."
+          : lang === "mix"
+            ? "先选择挂载源，再浏览目录树。 / Choose a mounted source first."
+            : "先选择挂载源，再浏览目录树。");
+        mountInlineRoot.classList.remove("is-success", "is-warn", "is-error");
+        if (mountInlineTone === "success") mountInlineRoot.classList.add("is-success");
+        else if (mountInlineTone === "warn") mountInlineRoot.classList.add("is-warn");
+      }
     }
     const captureCacheAvailable = !!bridgePreparation.capture_cache_available;
     const captureCacheLookupModes = Array.isArray(bridgePreparation.capture_cache_lookup_modes) ? bridgePreparation.capture_cache_lookup_modes : [];
@@ -404,40 +511,180 @@
     const transferPreviewText = sourceAnalyzeCache?.transferPlanPreview
       ? bridgeView.formatCountMap(ctx, sourceAnalyzeCache.transferPlanPreview.mode_counts || {}, (_ctx, key) => bridgeView.transferModeText(ctx, key))
       : "-";
-    const previewReasonText = sourceAnalyzeCache?.transferPlanPreview
-      ? bridgeView.formatCountMap(ctx, sourceAnalyzeCache.transferPlanPreview.reason_code_counts || {}, bridgeView.transferReasonCodeText)
-      : "-";
-    const previewNextActionText = sourceAnalyzeCache?.transferPlanPreview
-      ? bridgeView.formatCountMap(ctx, sourceAnalyzeCache.transferPlanPreview.next_action_hint_counts || {}, bridgeView.nextActionHintText)
-      : "-";
-    const previewTargetFastGapText = sourceAnalyzeCache?.transferPlanPreview
-      ? Object.entries(sourceAnalyzeCache.transferPlanPreview.missing_target_fast_hash_counts || {}).map(([k, v]) => `${k}:${v}`).join(" | ") || "-"
-      : "-";
     const bridgePreparation = sourceRuntime.source_enrichment?.bridge_preparation_summary || sourceRuntime.source_enrichment?.bridge_runtime?.preparation || {};
-    const captureCacheAvailable = !!bridgePreparation.capture_cache_available;
-    const captureCacheLookupModes = Array.isArray(bridgePreparation.capture_cache_lookup_modes) ? bridgePreparation.capture_cache_lookup_modes : [];
-    const captureCacheHashFields = Array.isArray(bridgePreparation.capture_cache_hash_fields) ? bridgePreparation.capture_cache_hash_fields : [];
-    const captureCacheSummary = captureCacheAvailable
-      ? `entries=${bridgePreparation.capture_cache_entry_count ?? 0} | lookup=${captureCacheLookupModes.join(", ") || "-"} | hashes=${captureCacheHashFields.join(", ") || "-"}`
-      : "-";
-    const routeBucket = String(sourceTargetRoute.decision_bucket || "-");
     const selectedMode = String(sourceRuntime.selected_source_mode || "-");
     const hasFast = !!statusTargetCapability.supports_fast_upload;
     const nextFocus = String(sourceTargetRoute.next_focus || "-");
+    const targetConfigured = !!statusTargetPreflight?.configured;
+    const lang = currentLang();
+    const taskReady = sourcePath !== "/" && !!targetConfigured && targetPath !== "/";
+    let headline = "";
+    let nextStep = "";
+    let routeLine = "";
+    let policyLine = "";
+    let statusTone = "";
+    if (sourcePath === "/") {
+      headline = lang === "en"
+        ? "Source folder is not selected yet."
+        : lang === "mix"
+          ? "还没选源目录。 / Source folder is not selected yet."
+          : "还没选源目录。";
+      nextStep = lang === "en"
+        ? "Go to the Source tab, pick a mounted source, browse into the folder, then set it as source."
+        : lang === "mix"
+          ? "先去“源端”页，选一个已挂载源，进入目录后把当前目录设为源目录。 / Go to Source and choose the folder first."
+          : "先去“源端”页，选一个已挂载源，进入目录后把当前目录设为源目录。";
+      statusTone = "warn";
+    } else if (!targetConfigured) {
+      headline = lang === "en"
+        ? "Target connection is not ready yet."
+        : lang === "mix"
+          ? "目标端还没配好。 / Target connection is not ready yet."
+          : "目标端还没配好。";
+      nextStep = lang === "en"
+        ? "Go to the Target tab, select the destination, complete the required fields, then test the connection."
+        : lang === "mix"
+          ? "去“目标端配置”页选择目标端，补齐必填项，并完成连接。 / Configure the target connection first."
+          : "去“目标端配置”页选择目标端，补齐必填项，并完成连接。";
+      statusTone = "warn";
+    } else if (targetPath === "/") {
+      headline = lang === "en"
+        ? "Target directory is still using the root path."
+        : lang === "mix"
+          ? "目标目录还没确认。 / Target directory still needs confirmation."
+          : "目标目录还没确认。";
+      nextStep = lang === "en"
+        ? "Open the Task tab and confirm where files should be written on the target side."
+        : lang === "mix"
+          ? "去“任务”页确认目标目录，避免直接写到根目录。 / Confirm the target directory in Task."
+          : "去“任务”页确认目标目录，避免直接写到根目录。";
+      statusTone = "warn";
+    } else {
+      headline = lang === "en"
+        ? "This sync task is ready to run."
+        : lang === "mix"
+          ? "这个同步任务已经可以执行。 / This sync task is ready to run."
+          : "这个同步任务已经可以执行。";
+      nextStep = hasFast
+        ? (lang === "en"
+            ? "You can go to the Execute tab now. Fast upload or fallback will be chosen automatically based on current capability."
+            : lang === "mix"
+              ? "现在可以去“执行”页开始。系统会按当前能力自动优先快传，不够时再降级。 / Ready to execute with fast-upload priority."
+              : "现在可以去“执行”页开始。系统会按当前能力自动优先快传，不够时再降级。")
+        : (lang === "en"
+            ? "You can go to the Execute tab now. This target will mainly use normal upload or fallback transfer."
+            : lang === "mix"
+              ? "现在可以去“执行”页开始。当前目标端会以普通上传或补传为主。 / Ready to execute with fallback transfer."
+              : "现在可以去“执行”页开始。当前目标端会以普通上传或补传为主。");
+      statusTone = "";
+    }
+    routeLine = taskReady
+      ? (lang === "en"
+          ? `Current route: ${sourcePath} -> ${targetKey}:${targetPath}`
+          : lang === "mix"
+            ? `当前路线：${sourcePath} -> ${targetKey}:${targetPath} / Current route`
+            : `当前路线：${sourcePath} -> ${targetKey}:${targetPath}`)
+      : (lang === "en"
+          ? `Planned target: ${targetKey}:${targetPath}`
+          : lang === "mix"
+            ? `当前目标计划：${targetKey}:${targetPath} / Planned target`
+            : `当前目标计划：${targetKey}:${targetPath}`);
+    policyLine = lang === "en"
+      ? `Target capability: ${hasFast ? "fast upload available" : "fallback upload only"} | Auto fallback threshold: ${autoThreshold} MB | Delete sync: ${deleteRemoved || deleteRealTarget ? "enabled" : "disabled"}`
+      : lang === "mix"
+        ? `目标端能力：${hasFast ? "可快传" : "仅补传/普通上传"} | 自动补传阈值：${autoThreshold} MB | 删除同步：${deleteRemoved || deleteRealTarget ? "已开启" : "未开启"} / Target capability`
+        : `目标端能力：${hasFast ? "可快传" : "仅补传/普通上传"} | 自动补传阈值：${autoThreshold} MB | 删除同步：${deleteRemoved || deleteRealTarget ? "已开启" : "未开启"}`;
+    const routeHint = lang === "en"
+      ? `This run will mainly read from ${selectedMode || "auto route"}.`
+      : lang === "mix"
+        ? `这次主要会按 ${selectedMode || "自动路线"} 读取源端。 / Main source route: ${selectedMode || "auto route"}.`
+        : `这次主要会按 ${selectedMode || "自动路线"} 读取源端。`;
+    const fastHint = lang === "en"
+      ? `Preferred fast hashes: ${(statusTargetCapability.fast_upload_hashes || []).join(", ") || "none"}; fallback path: ${(statusTargetCapability.fallback_modes || []).join(", ") || "none"}.`
+      : lang === "mix"
+        ? `优先尝试的快传指纹：${(statusTargetCapability.fast_upload_hashes || []).join(", ") || "无"}；降级方式：${(statusTargetCapability.fallback_modes || []).join(", ") || "无"}。 / Fast hashes and fallback path.`
+        : `优先尝试的快传指纹：${(statusTargetCapability.fast_upload_hashes || []).join(", ") || "无"}；降级方式：${(statusTargetCapability.fallback_modes || []).join(", ") || "无"}。`;
+    const analyzeHint = transferPreviewText !== "-"
+      ? (lang === "en"
+          ? `Current transfer preview: ${transferPreviewText}.`
+          : lang === "mix"
+            ? `当前传输预览：${transferPreviewText}。 / Current transfer preview available.`
+            : `当前传输预览：${transferPreviewText}。`)
+      : (lang === "en"
+          ? `No directory analysis result is available yet; follow the static matrix suggestion for now.`
+          : lang === "mix"
+          ? `当前还没有目录分析结果，先按静态矩阵建议处理。 / No analysis result yet.`
+          : `当前还没有目录分析结果，先按静态矩阵建议处理。`);
+    const detailSummary = lang === "en"
+      ? "Execution reasoning details"
+      : lang === "mix"
+        ? "执行判断细节 / Execution reasoning details"
+        : "执行判断细节";
+    const detailSummaryHint = lang === "en"
+      ? "Expand only when you want to understand why the console made this recommendation."
+      : lang === "mix"
+        ? "想看控制台为什么这样建议时再展开。 / Expand when you want the reasoning."
+        : "想看控制台为什么这样建议时再展开。";
+    const sourceCardTitle = lang === "en" ? "Source folder" : lang === "mix" ? "源目录 / Source folder" : "源目录";
+    const targetCardTitle = lang === "en" ? "Target connection" : lang === "mix" ? "目标端 / Target connection" : "目标端";
+    const runCardTitle = lang === "en" ? "Execution route" : lang === "mix" ? "执行方式 / Execution route" : "执行方式";
+    const sourceCardValue = sourcePath === "/"
+      ? (lang === "en" ? "Not selected" : lang === "mix" ? "未选择 / Not selected" : "未选择")
+      : sourcePath;
+    const targetCardValue = !targetConfigured
+      ? (lang === "en" ? "Not ready" : lang === "mix" ? "未就绪 / Not ready" : "未就绪")
+      : targetPath === "/"
+        ? (lang === "en" ? "Need target path" : lang === "mix" ? "待确认目录 / Need path" : "待确认目录")
+        : `${targetKey}:${targetPath}`;
+    const runCardValue = hasFast
+      ? (lang === "en" ? "Fast first" : lang === "mix" ? "优先快传 / Fast first" : "优先快传")
+      : (lang === "en" ? "Fallback upload" : lang === "mix" ? "补传/普通上传 / Fallback upload" : "补传/普通上传");
+    const sourceCardDesc = sourcePath === "/"
+      ? nextStep
+      : (lang === "en" ? "Current task source has been fixed." : lang === "mix" ? "当前任务源目录已经固定。 / Source is fixed." : "当前任务源目录已经固定。");
+    const targetCardDesc = !targetConfigured
+      ? nextStep
+      : targetPath === "/"
+        ? nextStep
+        : (lang === "en" ? "Target credentials and destination path are both ready." : lang === "mix" ? "目标端凭证和目标目录都已就绪。 / Target is ready." : "目标端凭证和目标目录都已就绪。");
+    const runCardDesc = policyLine;
     root.innerHTML = `
       <div class="summary-stack">
-        <div><strong>${escapeHtml(sourcePath)}</strong> -> <strong>${escapeHtml(targetKey)}:${escapeHtml(targetPath)}</strong></div>
-        <div class="summary-pill ${sourcePath === "/" || targetPath === "/" ? "warn" : ""}">${escapeHtml(currentLang() === "en" ? `Current route: ${selectedMode}` : currentLang() === "mix" ? `当前路线：${selectedMode} / Current route` : `当前路线：${selectedMode}`)}</div>
-        <div class="summary-pill ${hasFast ? "" : "warn"}">${escapeHtml(currentLang() === "en" ? `Target fast upload: ${hasFast ? "available" : "fallback only"}` : currentLang() === "mix" ? `目标端快传：${hasFast ? "可用" : "仅降级"} / Target fast upload` : `目标端快传：${hasFast ? "可用" : "仅降级"}`)}</div>
-        <div class="mono">${currentLang() === "en" ? "Recommended mode" : currentLang() === "mix" ? "建议模式 / Recommended mode" : "建议模式"}=${escapeHtml(recommendedMode)} | level=${escapeHtml(assessedLevel)} | auto_small_mb=${escapeHtml(autoThreshold)}</div>
-        <div class="mono">${currentLang() === "en" ? "Source preference" : currentLang() === "mix" ? "源端偏好 / Source preference" : "源端偏好"}=${escapeHtml(sourcePreference)} | ${currentLang() === "en" ? "next focus" : currentLang() === "mix" ? "下一步关注 / next focus" : "下一步关注"}=${escapeHtml(nextFocus)} | ${currentLang() === "en" ? "route bucket" : currentLang() === "mix" ? "路线分桶 / route bucket" : "路线分桶"}=${escapeHtml(routeBucket)}</div>
-        <div class="mono">${currentLang() === "en" ? "Transfer preview" : currentLang() === "mix" ? "传输预览 / Transfer preview" : "传输预览"}=${escapeHtml(transferPreviewText)}</div>
-        <div class="mono">${currentLang() === "en" ? "Fast hashes" : currentLang() === "mix" ? "目标快传哈希 / Fast hashes" : "目标快传哈希"}=${escapeHtml((statusTargetCapability.fast_upload_hashes || []).join(", ") || "-")} | ${currentLang() === "en" ? "fallback" : currentLang() === "mix" ? "降级 / fallback" : "降级"}=${escapeHtml((statusTargetCapability.fallback_modes || []).join(", ") || "-")}</div>
-        <div class="mono">${currentLang() === "en" ? "Cache and bridge" : currentLang() === "mix" ? "缓存与桥接 / Cache and bridge" : "缓存与桥接"}=${escapeHtml(captureCacheSummary)}</div>
-        <div class="mono">${currentLang() === "en" ? "Delete policy" : currentLang() === "mix" ? "删除策略 / Delete policy" : "删除策略"}=${deleteRemoved ? "state:on" : "state:off"} | ${deleteRealTarget ? "target:on" : "target:off"}</div>
-        ${sourceRuntime.selection_reason ? `<div>${escapeHtml(sourceRuntime.selection_reason)}</div>` : ""}
-        ${sourceRuntime.fallback_reason ? `<div>${escapeHtml(sourceRuntime.fallback_reason)}</div>` : ""}
-        ${rationale ? `<div>${escapeHtml(rationale)}</div>` : ""}
+        <div><strong>${escapeHtml(headline)}</strong></div>
+        <div class="summary-pill ${escapeHtml(statusTone)}">${escapeHtml(nextStep)}</div>
+        <div class="task-checklist-grid">
+          <div class="task-check-card ${sourcePath === "/" ? "is-warn" : "is-ready"}">
+            <div class="task-check-title">${escapeHtml(sourceCardTitle)}</div>
+            <div class="task-check-value">${escapeHtml(sourceCardValue)}</div>
+            <div class="task-check-desc">${escapeHtml(sourceCardDesc)}</div>
+          </div>
+          <div class="task-check-card ${!targetConfigured || targetPath === "/" ? "is-warn" : "is-ready"}">
+            <div class="task-check-title">${escapeHtml(targetCardTitle)}</div>
+            <div class="task-check-value">${escapeHtml(targetCardValue)}</div>
+            <div class="task-check-desc">${escapeHtml(targetCardDesc)}</div>
+          </div>
+          <div class="task-check-card ${hasFast ? "is-ready" : ""}">
+            <div class="task-check-title">${escapeHtml(runCardTitle)}</div>
+            <div class="task-check-value">${escapeHtml(runCardValue)}</div>
+            <div class="task-check-desc">${escapeHtml(runCardDesc)}</div>
+          </div>
+        </div>
+        <div class="summary-pill">${escapeHtml(routeLine)}</div>
+        <details class="task-summary-details">
+          <summary>
+            <span>${escapeHtml(detailSummary)}</span>
+            <small>${escapeHtml(detailSummaryHint)}</small>
+          </summary>
+          <div class="task-summary-detail-list">
+            <div>${escapeHtml(routeHint)} ${lang === "en" ? "Recommended mode" : lang === "mix" ? "建议模式 / Recommended mode" : "建议模式"}: ${escapeHtml(recommendedMode)} | ${lang === "en" ? "Level" : lang === "mix" ? "能力等级 / Level" : "能力等级"}: ${escapeHtml(assessedLevel)}</div>
+            <div>${lang === "en" ? "Source preference" : lang === "mix" ? "源端偏好 / Source preference" : "源端偏好"}: ${escapeHtml(sourcePreference)} | ${lang === "en" ? "Next focus" : lang === "mix" ? "下一步关注 / Next focus" : "下一步关注"}: ${escapeHtml(nextFocus)}</div>
+            <div>${escapeHtml(fastHint)}</div>
+            <div>${escapeHtml(analyzeHint)}</div>
+            ${sourceRuntime.selection_reason ? `<div>${escapeHtml(sourceRuntime.selection_reason)}</div>` : ""}
+            ${sourceRuntime.fallback_reason ? `<div>${escapeHtml(sourceRuntime.fallback_reason)}</div>` : ""}
+            ${rationale ? `<div>${escapeHtml(rationale)}</div>` : ""}
+          </div>
+        </details>
       </div>
     `;
   }

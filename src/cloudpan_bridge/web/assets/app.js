@@ -135,6 +135,7 @@
     let providerDefinitions = [...FALLBACK_PROVIDER_DEFINITIONS];
     let providerSnapshots = {};
     let storageRecords = [];
+    let storageRecordsLoaded = false;
     let sourceAnalyzeCache = null;
     let latestPendingItems = [];
     let pendingSelection = new Set();
@@ -173,6 +174,8 @@
         getGroupedConfigValue,
         activeTargetKey,
         translateDriverText,
+        storageRecords,
+        storageRecordsLoaded,
         renderOverviewRouteSummary,
         applyWorkflowGates,
       };
@@ -288,6 +291,7 @@
         },
         setStorageRecords: (items) => {
           storageRecords = items;
+          storageRecordsLoaded = true;
         },
         setCurrentDriverInfo: (info) => {
           currentDriverInfo = info;
@@ -626,6 +630,7 @@
       if (runtimeNotice && !runtimeNotice.textContent.trim()) {
         setNotice("runtime-action-notice", modeHelpText, runtimeManaged ? "warn" : "success");
       }
+      renderWorkflowGuidance();
     }
 
     function initializeMirroredInputs() {
@@ -1064,6 +1069,7 @@
             ? (currentLang() === "en" ? `Logged in: ${authState.username || "admin"}` : currentLang() === "mix" ? `已登录: ${authState.username || "admin"} / Logged in` : `已登录: ${authState.username || "admin"}`)
             : (currentLang() === "en" ? "Console locked" : currentLang() === "mix" ? "控制台已加锁 / Console locked" : "控制台已加锁");
       }
+      renderConnectionActionCards();
       applyWorkflowGates();
     }
 
@@ -1078,6 +1084,7 @@
       }
       hideAuthDialog();
       if (!appBootstrapped || force) {
+        storageRecordsLoaded = false;
         await loadConfig();
         try {
           await refreshStatus();
@@ -1110,34 +1117,32 @@
               : `状态刷新失败: ${error.message}`);
         }
         startAutoRefresher();
+        try {
+          await refreshStorages();
+        } catch (error) {
+          console.warn("refreshStorages failed", error);
+          setNotice("dir-notice", currentLang() === "en"
+            ? `Mounted source list unavailable: ${error.message}`
+            : currentLang() === "mix"
+              ? `挂载源列表暂不可用 / Mounted source list unavailable: ${error.message}`
+              : `挂载源列表暂不可用: ${error.message}`);
+        }
+        try {
+          await loadDrivers();
+        } catch (error) {
+          console.warn("loadDrivers failed", error);
+          const select = document.getElementById("driver-select");
+          if (select && !select.innerHTML.trim()) {
+            select.innerHTML = `<option value="">${escapeHtml(currentLang() === "en" ? "Driver list unavailable" : currentLang() === "mix" ? "驱动列表暂不可用 / Driver list unavailable" : "驱动列表暂不可用")}</option>`;
+          }
+          document.getElementById("driver-fields").innerHTML = `<div class='subtle'>${escapeHtml(currentLang() === "en" ? `OpenList driver list unavailable: ${error.message}` : currentLang() === "mix" ? `OpenList 驱动列表暂不可用 / Driver list unavailable: ${error.message}` : `OpenList 驱动列表暂不可用: ${error.message}`)}</div>`;
+        }
+        try {
+          await ensureDirectoryBrowserReady(true);
+        } catch (error) {
+          console.warn("ensureDirectoryBrowserReady failed", error);
+        }
         appBootstrapped = true;
-        void (async () => {
-          try {
-            await loadDrivers();
-          } catch (error) {
-            console.warn("loadDrivers failed", error);
-            const select = document.getElementById("driver-select");
-            if (select && !select.innerHTML.trim()) {
-              select.innerHTML = `<option value="">${escapeHtml(currentLang() === "en" ? "Driver list unavailable" : currentLang() === "mix" ? "驱动列表暂不可用 / Driver list unavailable" : "驱动列表暂不可用")}</option>`;
-            }
-            document.getElementById("driver-fields").innerHTML = `<div class='subtle'>${escapeHtml(currentLang() === "en" ? `OpenList driver list unavailable: ${error.message}` : currentLang() === "mix" ? `OpenList 驱动列表暂不可用 / Driver list unavailable: ${error.message}` : `OpenList 驱动列表暂不可用: ${error.message}`)}</div>`;
-          }
-          try {
-            await refreshStorages();
-          } catch (error) {
-            console.warn("refreshStorages failed", error);
-            setNotice("dir-notice", currentLang() === "en"
-              ? `Mounted source list unavailable: ${error.message}`
-              : currentLang() === "mix"
-                ? `挂载源列表暂不可用 / Mounted source list unavailable: ${error.message}`
-                : `挂载源列表暂不可用: ${error.message}`);
-          }
-          try {
-            await ensureDirectoryBrowserReady(true);
-          } catch (error) {
-            console.warn("ensureDirectoryBrowserReady failed", error);
-          }
-        })();
       } else {
         applyWorkflowGates();
       }
@@ -1154,6 +1159,16 @@
     function setDetailsOpen(id, open = true) {
       const el = document.getElementById(id);
       if (el && typeof el.open === "boolean") el.open = open;
+    }
+
+    function revealTargetConnectionDetails() {
+      setDetailsOpen("target-connection-details", true);
+      document.getElementById("target-connection-details")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function revealPanelDetails(id) {
+      setDetailsOpen(id, true);
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     function mountedSourceSelectIds() {
@@ -1285,6 +1300,89 @@
       });
     }
 
+    function renderConnectionActionCards() {
+      const consoleCard = document.getElementById("connection-card-console");
+      const openlistCard = document.getElementById("connection-card-openlist");
+      const captureCard = document.getElementById("connection-card-provider-capture");
+      const mode = normalizeOpenListMode(document.getElementById("openlist_mode")?.value || "external_local");
+      if (consoleCard) {
+        const action = consoleCard.querySelector(".card-inline-action");
+        if (action) {
+          action.textContent = authState.enabled
+            ? (authState.authenticated
+                ? (currentLang() === "en" ? "Already logged in" : currentLang() === "mix" ? "当前已登录 / Already logged in" : "当前已登录")
+                : (currentLang() === "en" ? "Open login dialog" : currentLang() === "mix" ? "打开登录弹窗 / Open login dialog" : "打开登录弹窗"))
+            : (currentLang() === "en" ? "Disabled in current config" : currentLang() === "mix" ? "当前配置未启用 / Disabled in config" : "当前配置未启用");
+        }
+      }
+      if (openlistCard) {
+        const action = openlistCard.querySelector(".card-inline-action");
+        if (action) {
+          action.textContent = mode === "managed_binary"
+            ? (currentLang() === "en" ? "Jump to managed runtime area" : currentLang() === "mix" ? "跳到托管运行区 / Jump to managed runtime" : "跳到托管运行区")
+            : mode === "managed_docker"
+              ? (currentLang() === "en" ? "Jump to Docker placeholder config" : currentLang() === "mix" ? "跳到 Docker 预留配置 / Jump to Docker config" : "跳到 Docker 预留配置")
+              : (currentLang() === "en" ? "Jump to current mode credentials" : currentLang() === "mix" ? "定位到当前模式凭证区 / Jump to current mode credentials" : "定位到当前模式凭证区");
+        }
+      }
+      if (captureCard) {
+        const action = captureCard.querySelector(".card-inline-action");
+        if (action) {
+          action.textContent = currentLang() === "en"
+            ? "Open capture section"
+            : currentLang() === "mix"
+              ? "展开抓取区 / Open capture section"
+              : "展开抓取区";
+        }
+      }
+    }
+
+    function renderMountsDetailHints() {
+      const mountHint = document.getElementById("mount-overview-empty-hint");
+      const captureHint = document.getElementById("provider-capture-empty-hint");
+      const createHint = document.getElementById("create-mount-empty-hint");
+      const mountCount = Array.isArray(storageRecords) ? storageRecords.length : 0;
+      if (mountHint) {
+        mountHint.textContent = !storageRecordsLoaded
+          ? (currentLang() === "en"
+              ? "The mount list is still loading. Open this section only if you want to watch the live list."
+              : currentLang() === "mix"
+                ? "挂载列表还在加载；只有想直接看实时列表时，再打开这里。 / Mount list is still loading."
+                : "挂载列表还在加载；只有想直接看实时列表时，再打开这里。")
+          : mountCount > 0
+            ? (currentLang() === "en"
+                ? `There are already ${mountCount} mounted item(s). Open this only when you want to inspect the list or verify that mounts refreshed correctly.`
+                : currentLang() === "mix"
+                  ? `当前已有 ${mountCount} 个挂载；只有想核对列表或确认刷新成功时，再打开这里。 / Open only to inspect the mount list.`
+                  : `当前已有 ${mountCount} 个挂载；只有想核对列表或确认刷新成功时，再打开这里。`)
+            : (currentLang() === "en"
+                ? "No mount is visible yet. Open this if you want to verify the list after refreshing."
+                : currentLang() === "mix"
+                  ? "当前还没有看到挂载；如果刷新后想确认结果，再打开这里。 / Open to verify the list after refresh."
+                  : "当前还没有看到挂载；如果刷新后想确认结果，再打开这里。");
+      }
+      if (captureHint) {
+        captureHint.textContent = mountCount > 0
+          ? (currentLang() === "en"
+              ? "You already have mounted sources. Open this only when you want to reduce manual fields or re-capture a provider login state."
+              : currentLang() === "mix"
+                ? "当前已经有挂载源；只有想减少手填字段，或重新抓一次登录态时，再打开这里。 / Open only when you need to re-capture login state."
+                : "当前已经有挂载源；只有想减少手填字段，或重新抓一次登录态时，再打开这里。")
+          : (currentLang() === "en"
+              ? "Use this when no source mount is ready yet, or when you want browser login capture to help fill fields."
+              : currentLang() === "mix"
+                ? "当还没有源挂载，或想通过网页登录抓取来帮你回填字段时，用这里。 / Use this when no source mount is ready."
+                : "当还没有源挂载，或想通过网页登录抓取来帮你回填字段时，用这里。");
+      }
+      if (createHint) {
+        createHint.textContent = currentLang() === "en"
+          ? "Manual mount creation is the fallback path. Open this only when the existing list and browser capture flow are still not enough."
+          : currentLang() === "mix"
+            ? "手动新增挂载属于兜底路径；只有现成挂载和网页登录抓取都不够用时，再打开这里。 / Manual mount creation is the fallback path."
+            : "手动新增挂载属于兜底路径；只有现成挂载和网页登录抓取都不够用时，再打开这里。";
+      }
+    }
+
     function applyI18n() {
       document.querySelectorAll("[data-i18n]").forEach((el) => {
         const key = el.getAttribute("data-i18n");
@@ -1316,6 +1414,8 @@
       }
       applyOpenListModeUi();
       applyHelpTips();
+      renderConnectionActionCards();
+      renderMountsDetailHints();
       renderTargetSpecificControls();
       renderCapabilitySummary();
       renderAboutRegistry();
@@ -1491,6 +1591,7 @@
       const root = document.getElementById("target-preflight-notice");
       if (!root) return;
       if (loading) {
+        renderTargetGuidanceActions({});
         setNotice(
           "target-preflight-notice",
           currentLang() === "en"
@@ -1503,6 +1604,7 @@
         return;
       }
       if (error) {
+        renderTargetGuidanceActions({});
         setNotice(
           "target-preflight-notice",
           currentLang() === "en"
@@ -1548,6 +1650,447 @@
         <div class="subtle">${escapeHtml(nextHint)}</div>
       `;
       setNoticeTone("target-preflight-notice", configured ? "success" : "warn");
+      renderTargetGuidanceActions({
+        targetKey,
+        configured,
+        implemented,
+        selectable,
+        missingFields,
+      });
+    }
+
+    function renderTargetGuidanceActions({ targetKey = "", configured = false, implemented = true, selectable = true, missingFields = [] } = {}) {
+      const root = document.getElementById("target-guidance-actions");
+      const openMountsBtn = document.getElementById("target-guidance-open-mounts");
+      const expandBtn = document.getElementById("target-guidance-expand");
+      const captureBtn = document.getElementById("target-guidance-capture");
+      const openTaskBtn = document.getElementById("target-guidance-open-task");
+      if (!root || !openMountsBtn || !expandBtn || !captureBtn || !openTaskBtn) return;
+      const normalizedTarget = String(targetKey || activeTargetKey() || "guangya");
+      const needsFields = Array.isArray(missingFields) && missingFields.length > 0;
+      const targetPath = String(document.getElementById("target_path")?.value || configCache?.target_path || "/").trim() || "/";
+      const showExpand = !configured && implemented && selectable;
+      const showCapture = normalizedTarget === "guangya" && needsFields;
+      const showOpenMounts = normalizedTarget === "openlist" && !configured;
+      const showOpenTask = configured && targetPath === "/";
+      root.classList.toggle("hidden", !(showExpand || showCapture || showOpenMounts || showOpenTask));
+      expandBtn.classList.toggle("hidden", !showExpand);
+      captureBtn.classList.toggle("hidden", !showCapture);
+      openMountsBtn.classList.toggle("hidden", !showOpenMounts);
+      openTaskBtn.classList.toggle("hidden", !showOpenTask);
+    }
+
+    function renderMountsGuidanceActions() {
+      const root = document.getElementById("mounts-guidance-actions");
+      const installBtn = document.getElementById("mounts-guidance-install-runtime");
+      const loginBtn = document.getElementById("mounts-guidance-login-openlist");
+      const refreshBtn = document.getElementById("mounts-guidance-refresh-storages");
+      const openSourceBtn = document.getElementById("mounts-guidance-open-source");
+      const captureBtn = document.getElementById("mounts-guidance-open-capture");
+      if (!root || !installBtn || !loginBtn || !refreshBtn || !openSourceBtn || !captureBtn) return;
+      const mode = normalizeOpenListMode(document.getElementById("openlist_mode")?.value || "external_local");
+      const runtime = window.__cpbStatusCache?.openlist_runtime || {};
+      const hasToken = !!String(document.getElementById("openlist_token")?.value || "").trim();
+      const hasUrl = !!String(document.getElementById("openlist_url")?.value || "").trim();
+      const providerKey = String(document.getElementById("provider-select")?.value || "").trim();
+      const mountCount = Array.isArray(storageRecords) ? storageRecords.length : 0;
+      const connectionReady = hasToken || !!runtime.active_url;
+      const showInstall = mode === "managed_binary" && !!runtime.install_required;
+      const showLogin = (mode === "external_local" || mode === "external_remote") && hasUrl && !hasToken;
+      const showRefresh = connectionReady && mountCount === 0;
+      const showOpenSource = mountCount > 0;
+      const showCapture = mountCount === 0 || !!providerKey;
+      root.classList.toggle("hidden", !(showInstall || showLogin || showRefresh || showOpenSource || showCapture));
+      installBtn.classList.toggle("hidden", !showInstall);
+      loginBtn.classList.toggle("hidden", !showLogin);
+      refreshBtn.classList.toggle("hidden", !showRefresh);
+      openSourceBtn.classList.toggle("hidden", !showOpenSource);
+      captureBtn.classList.toggle("hidden", !showCapture);
+    }
+
+    function renderSourceGuidanceActions() {
+      const root = document.getElementById("source-guidance-actions");
+      const openMountsBtn = document.getElementById("source-guidance-open-mounts");
+      const browseMountedBtn = document.getElementById("source-guidance-browse-mounted");
+      const useCurrentBtn = document.getElementById("source-guidance-use-current");
+      const openTaskBtn = document.getElementById("source-guidance-open-task");
+      if (!root || !openMountsBtn || !browseMountedBtn || !useCurrentBtn || !openTaskBtn) return;
+      const sourcePath = String(document.getElementById("source_path")?.value || configCache?.source_path || "/").trim() || "/";
+      const mountedCount = Array.from(document.querySelectorAll("#mounted_source_select_source option"))
+        .filter((option) => String(option.value || "").trim()).length;
+      const canUseCurrent = !!currentDirectoryPath && currentDirectoryPath !== "/" && currentDirectoryPath !== sourcePath;
+      const showOpenMounts = mountedCount === 0;
+      const showBrowseMounted = mountedCount > 0 && (sourcePath === "/" || !sourcePath);
+      const showOpenTask = sourcePath !== "/";
+      root.classList.toggle("hidden", !(showOpenMounts || showBrowseMounted || canUseCurrent || showOpenTask));
+      openMountsBtn.classList.toggle("hidden", !showOpenMounts);
+      browseMountedBtn.classList.toggle("hidden", !showBrowseMounted);
+      useCurrentBtn.classList.toggle("hidden", !canUseCurrent);
+      openTaskBtn.classList.toggle("hidden", !showOpenTask);
+    }
+
+    function renderTaskGuidanceActions() {
+      const root = document.getElementById("task-guidance-actions");
+      const openSourceBtn = document.getElementById("task-guidance-open-source");
+      const openTargetBtn = document.getElementById("task-guidance-open-target");
+      const openTargetDetailsBtn = document.getElementById("task-guidance-open-target-details");
+      const openExecuteBtn = document.getElementById("task-guidance-open-execute");
+      if (!root || !openSourceBtn || !openTargetBtn || !openTargetDetailsBtn || !openExecuteBtn) return;
+      const sourcePath = String(document.getElementById("source_path")?.value || configCache?.source_path || "/").trim() || "/";
+      const targetPath = String(document.getElementById("target_path")?.value || configCache?.target_path || "/").trim() || "/";
+      const targetConfigured = !!targetPreflightCache?.configured;
+      const showOpenSource = sourcePath === "/";
+      const showOpenTarget = !targetConfigured || targetPath === "/";
+      const showOpenTargetDetails = !targetConfigured;
+      const showOpenExecute = sourcePath !== "/" && targetConfigured && targetPath !== "/";
+      root.classList.toggle("hidden", !(showOpenSource || showOpenTarget || showOpenTargetDetails || showOpenExecute));
+      openSourceBtn.classList.toggle("hidden", !showOpenSource);
+      openTargetBtn.classList.toggle("hidden", !showOpenTarget);
+      openTargetDetailsBtn.classList.toggle("hidden", !showOpenTargetDetails);
+      openExecuteBtn.classList.toggle("hidden", !showOpenExecute);
+    }
+
+    function renderExecuteGuidanceActions() {
+      const root = document.getElementById("execute-guidance-actions");
+      const openSourceBtn = document.getElementById("execute-guidance-open-source");
+      const openTargetBtn = document.getElementById("execute-guidance-open-target");
+      const openTaskBtn = document.getElementById("execute-guidance-open-task");
+      if (!root || !openSourceBtn || !openTargetBtn || !openTaskBtn) return;
+      const sourcePath = String(document.getElementById("source_path")?.value || configCache?.source_path || "/").trim() || "/";
+      const targetPath = String(document.getElementById("target_path")?.value || configCache?.target_path || "/").trim() || "/";
+      const targetConfigured = !!targetPreflightCache?.configured;
+      const showOpenSource = sourcePath === "/";
+      const showOpenTarget = !targetConfigured;
+      const showOpenTask = !showOpenSource && !showOpenTarget && targetPath === "/";
+      root.classList.toggle("hidden", !(showOpenSource || showOpenTarget || showOpenTask));
+      openSourceBtn.classList.toggle("hidden", !showOpenSource);
+      openTargetBtn.classList.toggle("hidden", !showOpenTarget);
+      openTaskBtn.classList.toggle("hidden", !showOpenTask);
+    }
+
+    function renderMountsStageCards() {
+      const root = document.getElementById("mounts-stage-cards");
+      if (!root) return;
+      const mode = normalizeOpenListMode(document.getElementById("openlist_mode")?.value || "external_local");
+      const runtime = window.__cpbStatusCache?.openlist_runtime || {};
+      const hasToken = !!String(document.getElementById("openlist_token")?.value || "").trim();
+      const hasUrl = !!String(document.getElementById("openlist_url")?.value || "").trim();
+      const mountCount = Array.isArray(storageRecords) ? storageRecords.length : 0;
+      const lang = currentLang();
+      const modeValue = mode === "external_remote"
+        ? (lang === "en" ? "Remote instance" : lang === "mix" ? "远程实例 / Remote instance" : "远程实例")
+        : mode === "external_local"
+          ? (lang === "en" ? "Local instance" : lang === "mix" ? "本机实例 / Local instance" : "本机实例")
+          : mode === "managed_binary"
+            ? (lang === "en" ? "Managed binary" : lang === "mix" ? "本机托管 / Managed binary" : "本机托管")
+            : (lang === "en" ? "Docker placeholder" : lang === "mix" ? "Docker 预留 / Docker placeholder" : "Docker 预留");
+      const authReady = hasToken || !!runtime.active_url;
+      const authValue = authReady
+        ? (lang === "en" ? "Connected" : lang === "mix" ? "已连通 / Connected" : "已连通")
+        : (lang === "en" ? "Need login" : lang === "mix" ? "待登录 / Need login" : "待登录");
+      const mountsValue = !storageRecordsLoaded
+        ? (lang === "en" ? "Loading" : lang === "mix" ? "加载中 / Loading" : "加载中")
+        : (lang === "en" ? `${mountCount} mounts` : lang === "mix" ? `${mountCount} 个挂载 / mounts` : `${mountCount} 个挂载`);
+      const authDesc = authReady
+        ? (lang === "en" ? `Current URL: ${runtime.active_url || document.getElementById("openlist_url")?.value || "-"}` : lang === "mix" ? `当前访问地址：${runtime.active_url || document.getElementById("openlist_url")?.value || "-"} / Current URL ready.` : `当前访问地址：${runtime.active_url || document.getElementById("openlist_url")?.value || "-"}`)
+        : (mode === "managed_binary"
+            ? (lang === "en" ? "If the runtime is missing, install it first; then start the managed instance." : lang === "mix" ? "如果运行时不存在，先拉取；然后再启动托管实例。 / Install runtime first if needed." : "如果运行时不存在，先拉取；然后再启动托管实例。")
+            : (lang === "en" ? "Fill URL plus credentials or token, then log in to OpenList." : lang === "mix" ? "填好地址和凭证或 Token 后，再登录 OpenList。 / Fill URL and credentials first." : "填好地址和凭证或 Token 后，再登录 OpenList。"));
+      const mountsDesc = !storageRecordsLoaded
+        ? (lang === "en" ? "Mount list is still loading; you can continue with connection setup first." : lang === "mix" ? "挂载列表还在加载，先继续完成连接也可以。 / Mount list is still loading." : "挂载列表还在加载，先继续完成连接也可以。")
+        : mountCount > 0
+          ? (lang === "en" ? "Mounted sources are available. Next step: go to Source and pick the folder." : lang === "mix" ? "已能看到挂载。下一步去“源端”选目录。 / Mounted sources are ready." : "已能看到挂载。下一步去“源端”选目录。")
+          : (lang === "en" ? "No mount found yet. You can refresh the list or add a mount below." : lang === "mix" ? "还没看到挂载，可先刷新列表或去下面新增挂载。 / No mount found yet." : "还没看到挂载，可先刷新列表或去下面新增挂载。");
+      root.innerHTML = `
+        <div class="compact-summary-card is-info">
+          <div class="card-kicker">${escapeHtml(lang === "en" ? "Current mode" : lang === "mix" ? "当前模式 / Current mode" : "当前模式")}</div>
+          <div class="card-metric">${escapeHtml(modeValue)}</div>
+          <div>${escapeHtml(mode === "managed_docker"
+            ? (lang === "en" ? "This mode currently keeps parameters and expectations only." : lang === "mix" ? "这个模式当前主要保存参数和预期，不假装已全自动起容器。 / Parameters only for now." : "这个模式当前主要保存参数和预期，不假装已全自动起容器。")
+            : (lang === "en" ? "Only the configuration group matching this mode is shown below." : lang === "mix" ? "下方只会显示与当前模式匹配的配置区。 / Only matching config is shown below." : "下方只会显示与当前模式匹配的配置区。"))}</div>
+        </div>
+        <div class="compact-summary-card ${authReady ? "is-success" : "is-warn"}">
+          <div class="card-kicker">${escapeHtml(lang === "en" ? "OpenList access" : lang === "mix" ? "访问状态 / OpenList access" : "访问状态")}</div>
+          <div class="card-metric">${escapeHtml(authValue)}</div>
+          <div>${escapeHtml(authDesc)}</div>
+        </div>
+        <div class="compact-summary-card ${mountCount > 0 ? "is-success" : "is-info"}">
+          <div class="card-kicker">${escapeHtml(lang === "en" ? "Mounted sources" : lang === "mix" ? "挂载情况 / Mounted sources" : "挂载情况")}</div>
+          <div class="card-metric">${escapeHtml(mountsValue)}</div>
+          <div>${escapeHtml(mountsDesc)}</div>
+        </div>
+      `;
+    }
+
+    function renderTargetActionCards() {
+      const root = document.getElementById("target-action-cards");
+      if (!root) return;
+      const target = activeTargetKey();
+      const targetConfigured = !!targetPreflightCache?.configured;
+      const targetPath = String(document.getElementById("target_path")?.value || configCache?.target_path || "/").trim() || "/";
+      const lang = currentLang();
+      let cards = [];
+      if (target === "guangya") {
+        cards = [
+          {
+            id: "target-action-capture",
+            title: lang === "en" ? "Capture Guangya login" : lang === "mix" ? "抓取光鸭登录 / Capture Guangya login" : "抓取光鸭登录",
+            desc: targetConfigured
+              ? (lang === "en" ? "Use this when tokens expire or you want to refresh Authorization before a long run." : lang === "mix" ? "令牌过期或大任务前想刷新 Authorization 时，再点这里。 / Use when tokens need refresh." : "令牌过期或大任务前想刷新 Authorization 时，再点这里。")
+              : (lang === "en" ? "If Guangya is not configured yet, start from this capture入口 first." : lang === "mix" ? "如果光鸭还没配好，优先从这里开始抓取。 / Start from capture first." : "如果光鸭还没配好，优先从这里开始抓取。"),
+            action: lang === "en" ? "Open Guangya capture" : lang === "mix" ? "打开光鸭抓取 / Open capture" : "打开光鸭抓取",
+          },
+          {
+            id: "target-action-fields",
+            title: lang === "en" ? "Fill target fields" : lang === "mix" ? "补目标端字段 / Fill target fields" : "补目标端字段",
+            desc: targetConfigured
+              ? (lang === "en" ? "Connection looks healthy; open only when you need to inspect or adjust tokens and IDs." : lang === "mix" ? "当前连接看起来正常；只有想检查或调整 token、设备号时，再打开。 / Open only to inspect fields." : "当前连接看起来正常；只有想检查或调整 token、设备号时，再打开。")
+              : (lang === "en" ? "Open the connection details and complete the missing Guangya fields." : lang === "mix" ? "展开连接详情，把光鸭缺的字段补齐。 / Complete the missing Guangya fields." : "展开连接详情，把光鸭缺的字段补齐。"),
+            action: lang === "en" ? "Expand field area" : lang === "mix" ? "展开字段区 / Expand field area" : "展开字段区",
+          },
+          {
+            id: "target-action-task",
+            title: lang === "en" ? "Confirm target directory" : lang === "mix" ? "确认目标目录 / Confirm target directory" : "确认目标目录",
+            desc: targetPath === "/"
+              ? (lang === "en" ? "After Guangya is connected, go to Task and confirm where files should be written." : lang === "mix" ? "光鸭连好后，下一步去“任务”页确认写入目录。 / Confirm target directory in Task next." : "光鸭连好后，下一步去“任务”页确认写入目录。")
+              : (lang === "en" ? `Current target directory is ${targetPath}. Open Task only if you want to change it.` : lang === "mix" ? `当前目标目录是 ${targetPath}；只有想改目录时，再去任务页。 / Open Task only to change it.` : `当前目标目录是 ${targetPath}；只有想改目录时，再去任务页。`),
+            action: lang === "en" ? "Go to Task" : lang === "mix" ? "去任务页 / Go to Task" : "去任务页",
+          },
+        ];
+      } else if (target === "openlist") {
+        cards = [
+          {
+            id: "target-action-openlist-check",
+            title: lang === "en" ? "Check OpenList connection" : lang === "mix" ? "检查 OpenList 连接 / Check OpenList connection" : "检查 OpenList 连接",
+            desc: lang === "en"
+              ? "This target reuses the OpenList connection from the Connections tab."
+              : lang === "mix"
+                ? "这个目标端复用“连接”页里的 OpenList 连接。 / Reuses the OpenList connection from Connections."
+                : "这个目标端复用“连接”页里的 OpenList 连接。",
+            action: lang === "en" ? "Back to Connections" : lang === "mix" ? "回连接页 / Back to Connections" : "回连接页",
+          },
+          {
+            id: "target-action-openlist-mount",
+            title: lang === "en" ? "Choose target mount" : lang === "mix" ? "选择目标挂载 / Choose target mount" : "选择目标挂载",
+            desc: lang === "en"
+              ? "Open the field area only when you want to choose which mounted storage should receive files."
+              : lang === "mix"
+                ? "只有想选“写到哪个挂载”时，再展开字段区。 / Expand only to choose the target mount."
+                : "只有想选“写到哪个挂载”时，再展开字段区。",
+            action: lang === "en" ? "Open mount selector" : lang === "mix" ? "展开挂载选择 / Open mount selector" : "展开挂载选择",
+          },
+          {
+            id: "target-action-task",
+            title: lang === "en" ? "Confirm target path" : lang === "mix" ? "确认目标路径 / Confirm target path" : "确认目标路径",
+            desc: targetPath === "/"
+              ? (lang === "en" ? "After choosing the OpenList target mount, confirm the write path in Task." : lang === "mix" ? "选好 OpenList 目标挂载后，再去任务页确认写入路径。 / Confirm target path in Task." : "选好 OpenList 目标挂载后，再去任务页确认写入路径。")
+              : (lang === "en" ? `Current target path is ${targetPath}.` : lang === "mix" ? `当前目标路径是 ${targetPath}。 / Current target path is ready.` : `当前目标路径是 ${targetPath}。`),
+            action: lang === "en" ? "Go to Task" : lang === "mix" ? "去任务页 / Go to Task" : "去任务页",
+          },
+        ];
+      } else {
+        cards = [
+          {
+            id: "target-action-fields",
+            title: lang === "en" ? "Complete target credentials" : lang === "mix" ? "补目标端凭证 / Complete target credentials" : "补目标端凭证",
+            desc: targetConfigured
+              ? (lang === "en" ? "Connection looks usable. Open only when you need to check or change the target fields." : lang === "mix" ? "当前连接看起来可用；只有想检查或调整字段时，再展开。 / Open only to inspect fields." : "当前连接看起来可用；只有想检查或调整字段时，再展开。")
+              : (lang === "en" ? "Open the connection details and fill the required fields for this target." : lang === "mix" ? "展开连接详情，把这个目标端的必填字段补齐。 / Fill the required target fields." : "展开连接详情，把这个目标端的必填字段补齐。"),
+            action: lang === "en" ? "Expand field area" : lang === "mix" ? "展开字段区 / Expand field area" : "展开字段区",
+          },
+          {
+            id: "target-action-help",
+            title: lang === "en" ? "Read target help" : lang === "mix" ? "查看目标端说明 / Read target help" : "查看目标端说明",
+            desc: lang === "en"
+              ? "Use the help center when this target needs extra understanding or setup references."
+              : lang === "mix"
+                ? "如果这个目标端还有不明白的地方，可以打开帮助与能力看说明。 / Open help when you need setup references."
+                : "如果这个目标端还有不明白的地方，可以打开帮助与能力看说明。",
+            action: lang === "en" ? "Open help" : lang === "mix" ? "打开帮助 / Open help" : "打开帮助",
+          },
+          {
+            id: "target-action-task",
+            title: lang === "en" ? "Confirm write path" : lang === "mix" ? "确认写入路径 / Confirm write path" : "确认写入路径",
+            desc: targetPath === "/"
+              ? (lang === "en" ? "After the target is connected, go to Task and confirm where files should be written." : lang === "mix" ? "目标端连好后，再去任务页确认写入路径。 / Confirm write path in Task next." : "目标端连好后，再去任务页确认写入路径。")
+              : (lang === "en" ? `Current write path is ${targetPath}.` : lang === "mix" ? `当前写入路径是 ${targetPath}。 / Current write path is ready.` : `当前写入路径是 ${targetPath}。`),
+            action: lang === "en" ? "Go to Task" : lang === "mix" ? "去任务页 / Go to Task" : "去任务页",
+          },
+        ];
+      }
+      root.innerHTML = cards.map((card) => `
+        <button class="compact-summary-card compact-action-card" type="button" id="${escapeHtml(card.id)}">
+          <strong>${escapeHtml(card.title)}</strong>
+          <div class="subtle">${escapeHtml(card.desc)}</div>
+          <div class="card-inline-action">${escapeHtml(card.action)}</div>
+        </button>
+      `).join("");
+    }
+
+    function renderExecuteStageCards() {
+      const root = document.getElementById("execute-stage-cards");
+      const notice = document.getElementById("execute-overview-notice");
+      if (!root || !notice) return;
+      const state = computeWorkflowState();
+      const lang = currentLang();
+      const queueItems = Array.isArray(window.__cpbStatusCache?.sync?.source_queue) ? window.__cpbStatusCache.sync.source_queue : [];
+      const pendingItems = Array.isArray(window.__cpbStatusCache?.sync?.persistent_pending) ? window.__cpbStatusCache.sync.persistent_pending : [];
+      const hasCurrentDirectory = !!currentDirectoryPath && currentDirectoryPath !== "/";
+      const sourceValue = state.sourceReady
+        ? state.sourcePath
+        : (lang === "en" ? "Not ready" : lang === "mix" ? "未就绪 / Not ready" : "未就绪");
+      const runValue = state.executionReady
+        ? (lang === "en" ? "Can run now" : lang === "mix" ? "现在可执行 / Can run now" : "现在可执行")
+        : (lang === "en" ? "Need preparation" : lang === "mix" ? "还需准备 / Need prep" : "还需准备");
+      const slowRunValue = hasCurrentDirectory
+        ? (lang === "en" ? "Available" : lang === "mix" ? "可用 / Available" : "可用")
+        : (lang === "en" ? "Browse first" : lang === "mix" ? "先浏览目录 / Browse first" : "先浏览目录");
+      const queueValue = queueItems.length > 0
+        ? (lang === "en" ? `${queueItems.length} queued` : lang === "mix" ? `${queueItems.length} 个队列 / queued` : `${queueItems.length} 个队列`)
+        : (lang === "en" ? "Empty" : lang === "mix" ? "为空 / Empty" : "为空");
+      const pendingValue = pendingItems.length > 0
+        ? (lang === "en" ? `${pendingItems.length} pending` : lang === "mix" ? `${pendingItems.length} 个待补传 / pending` : `${pendingItems.length} 个待补传`)
+        : (lang === "en" ? "No pending" : lang === "mix" ? "无待补传 / No pending" : "无待补传");
+      let overviewText = "";
+      let overviewTone = "";
+      if (!state.sourceReady) {
+        overviewText = lang === "en"
+          ? "You have not selected a concrete source folder yet. Go to Source first."
+          : lang === "mix"
+            ? "你还没选定具体源目录，先去“源端”完成这一步。 / Pick a concrete source folder first."
+            : "你还没选定具体源目录，先去“源端”完成这一步。";
+        overviewTone = "warn";
+      } else if (!state.targetConfigured) {
+        overviewText = lang === "en"
+          ? "Source is ready, but the target is not connected yet. Go to Target first."
+          : lang === "mix"
+            ? "源目录已就绪，但目标端还没连好，先去“目标端”补配置。 / Target is not ready yet."
+            : "源目录已就绪，但目标端还没连好，先去“目标端”补配置。";
+        overviewTone = "warn";
+      } else if (!state.executionReady) {
+        overviewText = lang === "en"
+          ? "Connection and source are ready. Confirm the task path and strategy before running."
+          : lang === "mix"
+            ? "连接和源目录都好了，再去“任务”页确认目标目录和策略后就能执行。 / Confirm task settings before running."
+            : "连接和源目录都好了，再去“任务”页确认目标目录和策略后就能执行。";
+      } else if (pendingItems.length > 0) {
+        overviewText = lang === "en"
+          ? "Execution is ready, and there are pending reupload items left from previous runs. You can handle them in the pending tree below."
+          : lang === "mix"
+            ? "现在可以执行，而且下方还有上次遗留的待补传项；需要的话可以继续处理。 / Pending recovery is available."
+            : "现在可以执行，而且下方还有上次遗留的待补传项；需要的话可以继续处理。";
+        overviewTone = "success";
+      } else {
+        overviewText = lang === "en"
+          ? "Normal case: use direct sync below. Large slow-run and risk-control cases: use leaf mode above."
+          : lang === "mix"
+            ? "普通场景先用下面的“直接执行”；大目录慢跑或防风控场景再用上面的最底层目录模式。 / Use direct sync first in normal cases."
+            : "普通场景先用下面的“直接执行”；大目录慢跑或防风控场景再用上面的最底层目录模式。";
+        overviewTone = "success";
+      }
+      setNotice("execute-overview-notice", overviewText, overviewTone);
+      root.innerHTML = `
+        <div class="compact-summary-card ${state.sourceReady ? "is-success" : "is-warn"}">
+          <div class="card-kicker">${escapeHtml(lang === "en" ? "Current source" : lang === "mix" ? "当前源目录 / Current source" : "当前源目录")}</div>
+          <div class="card-metric">${escapeHtml(sourceValue)}</div>
+          <div>${escapeHtml(state.sourceReady
+            ? (lang === "en" ? "This is the folder that will be used for execution." : lang === "mix" ? "这就是执行时会使用的源目录。 / This folder will be used for execution." : "这就是执行时会使用的源目录。")
+            : (lang === "en" ? "Pick a concrete directory on the Source tab first." : lang === "mix" ? "先去“源端”页选一个具体目录。 / Pick a concrete directory first." : "先去“源端”页选一个具体目录。"))}</div>
+        </div>
+        <div class="compact-summary-card ${state.executionReady ? "is-success" : "is-warn"}">
+          <div class="card-kicker">${escapeHtml(lang === "en" ? "Direct sync" : lang === "mix" ? "直接执行 / Direct sync" : "直接执行")}</div>
+          <div class="card-metric">${escapeHtml(runValue)}</div>
+          <div>${escapeHtml(state.executionReady
+            ? (lang === "en" ? "Use the direct actions below for most normal sync jobs." : lang === "mix" ? "大多数普通同步场景，直接用下面的执行按钮即可。 / Direct actions fit most normal jobs." : "大多数普通同步场景，直接用下面的执行按钮即可。")
+            : (lang === "en" ? "Target configuration or task confirmation is still incomplete." : lang === "mix" ? "目标端配置或任务确认还没完成。 / Target or task is still incomplete." : "目标端配置或任务确认还没完成。"))}</div>
+        </div>
+        <div class="compact-summary-card ${hasCurrentDirectory ? "is-info" : "is-warn"}">
+          <div class="card-kicker">${escapeHtml(lang === "en" ? "Leaf slow-run" : lang === "mix" ? "最底层模式 / Leaf slow-run" : "最底层模式")}</div>
+          <div class="card-metric">${escapeHtml(slowRunValue)}</div>
+          <div>${escapeHtml(hasCurrentDirectory
+            ? (lang === "en" ? "Suitable for large trees, slower pacing, and lower risk-control pressure." : lang === "mix" ? "适合大目录、慢跑和更稳妥的节奏。 / Better for large trees and safer pacing." : "适合大目录、慢跑和更稳妥的节奏。")
+            : (lang === "en" ? "Browse into a concrete folder first, then this mode can be used." : lang === "mix" ? "先进入一个具体目录，最底层模式才有意义。 / Browse a concrete folder first." : "先进入一个具体目录，最底层模式才有意义。"))}</div>
+        </div>
+        <div class="compact-summary-card ${queueItems.length > 0 ? "is-info" : ""}">
+          <div class="card-kicker">${escapeHtml(lang === "en" ? "Queue" : lang === "mix" ? "目录队列 / Queue" : "目录队列")}</div>
+          <div class="card-metric">${escapeHtml(queueValue)}</div>
+          <div>${escapeHtml(queueItems.length > 0
+            ? (lang === "en" ? "You can continue with 'run next' or 'run all' below." : lang === "mix" ? "下面可以继续执行“下一个”或“整个队列”。 / Queue execution is available below." : "下面可以继续执行“下一个”或“整个队列”。")
+            : (lang === "en" ? "When you want batched execution, add the current folder or leaf folders into the queue first." : lang === "mix" ? "想分批执行时，先把当前目录或叶子目录加入队列。 / Add folders into the queue first." : "想分批执行时，先把当前目录或叶子目录加入队列。"))}</div>
+        </div>
+        <div class="compact-summary-card ${pendingItems.length > 0 ? "is-warn" : ""}">
+          <div class="card-kicker">${escapeHtml(lang === "en" ? "Pending recovery" : lang === "mix" ? "待补传 / Pending recovery" : "待补传")}</div>
+          <div class="card-metric">${escapeHtml(pendingValue)}</div>
+          <div>${escapeHtml(pendingItems.length > 0
+            ? (lang === "en" ? "Expand the pending tree below if you want to recover unfinished files." : lang === "mix" ? "如果要补之前没传完的文件，展开下面的待补传目录树。 / Expand the pending tree to recover files." : "如果要补之前没传完的文件，展开下面的待补传目录树。")
+            : (lang === "en" ? "This area stays empty until a previous run leaves unfinished files." : lang === "mix" ? "只有之前执行留下未完成文件时，这里才会出现内容。 / This appears after unfinished runs only." : "只有之前执行留下未完成文件时，这里才会出现内容。"))}</div>
+        </div>
+      `;
+    }
+
+    function setButtonAvailability(id, enabled, titleWhenDisabled = "") {
+      const button = document.getElementById(id);
+      if (!button) return;
+      button.disabled = !enabled;
+      if (enabled) button.removeAttribute("title");
+      else button.title = titleWhenDisabled || "";
+    }
+
+    function renderExecutionActionAvailability() {
+      const state = computeWorkflowState();
+      const hasCurrentDirectory = !!currentDirectoryPath && currentDirectoryPath !== "/";
+      const queueItems = Array.isArray(window.__cpbStatusCache?.sync?.source_queue) ? window.__cpbStatusCache.sync.source_queue : [];
+      const pendingItems = Array.isArray(window.__cpbStatusCache?.sync?.persistent_pending) ? window.__cpbStatusCache.sync.persistent_pending : [];
+      const queueReady = queueItems.length > 0;
+      const hasPending = pendingItems.length > 0;
+      const sourceHint = currentLang() === "en"
+        ? "Choose a concrete source directory first."
+        : currentLang() === "mix"
+          ? "请先选择具体源目录。 / Choose a concrete source directory first."
+          : "请先选择具体源目录。";
+      const targetHint = currentLang() === "en"
+        ? "Complete the target configuration first."
+        : currentLang() === "mix"
+          ? "请先完成目标端配置。 / Complete target configuration first."
+          : "请先完成目标端配置。";
+      const browseHint = currentLang() === "en"
+        ? "Browse into a concrete directory first."
+        : currentLang() === "mix"
+          ? "请先进入一个具体目录。 / Browse into a concrete directory first."
+          : "请先进入一个具体目录。";
+      const queueHint = currentLang() === "en"
+        ? "Add at least one directory into the queue first."
+        : currentLang() === "mix"
+          ? "请先往队列里加入至少一个目录。 / Add a queue item first."
+          : "请先往队列里加入至少一个目录。";
+      const pendingHint = currentLang() === "en"
+        ? "Pending reupload content will appear here only after execution leaves unfinished files."
+        : currentLang() === "mix"
+          ? "只有执行后留下待补传文件，这里才会有内容。 / Pending items appear after failed execution."
+          : "只有执行后留下待补传文件，这里才会有内容。";
+
+      setButtonAvailability("run-dry", state.taskReady, !state.sourceReady ? sourceHint : targetHint);
+      setButtonAvailability("run-direct", state.executionReady, !state.sourceReady ? sourceHint : !state.targetConfigured ? targetHint : "");
+      setButtonAvailability("add-current-queue", hasCurrentDirectory, browseHint);
+      setButtonAvailability("add-leaf-queue", hasCurrentDirectory, browseHint);
+      setButtonAvailability("run-leaf-direct", hasCurrentDirectory && state.connectionReady, !hasCurrentDirectory ? browseHint : targetHint);
+      setButtonAvailability("run-leaf-full", hasCurrentDirectory && state.connectionReady, !hasCurrentDirectory ? browseHint : targetHint);
+      setButtonAvailability("run-next-queue", queueReady, queueHint);
+      setButtonAvailability("run-all-queue", queueReady, queueHint);
+      setButtonAvailability("pending-select-all", hasPending, pendingHint);
+      setButtonAvailability("pending-clear-all", hasPending, pendingHint);
+      setButtonAvailability("pending-run-selected", hasPending, pendingHint);
+      setButtonAvailability("pending-run-stream", hasPending, pendingHint);
+    }
+
+    function renderWorkflowGuidance() {
+      renderMountsStageCards();
+      renderMountsGuidanceActions();
+      renderSourceGuidanceActions();
+      renderTaskGuidanceActions();
+      renderExecuteStageCards();
+      renderExecuteGuidanceActions();
+      renderExecutionActionAvailability();
     }
 
     function renderProviderQuickPicks() {
@@ -1697,6 +2240,8 @@
       }
       const popularSummary = document.getElementById("target-popular-summary");
       if (popularSummary) {
+        popularSummary.classList.remove("is-success", "is-warn", "is-info");
+        popularSummary.classList.add("is-info");
         const popularText = {
           guangya: currentLang() === "en"
             ? "Common target: Guangya cloud drive. Best when you want metadata fast upload first and fallback reupload second."
@@ -1749,18 +2294,64 @@
               ? "常用目标端：OpenList 挂载目标。适合写入另一个已挂载存储。 / OpenList mount target."
               : "常用目标端：OpenList 挂载目标。适合写入另一个已挂载存储。",
         };
-        popularSummary.textContent = popularText[target] || popularText.guangya;
+        const useCaseTitle = currentLang() === "en"
+          ? "Recommended use"
+          : currentLang() === "mix"
+            ? "适合场景 / Recommended use"
+            : "适合场景";
+        const targetHint = currentLang() === "en"
+          ? "Typical destination choice"
+          : currentLang() === "mix"
+            ? "常用建议 / Typical choice"
+            : "常用建议";
+        popularSummary.innerHTML = `
+          <div class="card-kicker">${escapeHtml(targetHint)}</div>
+          <div class="card-metric">${escapeHtml(useCaseTitle)}</div>
+          <div>${escapeHtml(popularText[target] || popularText.guangya)}</div>
+        `;
       }
       const guide = document.getElementById("target-auth-guide");
       if (guide) {
         const authMode = String(preflight?.auth_mode || targetProfile?.auth_mode || "-");
+        const nextGuide = !writable
+          ? (target === "guangya"
+              ? (currentLang() === "en"
+                  ? "Recommended next step: click 'Go log in and capture Guangya' below, then come back to confirm the target directory."
+                  : currentLang() === "mix"
+                    ? "建议下一步：先点下面的“去登录抓取光鸭”，抓到令牌后再回来确认目标目录。 / Capture Guangya login first."
+                    : "建议下一步：先点下面的“去登录抓取光鸭”，抓到令牌后再回来确认目标目录。")
+              : target === "openlist"
+                ? (currentLang() === "en"
+                    ? "Recommended next step: make sure OpenList is connected on the Connections tab, then choose an OpenList target mount."
+                    : currentLang() === "mix"
+                      ? "建议下一步：先确保“连接”页里的 OpenList 已连通，再选择一个 OpenList 目标挂载。 / Connect OpenList first."
+                      : "建议下一步：先确保“连接”页里的 OpenList 已连通，再选择一个 OpenList 目标挂载。")
+                : (currentLang() === "en"
+                    ? "Recommended next step: expand the connection details below and complete the required target fields."
+                    : currentLang() === "mix"
+                      ? "建议下一步：展开下方连接详情，把这个目标端的必填字段补齐。 / Complete the required target fields."
+                      : "建议下一步：展开下方连接详情，把这个目标端的必填字段补齐。"))
+          : (currentLang() === "en"
+              ? "Target side is connected. Next, go to Task and confirm where files should be written."
+              : currentLang() === "mix"
+                ? "目标端已经连通。下一步去“任务”页确认写入目录。 / Target is connected; confirm target path next."
+                : "目标端已经连通。下一步去“任务”页确认写入目录。");
+        guide.classList.remove("is-success", "is-warn", "is-info");
+        guide.classList.add("is-info");
         guide.innerHTML = `
-          <div><strong>${escapeHtml(targetName)}</strong></div>
+          <div class="card-kicker">${currentLang() === "en" ? "Target type" : currentLang() === "mix" ? "目标类型 / Target type" : "目标类型"}</div>
+          <div class="card-metric">${escapeHtml(targetName)}</div>
           <div class="subtle">${escapeHtml(guideTextPair(targetProfile?.description) || "")}</div>
-          <div class="mono">${currentLang() === "en" ? "Auth mode" : currentLang() === "mix" ? "鉴权 / Auth mode" : "鉴权"}: ${escapeHtml(authMode)}</div>
+          <div class="card-meta-row">
+            <span class="card-meta">${currentLang() === "en" ? "Auth" : currentLang() === "mix" ? "鉴权 / Auth" : "鉴权"}: ${escapeHtml(authMode)}</span>
+            <span class="card-meta">${preflight?.auto_create_dir
+              ? (currentLang() === "en" ? "Auto dir on" : currentLang() === "mix" ? "自动建目录 / on" : "自动建目录")
+              : (currentLang() === "en" ? "Auto dir off" : currentLang() === "mix" ? "自动建目录 / off" : "自动建目录关闭")}</span>
+          </div>
           <div class="subtle">${preflight?.auto_create_dir
             ? (currentLang() === "en" ? "Can create target directories automatically." : currentLang() === "mix" ? "支持自动建目录。 / Auto directory creation supported." : "支持自动建目录。")
             : (currentLang() === "en" ? "Target directories may need to exist in advance." : currentLang() === "mix" ? "目标目录可能需要提前存在。 / Target directory may need to exist first." : "目标目录可能需要提前存在。")}</div>
+          <div>${escapeHtml(nextGuide)}</div>
         `;
       }
       const summary = document.getElementById("target-auth-summary");
@@ -1769,15 +2360,25 @@
         const readyText = writable
           ? (currentLang() === "en" ? "Ready to execute" : currentLang() === "mix" ? "可直接执行 / Ready to execute" : "可直接执行")
           : (currentLang() === "en" ? "Needs configuration" : currentLang() === "mix" ? "还需配置 / Needs configuration" : "还需配置");
+        summary.classList.remove("is-success", "is-warn", "is-info");
+        summary.classList.add(writable ? "is-success" : "is-warn");
         summary.innerHTML = `
-          <div class="summary-pill ${writable ? "" : "warn"}">${escapeHtml(readyText)}</div>
+          <div class="card-kicker">${currentLang() === "en" ? "Connection status" : currentLang() === "mix" ? "连接状态 / Connection status" : "连接状态"}</div>
+          <div class="card-meta-row">
+            <span class="summary-pill ${writable ? "" : "warn"}">${escapeHtml(readyText)}</span>
+            <span class="card-meta">${currentLang() === "en" ? "Missing" : currentLang() === "mix" ? "缺项 / Missing" : "缺项"}: ${escapeHtml(String(missingFields.length || 0))}</span>
+          </div>
+          <div class="card-metric">${escapeHtml(writable ? (currentLang() === "en" ? "Connected" : currentLang() === "mix" ? "已连接 / Connected" : "已连接") : (currentLang() === "en" ? "Incomplete" : currentLang() === "mix" ? "待补字段 / Incomplete" : "待补字段"))}</div>
           <div>${writable
             ? (currentLang() === "en" ? "Connection looks healthy and this target can continue into execution." : currentLang() === "mix" ? "连接状态正常，可以继续执行。 / Connection looks healthy." : "连接状态正常，可以继续执行。")
             : (currentLang() === "en" ? `There are still ${missingFields.length || 0} required field(s) to complete.` : currentLang() === "mix" ? `还有 ${missingFields.length || 0} 个必填项需要补齐。 / Required fields are still missing.` : `还有 ${missingFields.length || 0} 个必填项需要补齐。`)}</div>
-          <div class="mono">${currentLang() === "en" ? "Write mode" : currentLang() === "mix" ? "写入方式 / Write mode" : "写入方式"}: ${escapeHtml(preflight?.write_mode || "-")}</div>
+          <div class="card-meta-row">
+            <span class="card-meta">${currentLang() === "en" ? "Write mode" : currentLang() === "mix" ? "写入方式 / Write mode" : "写入方式"}: ${escapeHtml(preflight?.write_mode || "-")}</span>
+          </div>
           <div class="subtle">${escapeHtml(preflight?.message || "")}</div>
         `;
       }
+      renderTargetActionCards();
     }
 
     async function loadProviderRegistry() {
@@ -2187,7 +2788,11 @@
       if (!selects.length) return;
       if (!list.length) {
         selects.forEach((select) => {
-          select.innerHTML = `<option value="">${currentLang() === "en" ? "No OpenList mounts" : currentLang() === "mix" ? "暂无 OpenList 挂载 / No OpenList mounts" : "暂无 OpenList 挂载"}</option>`;
+          const text = storageRecordsLoaded
+            ? (currentLang() === "en" ? "No OpenList mounts" : currentLang() === "mix" ? "暂无 OpenList 挂载 / No OpenList mounts" : "暂无 OpenList 挂载")
+            : (currentLang() === "en" ? "Loading OpenList mounts..." : currentLang() === "mix" ? "正在载入 OpenList 挂载... / Loading OpenList mounts..." : "正在载入 OpenList 挂载...");
+          select.innerHTML = `<option value="">${text}</option>`;
+          select.disabled = true;
         });
         return;
       }
@@ -2200,6 +2805,7 @@
       }).join("");
       selects.forEach((select) => {
         select.innerHTML = html;
+        select.disabled = false;
       });
     }
 
@@ -2343,10 +2949,12 @@
 
     function renderSourceDriverSummary() {
       workflowView.renderSourceDriverSummary?.(workflowContext());
+      renderWorkflowGuidance();
     }
 
     function renderTaskModeSummary() {
       workflowView.renderTaskModeSummary?.(workflowContext());
+      renderWorkflowGuidance();
     }
 
     function renderWorkflowSummaries(syncState = {}, runtimeState = {}) {
@@ -2369,6 +2977,7 @@
       if (data.sync?.directory_browser) renderDirectoryBrowser(data.sync.directory_browser);
       renderLogs(data.logs || []);
       renderWorkflowSummaries(data.sync || {}, data.openlist_runtime || {});
+      renderWorkflowGuidance();
     }
 
     async function analyzeCurrentSource() {
@@ -2540,6 +3149,92 @@
         setAuthNotice(currentLang() === "en" ? "Enter the console credentials." : currentLang() === "mix" ? "请输入控制台账号密码。 / Enter the console credentials." : "请输入控制台账号密码。");
         showAuthDialog();
       });
+      bindClick("connection-card-console", () => {
+        if (!authState.enabled) {
+          setNotice("runtime-action-notice", currentLang() === "en"
+            ? "Console login is not enabled in the current config."
+            : currentLang() === "mix"
+              ? "当前配置没有启用控制台登录。 / Console login is not enabled."
+              : "当前配置没有启用控制台登录。");
+          return;
+        }
+        document.getElementById("open-auth-login")?.click();
+      });
+      bindClick("connection-card-openlist", () => {
+        const mode = normalizeOpenListMode(document.getElementById("openlist_mode")?.value || "external_local");
+        const section = document.querySelector(`[data-openlist-section="${mode}"]`);
+        section?.scrollIntoView({ behavior: "smooth", block: "start" });
+        const focusTarget = mode === "managed_binary"
+          ? document.getElementById("managed_openlist_bin") || document.getElementById("managed_openlist_port")
+          : mode === "managed_docker"
+            ? document.getElementById("managed_openlist_docker_image") || document.getElementById("managed_openlist_docker_container_name")
+            : mode === "external_remote"
+              ? document.querySelector('[data-openlist-mirror="openlist_url"]')
+              : document.getElementById("openlist_url");
+        focusTarget?.focus?.();
+        setNotice("runtime-action-notice", currentLang() === "en"
+          ? "Jumped to the configuration area that matches the current OpenList mode."
+          : currentLang() === "mix"
+            ? "已定位到当前 OpenList 模式对应的配置区。 / Jumped to the current mode config area."
+            : "已定位到当前 OpenList 模式对应的配置区。");
+      });
+      bindClick("connection-card-provider-capture", () => {
+        revealPanelDetails("provider-capture-details");
+        window.setTimeout(() => {
+          const select = document.getElementById("provider-select");
+          if (select) {
+            const top = select.getBoundingClientRect().top + window.scrollY - 140;
+            window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+          }
+          window.setTimeout(() => {
+            select?.focus?.();
+          }, 220);
+        }, 80);
+        setNotice("runtime-action-notice", currentLang() === "en"
+          ? "Capture section opened. Choose a provider type there."
+          : currentLang() === "mix"
+            ? "已展开抓取区，请在那里选择源网盘类型。 / Capture section opened."
+            : "已展开抓取区，请在那里选择源网盘类型。");
+      });
+      bindClick("target-action-cards", (event) => {
+        const card = event.target?.closest?.(".compact-action-card");
+        if (!card?.id) return;
+        const id = card.id;
+        if (id === "target-action-capture") {
+          revealTargetConnectionDetails();
+          document.getElementById("capture-guangya")?.click();
+          return;
+        }
+        if (id === "target-action-fields") {
+          revealTargetConnectionDetails();
+          const firstVisibleInput = document.querySelector('[data-target-section].is-active input, [data-target-section].is-active select');
+          firstVisibleInput?.focus?.();
+          return;
+        }
+        if (id === "target-action-task") {
+          activateTab("task");
+          return;
+        }
+        if (id === "target-action-openlist-check") {
+          activateTab("mounts");
+          setNotice("runtime-action-notice", currentLang() === "en"
+            ? "OpenList target reuses the connection from this page. Verify it here first."
+            : currentLang() === "mix"
+              ? "OpenList 目标端复用这里的连接，先在本页确认连接没问题。 / Verify OpenList connection here first."
+              : "OpenList 目标端复用这里的连接，先在本页确认连接没问题。");
+          return;
+        }
+        if (id === "target-action-openlist-mount") {
+          revealTargetConnectionDetails();
+          const select = document.getElementById("openlist_target_mount_select");
+          select?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+          window.setTimeout(() => select?.focus?.(), 120);
+          return;
+        }
+        if (id === "target-action-help") {
+          toggleDialog("help-center-dialog", true);
+        }
+      });
       bindClick("close-auth-dialog", () => {
         if (authState.enabled && !authState.authenticated) return;
         hideAuthDialog();
@@ -2597,6 +3292,59 @@
       bindClick("jump-source", () => activateTab("source"));
       bindClick("jump-target", () => activateTab("config"));
       bindClick("jump-execute", () => activateTab("execute"));
+      bindClick("source-guidance-open-mounts", () => {
+        activateTab("mounts");
+        revealPanelDetails("provider-capture-details");
+      });
+      bindClick("source-guidance-browse-mounted", () => {
+        document.getElementById("browse-mounted-source")?.click();
+      });
+      bindClick("source-guidance-use-current", () => {
+        document.getElementById("use-current-dir")?.click();
+      });
+      bindClick("source-guidance-open-task", () => activateTab("task"));
+      bindClick("task-guidance-open-source", () => activateTab("source"));
+      bindClick("task-guidance-open-target", () => activateTab("config"));
+      bindClick("task-guidance-open-target-details", () => {
+        activateTab("config");
+        revealTargetConnectionDetails();
+      });
+      bindClick("task-guidance-open-execute", () => activateTab("execute"));
+      bindClick("execute-guidance-open-source", () => activateTab("source"));
+      bindClick("execute-guidance-open-target", () => activateTab("config"));
+      bindClick("execute-guidance-open-task", () => activateTab("task"));
+      bindClick("mounts-guidance-install-runtime", () => {
+        document.getElementById("install-runtime")?.click();
+      });
+      bindClick("mounts-guidance-login-openlist", () => {
+        if (normalizeOpenListMode(document.getElementById("openlist_mode")?.value || "external_local") === "external_remote") {
+          document.getElementById("login-openlist-remote")?.click();
+          return;
+        }
+        document.getElementById("login-openlist")?.click();
+      });
+      bindClick("mounts-guidance-refresh-storages", () => {
+        document.getElementById("refresh-storages")?.click();
+      });
+      bindClick("mounts-guidance-open-source", () => activateTab("source"));
+      bindClick("mounts-guidance-open-capture", () => {
+        activateTab("mounts");
+        revealPanelDetails("provider-capture-details");
+      });
+      bindClick("target-guidance-expand", () => revealTargetConnectionDetails());
+      bindClick("target-guidance-capture", () => {
+        revealTargetConnectionDetails();
+        document.getElementById("capture-guangya")?.click();
+      });
+      bindClick("target-guidance-open-mounts", () => {
+        activateTab("mounts");
+        setNotice("runtime-action-notice", currentLang() === "en"
+          ? "Check the OpenList connection first, then return to the target tab."
+          : currentLang() === "mix"
+            ? "请先检查 OpenList 连接，确认可用后再回到目标端。 / Check OpenList connection first."
+            : "请先检查 OpenList 连接，确认可用后再回到目标端。");
+      });
+      bindClick("target-guidance-open-task", () => activateTab("task"));
       bindClick("save-config-top", withBusy("save-config-top", "保存中...", saveConfig));
       bindClick("save-config-overview", withBusy("save-config-overview", "保存中...", saveConfig));
       bindClick("save-config-bottom", withBusy("save-config-bottom", "保存中...", saveConfig));

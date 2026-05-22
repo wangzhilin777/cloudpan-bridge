@@ -105,9 +105,16 @@
                 <label class="help-anchor" data-i18n="label.mounted_source_select" data-help-key="mounted_source_select">已挂载源目录</label>
                 <select id="mounted_source_select_source"></select>
                 <div class="subtle" data-i18n="desc.source_mount_quick_pick">先在这里选一个已挂载源，再进入目录浏览，会更容易理解当前在操作哪个网盘。</div>
+                <div class="notice compact-inline-notice" id="source-mounted-inline-status">正在准备挂载源提示...</div>
               </div>
             </div>
             <div class="notice" id="source-driver-human-summary">等待源端上下文...</div>
+            <div class="actions guidance-actions hidden" id="source-guidance-actions">
+              <button class="secondary hidden" id="source-guidance-open-mounts" data-i18n="btn.source_guidance_open_mounts">去连接页挂载源网盘</button>
+              <button class="secondary hidden" id="source-guidance-browse-mounted" data-i18n="btn.source_guidance_browse_mounted">从已挂载源开始浏览</button>
+              <button class="accent hidden" id="source-guidance-use-current" data-i18n="btn.source_guidance_use_current">把当前目录设为源目录</button>
+              <button class="secondary hidden" id="source-guidance-open-task" data-i18n="btn.source_guidance_open_task">去任务页确认目标目录</button>
+            </div>
             <details class="panel collapsible-panel">
               <summary>
                 <span data-i18n="panel.source_driver_debug">源端技术详情</span>
@@ -127,7 +134,7 @@
             <div class="browser-list" id="dir-browser-list">正在等待目录数据...</div>
           </div>
 
-          <details class="panel collapsible-panel">
+          <details class="panel collapsible-panel" id="mount-overview-details">
             <summary>
               <span data-i18n="panel.source_profile_tools">源端覆盖与映射</span>
               <small data-i18n="desc.panel_source_profile_tools_summary">只有驱动识别不准时，才需要手动改这里。</small>
@@ -148,7 +155,7 @@
             </div>
           </details>
 
-          <details class="panel collapsible-panel">
+          <details class="panel collapsible-panel" id="provider-capture-details">
             <summary>
               <span data-i18n="panel.source_analyze">源端元数据分析</span>
               <small data-i18n="desc.panel_source_analyze_summary">低频分析工具，默认收起。</small>
@@ -166,10 +173,24 @@
         </section>
 
         <section class="tab-panel" data-panel="execute">
+          <div class="panel">
+            <h2 class="help-anchor" data-i18n="panel.sync_actions" data-help-key="panel_sync_actions">同步执行</h2>
+            <div class="subtle" data-i18n="desc.execute_primary">先看这里的执行建议，再决定是直接同步、最底层模式、队列还是补传。</div>
+            <div class="notice" id="execute-overview-notice">正在准备执行建议...</div>
+            <div class="compact-summary-grid" id="execute-stage-cards">
+              <div class="compact-summary-card">正在准备执行状态卡...</div>
+            </div>
+            <div class="actions guidance-actions hidden" id="execute-guidance-actions">
+              <button class="secondary hidden" id="execute-guidance-open-source" data-i18n="btn.execute_guidance_open_source">先去选源目录</button>
+              <button class="secondary hidden" id="execute-guidance-open-target" data-i18n="btn.execute_guidance_open_target">先去配目标端</button>
+              <button class="secondary hidden" id="execute-guidance-open-task" data-i18n="btn.execute_guidance_open_task">先去确认任务配置</button>
+            </div>
+          </div>
+
           <details class="panel collapsible-panel" open>
             <summary>
               <span data-i18n="panel.leaf_mode">最底层目录模式</span>
-              <small data-i18n="desc.panel_leaf_mode_summary">慢跑、防风控和队列准备放这里。</small>
+              <small data-i18n="desc.panel_leaf_mode_summary">大目录慢跑、防风控和叶子目录队列放这里。</small>
             </summary>
             <h2 class="help-anchor" data-i18n="panel.leaf_mode" data-help-key="panel_leaf_mode">最底层目录模式</h2>
             <div class="subtle" data-i18n="desc.leaf_mode">适合防风控慢跑。可以直接边扫边同步，也可以先把叶子目录加入队列后分批执行。</div>
@@ -182,8 +203,8 @@
           </details>
 
           <div class="panel">
-            <h2 class="help-anchor" data-i18n="panel.sync_actions" data-help-key="panel_sync_actions">同步执行</h2>
-            <div class="subtle" data-i18n="desc.execute_primary">先在这里完成主执行；补传、秒传和能力说明都在下方折叠区，按需展开即可。</div>
+            <h2>直接执行</h2>
+            <div class="subtle">常规场景先用这里。大目录慢跑才用上面的最底层目录模式。</div>
             <div class="actions">
               <button class="secondary" id="run-dry" data-i18n="btn.run_dry" data-help-key="btn_run_dry">只看计划 dry-run</button>
               <button class="warn" id="run-direct" data-i18n="btn.direct_sync" data-help-key="btn_direct_sync">直接同步当前目录</button>
@@ -193,7 +214,7 @@
             <div class="notice" id="sync-notice" data-i18n="notice.sync_idle">等待操作</div>
           </div>
 
-          <details class="panel collapsible-panel">
+          <details class="panel collapsible-panel" id="create-mount-details">
             <summary>
               <span data-i18n="panel.queue">目录队列</span>
               <small data-i18n="desc.panel_queue_summary">当前目录队列与连续执行入口。</small>
@@ -251,6 +272,12 @@
           <div class="panel">
             <h2 class="help-anchor" data-i18n="panel.current_task" data-help-key="panel_current_task">当前任务</h2>
             <div class="notice" id="task-mode-summary">等待任务策略分析...</div>
+            <div class="actions guidance-actions hidden" id="task-guidance-actions">
+              <button class="secondary hidden" id="task-guidance-open-source" data-i18n="btn.task_guidance_open_source">去源端选择目录</button>
+              <button class="secondary hidden" id="task-guidance-open-target" data-i18n="btn.task_guidance_open_target">去目标端补配置</button>
+              <button class="secondary hidden" id="task-guidance-open-target-details" data-i18n="btn.task_guidance_open_target_details">展开目标端连接详情</button>
+              <button class="accent hidden" id="task-guidance-open-execute" data-i18n="btn.task_guidance_open_execute">去执行页开始同步</button>
+            </div>
             <div class="panel-grid">
               <div>
                 <label class="help-anchor" data-i18n="label.source_path" data-help-key="source_path">当前源目录</label>
@@ -341,19 +368,32 @@
             </div>
             <div class="notice" id="openlist-mode-summary">等待选择 OpenList 运行方式。</div>
             <div class="mode-active-chip" id="openlist-mode-chip">当前模式：外部模式（本机）</div>
+            <div class="actions guidance-actions hidden" id="mounts-guidance-actions">
+              <button class="secondary hidden" id="mounts-guidance-install-runtime" data-i18n="btn.mounts_guidance_install_runtime">先拉取本机运行时</button>
+              <button class="secondary hidden" id="mounts-guidance-login-openlist" data-i18n="btn.mounts_guidance_login_openlist">登录 OpenList 并写回 Token</button>
+              <button class="secondary hidden" id="mounts-guidance-refresh-storages" data-i18n="btn.mounts_guidance_refresh_storages">刷新挂载列表</button>
+              <button class="accent hidden" id="mounts-guidance-open-source" data-i18n="btn.mounts_guidance_open_source">去源端选择目录</button>
+              <button class="secondary hidden" id="mounts-guidance-open-capture" data-i18n="btn.mounts_guidance_open_capture">去抓取源网盘登录态</button>
+            </div>
+            <div class="compact-summary-grid" id="mounts-stage-cards">
+              <div class="compact-summary-card">正在准备连接状态卡...</div>
+            </div>
             <div class="compact-summary-grid">
-              <div class="compact-summary-card">
+              <button class="compact-summary-card compact-action-card" id="connection-card-console" type="button">
                 <strong data-i18n="card.console_auth">控制台登录</strong>
                 <div class="subtle" data-i18n="desc.console_auth_card">控制整个控制台页面访问。开启后，必须先通过右上角登录弹窗进入。</div>
-              </div>
-              <div class="compact-summary-card">
+                <div class="card-inline-action">打开登录入口</div>
+              </button>
+              <button class="compact-summary-card compact-action-card" id="connection-card-openlist" type="button">
                 <strong data-i18n="card.openlist_auth">OpenList 登录</strong>
                 <div class="subtle" data-i18n="desc.openlist_auth_card">用于把用户名密码登录成 Token，并写回当前模式配置。</div>
-              </div>
-              <div class="compact-summary-card">
+                <div class="card-inline-action">定位到当前模式配置</div>
+              </button>
+              <button class="compact-summary-card compact-action-card" id="connection-card-provider-capture" type="button">
                 <strong data-i18n="card.provider_auth">源网盘网页登录抓取</strong>
                 <div class="subtle" data-i18n="desc.provider_auth_card">用于抓浏览器登录态，再尽量自动回填挂载字段，减少手工抄写。</div>
-              </div>
+                <div class="card-inline-action">展开抓取区</div>
+              </button>
             </div>
             <details class="panel collapsible-panel compact-inner-panel">
               <summary>
@@ -513,6 +553,7 @@
               <small data-i18n="desc.panel_mount_overview_summary">已挂载内容与驱动列表，默认收起。</small>
             </summary>
             <h2 data-i18n="panel.mount_overview">OpenList 挂载总览</h2>
+            <div class="notice compact-inline-notice" id="mount-overview-empty-hint">只有想确认挂载有没有成功、或想看当前已挂载列表时，才需要打开这里。</div>
             <div class="actions">
               <button class="secondary" id="refresh-storages" data-i18n="btn.refresh_storages">刷新挂载列表</button>
               <button class="secondary" id="refresh-drivers" data-i18n="btn.refresh_drivers">刷新驱动列表</button>
@@ -526,6 +567,7 @@
               <small data-i18n="desc.panel_provider_capture_summary">没挂载时再展开这里接入源网盘。</small>
             </summary>
             <h2 class="help-anchor" data-i18n="panel.provider_capture" data-help-key="panel_provider_capture">源网盘登录抓取</h2>
+            <div class="notice compact-inline-notice" id="provider-capture-empty-hint">当你还没挂载源网盘，或者想少手填 Cookie / Token 时，再打开这里。</div>
             <div class="subtle" data-i18n="desc.provider_capture">如果还没有挂载，或想直接从网页登录态抓取 Cookie / Token / Header，可以先在这里选网盘类型，打开登录页抓取，再一键写入当前挂载表单。</div>
             <div class="quick-pick-strip" id="provider-quick-picks"></div>
             <div class="panel-grid">
@@ -558,6 +600,7 @@
               <small data-i18n="desc.panel_create_mount_summary">需要手动建挂载时再展开。</small>
             </summary>
             <h2 class="help-anchor" data-i18n="panel.create_mount" data-help-key="panel_create_mount">新增挂载</h2>
+            <div class="notice compact-inline-notice" id="create-mount-empty-hint">只有自动抓取或现成挂载都不够用时，才需要手动新增挂载。</div>
             <div class="panel-grid">
               <div>
                 <label class="help-anchor" data-i18n="label.driver_select" data-help-key="driver_select">驱动类型</label>
@@ -597,6 +640,12 @@
               <button class="secondary" id="open-help-center-target" data-i18n="btn.open_help_center">帮助与能力</button>
             </div>
             <div class="notice" id="target-preflight-notice">等待目标端检查...</div>
+            <div class="actions guidance-actions hidden" id="target-guidance-actions">
+              <button class="secondary hidden" id="target-guidance-open-mounts" data-i18n="btn.target_guidance_open_mounts">去连接页检查 OpenList</button>
+              <button class="secondary hidden" id="target-guidance-expand" data-i18n="btn.target_guidance_expand">展开连接详情</button>
+              <button class="accent hidden" id="target-guidance-capture" data-i18n="btn.target_guidance_capture">去登录抓取光鸭</button>
+              <button class="secondary hidden" id="target-guidance-open-task" data-i18n="btn.target_guidance_open_task">去任务页确认目标目录</button>
+            </div>
           </div>
 
           <div class="panel">
@@ -607,6 +656,9 @@
               <div id="target-auth-guide" class="compact-summary-card">当前目标端说明将显示在这里。</div>
               <div id="target-auth-summary" class="compact-summary-card">等待目标端能力摘要...</div>
               <div id="target-popular-summary" class="compact-summary-card">常用目标端会在这里显示说明。</div>
+            </div>
+            <div class="compact-summary-grid" id="target-action-cards">
+              <div class="compact-summary-card">正在准备目标端下一步入口...</div>
             </div>
             <details class="panel collapsible-panel compact-inner-panel" id="target-connection-details">
               <summary>

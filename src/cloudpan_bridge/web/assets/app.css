@@ -176,6 +176,27 @@
       gap: 6px;
       line-height: 1.55;
     }
+    .compact-action-card {
+      width: 100%;
+      text-align: left;
+      border: 1px solid rgba(221,207,188,.9);
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+    }
+    .compact-action-card:hover,
+    .compact-action-card:focus-visible {
+      border-color: rgba(12,122,99,.34);
+      box-shadow: 0 10px 24px rgba(12,122,99,.08);
+      transform: translateY(-1px);
+      outline: none;
+    }
+    .card-inline-action {
+      margin-top: 2px;
+      font-size: 12px;
+      color: var(--accent);
+      font-weight: 600;
+    }
     .mini-card strong {
       display: block;
       margin-bottom: 6px;
@@ -184,6 +205,43 @@
     .compact-summary-card strong {
       display: block;
       font-size: 13px;
+    }
+    .card-kicker {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: .02em;
+    }
+    .card-metric {
+      font-size: 24px;
+      line-height: 1.15;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .card-meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .card-meta {
+      font-size: 12px;
+      color: var(--muted);
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(236,228,214,.7);
+      border: 1px solid rgba(221,207,188,.8);
+    }
+    .compact-summary-card.is-success {
+      background: rgba(244,252,247,.94);
+      border-color: rgba(12,122,99,.24);
+    }
+    .compact-summary-card.is-warn {
+      background: rgba(255,249,242,.94);
+      border-color: rgba(207,106,66,.24);
+    }
+    .compact-summary-card.is-info {
+      background: rgba(248,251,251,.94);
+      border-color: rgba(93,115,130,.18);
     }
     .mode-active-chip {
       display: inline-flex;
@@ -299,7 +357,18 @@
     button.secondary { background: var(--soft); color: var(--text); }
     button.accent { background: var(--accent); }
     button.warn { background: var(--accent-2); }
-    button:disabled { opacity: .62; cursor: wait; }
+    button:disabled {
+      opacity: .58;
+      cursor: not-allowed;
+      filter: saturate(.75);
+    }
+    .actions.guidance-actions {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px dashed rgba(207,106,66,.28);
+      border-radius: 16px;
+      background: rgba(255,249,242,.78);
+    }
     .actions {
       display: flex;
       flex-wrap: wrap;
@@ -386,6 +455,12 @@
       padding: 10px 12px;
       font-size: 13px;
     }
+    .compact-inline-notice {
+      min-height: 0;
+      margin-top: 10px;
+      padding: 9px 12px;
+      background: rgba(248,251,251,.86);
+    }
     .summary-pill {
       display: inline-flex;
       align-items: center;
@@ -405,6 +480,74 @@
     .summary-stack {
       display: grid;
       gap: 8px;
+    }
+    .task-summary-details {
+      border-top: 1px dashed rgba(221,207,188,.9);
+      padding-top: 8px;
+    }
+    .task-summary-details > summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      cursor: pointer;
+      list-style: none;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .task-summary-details > summary::-webkit-details-marker {
+      display: none;
+    }
+    .task-summary-details > summary small {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .task-summary-detail-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .task-checklist-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .task-check-card {
+      border: 1px solid rgba(221,207,188,.88);
+      border-radius: 16px;
+      background: rgba(255,255,255,.8);
+      padding: 12px;
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+    .task-check-card.is-ready {
+      background: rgba(244,252,247,.94);
+      border-color: rgba(12,122,99,.24);
+    }
+    .task-check-card.is-warn {
+      background: rgba(255,249,242,.94);
+      border-color: rgba(207,106,66,.24);
+    }
+    .task-check-title {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .task-check-value {
+      font-size: 18px;
+      line-height: 1.25;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .task-check-desc {
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--text);
     }
     .notice.is-success {
       border-style: solid;
@@ -639,7 +782,7 @@
       }
     }
     @media (max-width: 860px) {
-      .panel-grid, .status-grid, .workflow-grid, .connection-login-grid, .summary-grid, .compact-summary-grid, .target-summary-grid {
+      .panel-grid, .status-grid, .workflow-grid, .connection-login-grid, .summary-grid, .compact-summary-grid, .target-summary-grid, .task-checklist-grid {
         grid-template-columns: 1fr;
       }
       .col-span-2 {
