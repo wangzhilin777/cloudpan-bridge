@@ -1405,6 +1405,11 @@ def create_app(config_path: Path) -> FastAPI:
         runtime_mode = AppConfig.normalize_openlist_mode(
             str(resolve_payload_value(payload, "openlist_mode", ("openlist", "mode"), config.openlist_mode))
         )
+        login_url = (
+            refresh_runtime().active_url()
+            if AppConfig.is_managed_openlist_mode(runtime_mode)
+            else str(resolve_payload_value(payload, "openlist_url", ("openlist", "url"), config.openlist_url))
+        )
         connection_path = (
             ("openlist", "connections", "external_remote")
             if runtime_mode == "external_remote"
@@ -1413,7 +1418,7 @@ def create_app(config_path: Path) -> FastAPI:
             else ("openlist", "connections", "external_local")
         )
         client = OpenListClient(
-            base_url=str(resolve_payload_value(payload, "openlist_url", ("openlist", "url"), config.openlist_url)),
+            base_url=login_url,
             username=str(resolve_payload_value(payload, "openlist_username", ("openlist", "username"), config.openlist_username)),
             password=str(resolve_payload_value(payload, "openlist_password", ("openlist", "password"), config.openlist_password)),
             token=str(resolve_payload_value(payload, "openlist_token", ("openlist", "token"), "")),
@@ -1464,25 +1469,53 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.post("/api/openlist/runtime/start")
     def start_openlist_runtime() -> dict[str, Any]:
+        nonlocal config
         status = refresh_runtime().start()
         if not status.running and AppConfig.is_managed_openlist_mode(config.openlist_mode):
             logger.error(f"OpenList runtime 启动失败: {status.message}")
             raise HTTPException(status_code=400, detail=status.message or "Managed OpenList 启动失败")
         if status.running:
+            current_runtime = refresh_runtime()
+            runtime_password = str(current_runtime.effective_admin_password or "")
+            runtime_username = str(current_runtime.effective_admin_username or "admin")
+            runtime_token = str(current_runtime.admin_token or "")
+            updates: dict[tuple[str, ...], Any] = {
+                ("openlist", "url"): status.active_url,
+                ("openlist", "username"): runtime_username,
+                ("openlist", "connections", "managed_binary", "url"): status.active_url,
+                ("openlist", "connections", "managed_binary", "username"): runtime_username,
+            }
+            if runtime_password:
+                updates[("openlist", "password")] = runtime_password
+                updates[("openlist", "managed_init_admin", "password")] = runtime_password
+                updates[("openlist", "connections", "managed_binary", "password")] = runtime_password
+            if runtime_token:
+                updates[("openlist", "token")] = runtime_token
+                updates[("openlist", "connections", "managed_binary", "token")] = runtime_token
+            if runtime_username:
+                updates[("openlist", "managed_init_admin", "username")] = runtime_username
+            if save_grouped_config_updates(retain_explicit_grouped_updates(updates)):
+                config = AppConfig.load(config_path)
             logger.info(f"OpenList runtime 已就绪: {status.active_url}")
         return status.to_dict()
 
     @app.get("/api/openlist/drivers")
     def get_openlist_drivers() -> dict[str, Any]:
-        with build_admin_client() as client:
-            return {"items": client.driver_names()}
+        try:
+            with build_admin_client() as client:
+                return {"items": client.driver_names()}
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"读取 OpenList 驱动列表失败: {exc}") from exc
 
     @app.get("/api/openlist/driver_info")
     def get_openlist_driver_info(driver: str) -> dict[str, Any]:
         if not driver.strip():
             raise HTTPException(status_code=400, detail="缺少 driver")
-        with build_admin_client() as client:
-            info = client.driver_info(driver)
+        try:
+            with build_admin_client() as client:
+                info = client.driver_info(driver)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"读取 OpenList 驱动详情失败: {exc}") from exc
         return {
             "name": info.name,
             "config": info.config,
@@ -1494,8 +1527,11 @@ def create_app(config_path: Path) -> FastAPI:
     def get_provider_driver_blueprint(driver: str) -> dict[str, Any]:
         if not driver.strip():
             raise HTTPException(status_code=400, detail="缺少 driver")
-        with build_admin_client() as client:
-            info = client.driver_info(driver)
+        try:
+            with build_admin_client() as client:
+                info = client.driver_info(driver)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"读取驱动蓝图失败: {exc}") from exc
         spec = build_driver_capture_spec(driver, [*info.common, *info.additional])
         guide = get_driver_guide(driver)
         return {
@@ -1693,8 +1729,11 @@ def create_app(config_path: Path) -> FastAPI:
 
     @app.get("/api/openlist/storages")
     def get_openlist_storages(page: int = 1, per_page: int = 200) -> dict[str, Any]:
-        with build_admin_client() as client:
-            payload = client.storage_list(page=page, per_page=per_page)
+        try:
+            with build_admin_client() as client:
+                payload = client.storage_list(page=page, per_page=per_page)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"读取 OpenList 挂载列表失败: {exc}") from exc
         return payload
 
     @app.post("/api/openlist/storage/create")

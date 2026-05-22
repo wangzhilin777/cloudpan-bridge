@@ -20,13 +20,12 @@
     const activeUrl = String(document.getElementById("effective_openlist_url")?.value || runtimeState?.active_url || ctx.getConfigCache()?.openlist_url || "-").trim() || "-";
     const sourceRuntime = window.__cpbStatusCache?.source_runtime || {};
     root.innerHTML = `
-      <div class="mono">OpenList Mode: ${ctx.escapeHtml(ctx.getOpenListModeLabel(mode))}</div>
-      <div class="mono">OpenList URL: ${ctx.escapeHtml(activeUrl)}</div>
-      <div class="mono">Source: ${ctx.escapeHtml(sourcePath)}</div>
-      <div class="mono">Target: ${ctx.escapeHtml(targetKey)} -> ${ctx.escapeHtml(targetPath)}</div>
-      <div class="mono">Source Mapping: mount=${ctx.escapeHtml(currentSourceContext.mount_path || "-")} | effective=${ctx.escapeHtml(currentSourceContext.effective_driver || "-")}</div>
-      <div class="mono">Source Route: pref=${ctx.escapeHtml(sourceRuntime.requested_provider_preference || "-")} | selected=${ctx.escapeHtml(sourceRuntime.selected_source_mode || "-")} | provider=${ctx.escapeHtml(sourceRuntime.selected_provider_key || "-")}</div>
-      <div class="mono">Queue: ${queueSize} | Pending: ${pendingSize}</div>
+      <div class="summary-stack">
+        <div><strong>${ctx.escapeHtml(sourcePath)}</strong> -> <strong>${ctx.escapeHtml(targetKey)}:${ctx.escapeHtml(targetPath)}</strong></div>
+        <div class="mono">${ctx.escapeHtml(ctx.getOpenListModeLabel(mode))} | ${ctx.escapeHtml(activeUrl)}</div>
+        <div class="mono">mount=${ctx.escapeHtml(currentSourceContext.mount_path || "-")} | effective=${ctx.escapeHtml(currentSourceContext.effective_driver || "-")}</div>
+        <div class="mono">route=${ctx.escapeHtml(sourceRuntime.selected_source_mode || "-")} | provider=${ctx.escapeHtml(sourceRuntime.selected_provider_key || "-")} | queue=${queueSize} | pending=${pendingSize}</div>
+      </div>
     `;
   }
 

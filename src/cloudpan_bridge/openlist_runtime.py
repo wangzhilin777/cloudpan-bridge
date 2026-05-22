@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import platform
 import shutil
 import socket
@@ -103,6 +104,9 @@ class ManagedOpenListRuntime:
         self.docker_image = str(docker_image or "openlistteam/openlist:latest").strip() or "openlistteam/openlist:latest"
         self.docker_container_name = str(docker_container_name or "cloudpan-bridge-openlist").strip() or "cloudpan-bridge-openlist"
         self.process: subprocess.Popen[str] | None = None
+        self.effective_admin_username = "admin"
+        self.effective_admin_password = ""
+        self.admin_token = ""
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
     def normalized_mode(self) -> str:
@@ -225,6 +229,102 @@ class ManagedOpenListRuntime:
         self.port = port
         return f"http://127.0.0.1:{port}"
 
+    def config_path(self) -> Path:
+        return self.data_dir / "config.json"
+
+    def _managed_command(self, binary: str, *args: str) -> list[str]:
+        return [
+            binary,
+            *args,
+            "--data",
+            str(self.data_dir),
+            "--config",
+            str(self.config_path()),
+            "--no-prefix",
+        ]
+
+    def _run_managed_cli(self, binary: str, *args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            self._managed_command(binary, *args),
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+            cwd=str(self.data_dir),
+        )
+
+    def _extract_generated_password(self, output: str) -> str:
+        text = str(output or "")
+        patterns = [
+            r"initial password is:\s*([^\r\n]+)",
+            r"password:\s*([^\r\n]+)",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return str(match.group(1) or "").strip()
+        return ""
+
+    def _prepare_managed_admin(self, binary: str) -> None:
+        configured_password = str(self.init_admin_password or "").strip()
+        self.effective_admin_username = "admin"
+        self.effective_admin_password = configured_password
+        self.admin_token = ""
+
+        if configured_password:
+            completed = self._run_managed_cli(binary, "admin", "set", configured_password)
+            if completed.returncode != 0:
+                message = (completed.stderr or completed.stdout or "").strip() or "OpenList admin set 失败"
+                raise RuntimeError(message)
+        else:
+            completed = self._run_managed_cli(binary, "admin", "random")
+            if completed.returncode != 0:
+                message = (completed.stderr or completed.stdout or "").strip() or "OpenList admin random 失败"
+                raise RuntimeError(message)
+            generated = self._extract_generated_password(completed.stdout or completed.stderr or "")
+            self.effective_admin_password = generated
+
+        token_result = self._run_managed_cli(binary, "admin", "token")
+        if token_result.returncode == 0:
+            token_output = str(token_result.stdout or token_result.stderr or "")
+            token_match = re.search(r"Admin token:\s*([^\r\n]+)", token_output, re.IGNORECASE)
+            if token_match:
+                self.admin_token = str(token_match.group(1) or "").strip()
+
+    def _ensure_managed_config(self) -> None:
+        path = self.config_path()
+        payload: dict[str, Any] = {}
+        if path.exists():
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                payload = {}
+        scheme = dict(payload.get("scheme") or {})
+        scheme["address"] = "127.0.0.1"
+        scheme["http_port"] = int(self.port or 5244)
+        payload["scheme"] = scheme
+
+        database = dict(payload.get("database") or {})
+        if not database.get("type"):
+            database["type"] = "sqlite3"
+        if not database.get("db_file"):
+            database["db_file"] = str((self.data_dir / "data.db").resolve())
+        payload["database"] = database
+
+        if not payload.get("temp_dir"):
+            payload["temp_dir"] = str((self.data_dir / "temp").resolve())
+        if not payload.get("bleve_dir"):
+            payload["bleve_dir"] = str((self.data_dir / "bleve").resolve())
+
+        log_payload = dict(payload.get("log") or {})
+        if not log_payload.get("name"):
+            log_payload["name"] = str((self.data_dir / "log" / "log.log").resolve())
+        if "enable" not in log_payload:
+            log_payload["enable"] = True
+        payload["log"] = log_payload
+
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
     def status(self) -> ManagedOpenListStatus:
         binary = self._detect_binary()
         active_url = self.active_url()
@@ -270,6 +370,10 @@ class ManagedOpenListRuntime:
         elif not self.is_managed_mode() and not running:
             message = "当前外部 OpenList 不可访问。"
             suggested_action = "请检查 URL、端口和登录凭证，或切换到托管模式。"
+        if self.is_managed_mode() and self.init_admin_username.strip() and self.init_admin_username.strip() != "admin":
+            suggested_action = (
+                "当前 OpenList CLI 已验证可稳定设置管理员密码，但管理员用户名仍按底层程序限制保持为 admin。"
+            )
         if self.is_managed_mode() and not self.init_admin_password and not suggested_action:
             suggested_action = "当前只负责启动进程；若底层程序不支持启动时初始化管理员密码，请在 OpenList 首次进入后自行确认或重设管理员密码。"
         return ManagedOpenListStatus(
@@ -288,7 +392,7 @@ class ManagedOpenListRuntime:
             suggested_action=suggested_action,
             runtime_profile=self.normalized_mode() if self.is_managed_mode() else self.normalized_mode(),
             init_admin_username=self.init_admin_username,
-            init_admin_password_set=bool(self.init_admin_password),
+            init_admin_password_set=bool(self.effective_admin_password or self.init_admin_password),
             install_download_url=install_download_url,
             install_filename=install_filename,
             data_dir=str(self.data_dir),
@@ -305,6 +409,8 @@ class ManagedOpenListRuntime:
             return self._start_docker()
         if self.normalized_mode() != "managed_binary":
             return self.status()
+        if self.process and self.process.poll() is not None:
+            self.process = None
         status = self.status()
         if status.running:
             return status
@@ -313,15 +419,9 @@ class ManagedOpenListRuntime:
             return status
         active_url = self.active_url()
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        command = [
-            binary,
-            "server",
-            "--data",
-            str(self.data_dir),
-            "--force-bin-dir",
-            str(self.data_dir),
-            "--no-prefix",
-        ]
+        self._prepare_managed_admin(binary)
+        self._ensure_managed_config()
+        command = self._managed_command(binary, "server", "--force-bin-dir", str(self.data_dir))
         self.process = subprocess.Popen(
             command,
             cwd=str(self.data_dir),

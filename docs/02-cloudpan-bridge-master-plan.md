@@ -5,9 +5,9 @@
 本文档是当前仓库的主计划文档，用来合并并替代早期的“天翼转光鸭”与 `Cloud2Guangya` 阶段性计划。
 
 - 当前仓库历史计划文档仍保留：
-  - `docs/cloud2guangya-rebuild-plan.md`
+  - 早期 `Cloud2Guangya` 方案仅保留为历史背景，不再作为当前仓库主计划引用
 - 前期调研计划独立文档：
-  - `docs/cloudpan-bridge-research-plan.md`
+  - `docs/01-cloudpan-bridge-research-plan.md`
 - 但后续实施、扩展、验收、README 与对外说明，统一以本文档为准。
 
 ## 2. 当前项目现状

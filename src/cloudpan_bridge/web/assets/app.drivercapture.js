@@ -206,7 +206,11 @@
     const current = select.value || inferProviderFromDriver(ctx, document.getElementById("driver-select")?.value || "");
     select.innerHTML = items.map((item) => {
       const selected = item.key === current ? "selected" : "";
-      return `<option value="${ctx.escapeHtml(item.key)}" ${selected}>${ctx.escapeHtml(item.label)}</option>`;
+      const profile = item.source_profile || {};
+      const zh = String(profile.label_zh || item.label_zh || item.labelZh || item.label || item.key || "");
+      const en = String(profile.label || item.label || item.key || zh || "");
+      const label = ctx.currentLang() === "en" ? en : ctx.currentLang() === "mix" ? `${zh} / ${en}` : zh;
+      return `<option value="${ctx.escapeHtml(item.key)}" ${selected}>${ctx.escapeHtml(label)}</option>`;
     }).join("");
   }
 
@@ -232,13 +236,13 @@
       : (ctx.PROVIDER_DRIVER_HINTS?.[provider] || []);
     const profile = definition?.source_profile || {};
     const loginModeText = ctx.currentLang() === "en"
-      ? (profile.loginMode || "")
+      ? (profile.login_mode || profile.loginMode || "")
       : ctx.currentLang() === "mix"
-        ? `${profile.loginMode || ""} / ${profile.loginMode || ""}`.trim()
-        : (profile.loginMode || "");
-    const hashText = Array.isArray(profile.hashFieldsSupported) ? profile.hashFieldsSupported.join(", ") : "";
-    const docLinks = Array.isArray(profile.docLinks) ? profile.docLinks : [];
-    const rateText = profile.recommendedRateProfile || "";
+        ? `${profile.login_mode || profile.loginMode || ""} / ${profile.login_mode || profile.loginMode || ""}`.trim()
+        : (profile.login_mode || profile.loginMode || "");
+    const hashText = Array.isArray(profile.hash_fields_supported || profile.hashFieldsSupported) ? (profile.hash_fields_supported || profile.hashFieldsSupported).join(", ") : "";
+    const docLinks = Array.isArray(profile.doc_links || profile.docLinks) ? (profile.doc_links || profile.docLinks) : [];
+    const rateText = profile.recommended_rate_profile || profile.recommendedRateProfile || "";
     const lines = requiredKeys.length
       ? requiredKeys.map((key) => `<div class="mono">${ctx.escapeHtml(key)}: ${fieldStatus(ctx, captured[key])}${captured[key] ? ` | ${ctx.escapeHtml(maskValue(captured[key]))}` : ""}</div>`).join("")
       : `<div class="mono">${ctx.currentLang() === "en" ? "No required fields declared." : ctx.currentLang() === "mix" ? "未声明必需字段 / No required fields declared." : "未声明必需字段。"}</div>`;

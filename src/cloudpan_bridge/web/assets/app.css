@@ -114,6 +114,127 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 14px;
     }
+    .mode-switch-grid {
+      display: grid;
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .mode-section,
+    .target-section {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,.58);
+      padding: 14px;
+      min-width: 0;
+    }
+    .mode-section h3,
+    .target-section h3 {
+      margin: 0 0 8px;
+    }
+    .target-section.is-active,
+    .mode-section.is-active {
+      border-color: rgba(12,122,99,.36);
+      box-shadow: 0 10px 24px rgba(12,122,99,.08);
+      background: rgba(245,252,249,.92);
+    }
+    .mode-section-always {
+      margin-top: 14px;
+    }
+    .connection-login-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 10px 0 12px;
+    }
+    .compact-summary-grid,
+    .target-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 10px 0 12px;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
+    }
+    .mini-card {
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      padding: 12px;
+      background: rgba(255,255,255,.66);
+      min-width: 0;
+    }
+    .compact-summary-card {
+      border: 1px solid rgba(221,207,188,.9);
+      border-radius: 16px;
+      padding: 12px;
+      background: rgba(255,255,255,.72);
+      min-width: 0;
+      display: grid;
+      gap: 6px;
+      line-height: 1.55;
+    }
+    .mini-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .compact-summary-card strong {
+      display: block;
+      font-size: 13px;
+    }
+    .mode-active-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0 14px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(207,106,66,.12);
+      border: 1px solid rgba(207,106,66,.22);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .quick-pick-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin: 10px 0 12px;
+    }
+    .quick-pick {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      min-width: 122px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,.86);
+      color: var(--text);
+      padding: 9px 11px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .quick-pick.is-active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 8px 20px rgba(12,122,99,.18);
+    }
+    .quick-pick small {
+      display: block;
+      opacity: .82;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .quick-pick strong {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
     .col-span-2 {
       grid-column: span 2;
     }
@@ -219,6 +340,9 @@
       display: block;
       margin-bottom: 8px;
     }
+    .status-card .summary-pill {
+      margin-top: 10px;
+    }
     .auth-lock-panel {
       display: none;
       margin-bottom: 16px;
@@ -261,6 +385,46 @@
       background: rgba(255,255,255,.65);
       padding: 10px 12px;
       font-size: 13px;
+    }
+    .summary-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(12,122,99,.08);
+      border: 1px solid rgba(12,122,99,.16);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .summary-pill.warn {
+      background: rgba(207,106,66,.08);
+      border-color: rgba(207,106,66,.18);
+    }
+    .summary-stack {
+      display: grid;
+      gap: 8px;
+    }
+    .notice.is-success {
+      border-style: solid;
+      border-color: rgba(12,122,99,.3);
+      background: rgba(12,122,99,.08);
+    }
+    .notice.is-warn {
+      border-style: solid;
+      border-color: rgba(207,106,66,.28);
+      background: rgba(207,106,66,.08);
+    }
+    .notice.is-error {
+      border-style: solid;
+      border-color: rgba(188,54,54,.28);
+      background: rgba(188,54,54,.08);
+    }
+    .summary-grid .notice {
+      margin: 0;
+      min-height: 100%;
+      background: rgba(255,255,255,.78);
     }
     .browser-list, .mount-list, .tree-wrap, .queue-list {
       max-height: 520px;
@@ -348,6 +512,31 @@
       padding: 12px 0;
       font-weight: 600;
     }
+    .collapsible-panel {
+      padding-top: 0;
+    }
+    .compact-inner-panel {
+      margin-top: 12px;
+    }
+    .collapsible-panel > summary {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      list-style: none;
+    }
+    .collapsible-panel > summary::-webkit-details-marker {
+      display: none;
+    }
+    .collapsible-panel > summary small {
+      color: var(--muted);
+      font-weight: 400;
+      text-align: right;
+      line-height: 1.5;
+    }
+    .collapsible-panel[open] > summary {
+      margin-bottom: 8px;
+    }
     .checkbox-inline {
       display: inline-flex;
       gap: 6px;
@@ -378,12 +567,23 @@
       padding: 20px;
       box-shadow: var(--shadow);
     }
+    .dialog-card-wide {
+      width: min(1120px, 100%);
+    }
+    .dialog-card-tall {
+      max-height: 90vh;
+    }
     .dialog-head {
       display: flex;
       justify-content: space-between;
       gap: 12px;
       align-items: center;
       margin-bottom: 12px;
+    }
+    .dialog-scroll {
+      max-height: calc(90vh - 110px);
+      overflow: auto;
+      padding-right: 4px;
     }
     .guide-steps {
       display: grid;
@@ -399,6 +599,12 @@
     }
     .auth-dialog-card {
       width: min(420px, 100%);
+    }
+    .auth-dialog-card form {
+      margin: 0;
+    }
+    .dialog-head button.secondary {
+      flex: 0 0 auto;
     }
     .auth-input {
       width: 100%;
@@ -433,7 +639,7 @@
       }
     }
     @media (max-width: 860px) {
-      .panel-grid, .status-grid, .workflow-grid {
+      .panel-grid, .status-grid, .workflow-grid, .connection-login-grid, .summary-grid, .compact-summary-grid, .target-summary-grid {
         grid-template-columns: 1fr;
       }
       .col-span-2 {

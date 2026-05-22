@@ -67,15 +67,20 @@
   }
 
   function populateMountedSources(ctx, items) {
-    const select = document.getElementById("mounted_source_select");
+    const selects = ["mounted_source_select", "mounted_source_select_source"]
+      .map((id) => document.getElementById(id))
+      .filter(Boolean);
     const list = Array.isArray(items) ? items : [];
+    if (!selects.length) return;
     if (!list.length) {
-      select.innerHTML = `<option value="">${ctx.currentLang() === "en" ? "No mounts" : ctx.currentLang() === "mix" ? "暂无挂载 / No mounts" : "暂无挂载"}</option>`;
+      selects.forEach((select) => {
+        select.innerHTML = `<option value="">${ctx.currentLang() === "en" ? "No mounts" : ctx.currentLang() === "mix" ? "暂无挂载 / No mounts" : "暂无挂载"}</option>`;
+      });
       return;
     }
     const sourcePath = String(document.getElementById("source_path").value || "").trim();
     const mountedSource = String(ctx.getGroupedConfigValue(["ui", "browser", "mounted_source"], "") || "").trim();
-    select.innerHTML = list.map((item) => {
+    const html = list.map((item) => {
       const mountPath = item.mount_path || item.mountPath || item.path || "/";
       const driver = item.driver || item.driver_name || item.driverName || "-";
       const selected = mountedSource
@@ -83,6 +88,9 @@
         : (sourcePath.startsWith(String(mountPath)) ? "selected" : "");
       return `<option value="${ctx.escapeHtml(mountPath)}" ${selected}>${ctx.escapeHtml(mountPath)} | ${ctx.escapeHtml(driver)}</option>`;
     }).join("");
+    selects.forEach((select) => {
+      select.innerHTML = html;
+    });
   }
 
   function renderQueue(ctx, items) {

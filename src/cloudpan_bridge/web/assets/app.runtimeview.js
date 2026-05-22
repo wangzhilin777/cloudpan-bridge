@@ -43,7 +43,32 @@
     `;
     const noticeEl = document.getElementById("runtime-action-notice");
     if (noticeEl) {
-      noticeEl.textContent = runtime?.message || (currentLang() === "en" ? "Runtime status is ready." : currentLang() === "mix" ? "运行时状态已更新。 / Runtime status is ready." : "运行时状态已更新。");
+      const fallbackMessage = runtime?.running && runtime?.active_url
+        ? (currentLang() === "en"
+          ? `OpenList runtime is ready: ${runtime.active_url}`
+          : currentLang() === "mix"
+            ? `OpenList runtime 已就绪: ${runtime.active_url} / Runtime ready`
+            : `OpenList runtime 已就绪: ${runtime.active_url}`)
+        : (currentLang() === "en"
+          ? "Runtime status is ready."
+          : currentLang() === "mix"
+            ? "运行时状态已更新。 / Runtime status is ready."
+            : "运行时状态已更新。");
+      const waitingTexts = [
+        "",
+        "等待运行时检查。",
+        "Waiting for runtime check.",
+        "等待运行时检查。 / Waiting for runtime check.",
+        "运行时状态已更新。",
+        "Runtime status is ready.",
+        "运行时状态已更新。 / Runtime status is ready.",
+      ];
+      const existing = String(noticeEl.textContent || "").trim();
+      if (runtime?.message) {
+        noticeEl.textContent = runtime.message;
+      } else if (waitingTexts.includes(existing)) {
+        noticeEl.textContent = fallbackMessage;
+      }
     }
     const installBtn = document.getElementById("install-runtime");
     if (installBtn) {

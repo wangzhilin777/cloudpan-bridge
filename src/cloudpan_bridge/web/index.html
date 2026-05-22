@@ -4,26 +4,28 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CloudPan Bridge 控制台</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230c7a63'/%3E%3Cpath d='M17 24h30l-5 17H22z' fill='%23fff3e0'/%3E%3Cpath d='M24 20h16l3 7H21z' fill='%23cf6a42'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
   <div class="app">
     <div class="hero">
       <div>
-        <h1>CloudPan Bridge</h1>
-        <div class="lead">统一读取 OpenList 挂载源，优先做秒传，未命中再进入自动补传或待补传目录树。页面会按配置恢复当前目录浏览位置，并把日志单独放到右侧抽屉，避免整页长滚动。</div>
+        <h1 data-i18n="hero.title">CloudPan Bridge</h1>
+        <div class="lead" data-i18n="hero.lead">统一读取 OpenList 挂载源，优先做秒传，未命中再进入自动补传或待补传目录树。页面会按配置恢复当前目录浏览位置，并把日志单独放到右侧抽屉，避免整页长滚动。</div>
       </div>
       <div class="hero-actions">
         <div class="auth-stack">
           <span class="badge" id="auth-status-badge">控制台未加锁</span>
-          <button class="secondary" id="open-auth-login">控制台登录</button>
-          <button class="secondary hidden" id="logout-auth">退出登录</button>
+          <button class="secondary" id="open-auth-login" data-i18n="btn.console_login">控制台登录</button>
+          <button class="secondary hidden" id="logout-auth" data-i18n="btn.console_logout">退出登录</button>
         </div>
         <select id="ui_language" style="width:auto;min-width:140px;">
           <option value="zh">中文</option>
           <option value="en">English</option>
           <option value="mix">中英混合</option>
         </select>
+        <button class="secondary" id="open-help-center" data-i18n="btn.open_help_center">帮助与能力</button>
         <button class="secondary" id="toggle-logs" data-i18n="btn.toggle_logs_hide">隐藏日志</button>
         <button class="secondary" id="reload-all" data-i18n="btn.reload_all">重新载入</button>
         <button class="accent" id="save-config-top" data-i18n="btn.save_config_top">保存配置</button>
@@ -32,11 +34,11 @@
 
     <div class="auth-lock-panel hidden" id="auth-lock-panel">
       <div class="panel">
-        <h2>控制台已加锁</h2>
-        <div class="notice" id="auth-lock-summary">如果你启用了控制台管理员账号密码，需要先登录后才能继续加载连接、源端、目标端和同步页面。</div>
-        <div class="actions">
-          <button class="accent" id="open-auth-login-inline">立即登录控制台</button>
-        </div>
+            <h2 data-i18n="panel.auth_locked">控制台已加锁</h2>
+            <div class="notice" id="auth-lock-summary" data-i18n="desc.auth_locked">如果你启用了控制台管理员账号密码，需要先登录后才能继续加载连接、源端、目标端和同步页面。</div>
+            <div class="actions">
+              <button class="accent" id="open-auth-login-inline" data-i18n="btn.console_login_now">立即登录控制台</button>
+            </div>
       </div>
     </div>
 
@@ -49,9 +51,6 @@
           <button class="tab" data-tab="config" data-i18n="tab.config">目标端</button>
           <button class="tab" data-tab="task" data-i18n="tab.task">任务</button>
           <button class="tab" data-tab="execute" data-i18n="tab.execute">执行</button>
-          <button class="tab" data-tab="pending" data-i18n="tab.pending">补传</button>
-          <button class="tab" id="tab-miaochuan-label" data-tab="miaochuan" data-i18n="tab.miaochuan">秒传</button>
-          <button class="tab" data-tab="about" data-i18n="tab.about">关于</button>
         </div>
 
         <section class="tab-panel active" data-panel="overview">
@@ -75,6 +74,17 @@
           </div>
 
           <div class="panel">
+            <h2 data-i18n="panel.next_step">下一步建议</h2>
+            <div class="notice" id="overview-next-step">等待当前建议...</div>
+            <div class="actions">
+              <button class="secondary" id="jump-connect" data-i18n="btn.jump_connect">去连接</button>
+              <button class="secondary" id="jump-source" data-i18n="btn.jump_source">去选源目录</button>
+              <button class="secondary" id="jump-target" data-i18n="btn.jump_target">去配目标端</button>
+              <button class="accent" id="jump-execute" data-i18n="btn.jump_execute">去执行</button>
+            </div>
+          </div>
+
+          <div class="panel">
             <h2 data-i18n="panel.current_route">当前执行路线</h2>
             <div class="notice" id="overview-route-summary">等待载入当前任务路线...</div>
             <div class="workflow-grid" id="workflow-roadmap">
@@ -90,31 +100,52 @@
           <div class="panel">
             <h2 class="help-anchor" data-i18n="panel.source_browser" data-help-key="panel_source_browser">目录浏览</h2>
             <div class="subtle" data-i18n="desc.source_browser">页面进入时会优先按配置里的 <code>source_path</code> 恢复当前浏览目录；如果该目录读取失败，再回退到挂载根目录。</div>
-            <div class="notice" id="source-driver-summary">等待源端上下文...</div>
-            <div class="panel-grid">
-              <div>
-                <label>源 Profile 覆盖</label>
-                <select id="source_profile_override"></select>
-              </div>
-              <div>
-                <label>覆盖说明</label>
-                <div class="notice" id="source-profile-override-notice">默认按挂载驱动自动匹配 source profile；如果当前驱动识别不准，可以在这里手动改绑。</div>
+            <div class="panel-grid" style="margin-top:14px;">
+              <div class="col-span-2">
+                <label class="help-anchor" data-i18n="label.mounted_source_select" data-help-key="mounted_source_select">已挂载源目录</label>
+                <select id="mounted_source_select_source"></select>
+                <div class="subtle" data-i18n="desc.source_mount_quick_pick">先在这里选一个已挂载源，再进入目录浏览，会更容易理解当前在操作哪个网盘。</div>
               </div>
             </div>
+            <div class="notice" id="source-driver-summary">等待源端上下文...</div>
             <div class="actions">
+              <button class="secondary" id="browse-mounted-source" data-i18n="btn.browse_mounted_source">从已挂载源开始浏览</button>
               <button class="secondary" id="browse-root" data-i18n="btn.browse_root" data-help-key="btn_browse_root">浏览挂载根目录</button>
               <button class="secondary" id="browse-up" data-i18n="btn.browse_up" data-help-key="btn_browse_up">返回上级</button>
               <button class="secondary" id="browse-refresh" data-i18n="btn.browse_refresh" data-help-key="btn_browse_refresh">刷新当前目录</button>
               <button class="accent" id="use-current-dir" data-i18n="btn.use_current_dir" data-help-key="btn_use_current_dir">使用当前目录作为源目录</button>
-              <button class="secondary" id="save-source-profile-override">保存源 Profile 覆盖</button>
-              <button class="secondary" id="clear-source-profile-override">清除覆盖</button>
             </div>
             <div class="notice" id="dir-notice">等待操作</div>
             <div class="mono" id="dir-current">当前浏览: 未载入</div>
             <div class="browser-list" id="dir-browser-list">正在等待目录数据...</div>
           </div>
 
-          <div class="panel">
+          <details class="panel collapsible-panel">
+            <summary>
+              <span data-i18n="panel.source_profile_tools">源端覆盖与映射</span>
+              <small data-i18n="desc.panel_source_profile_tools_summary">只有驱动识别不准时，才需要手动改这里。</small>
+            </summary>
+            <div class="panel-grid">
+              <div>
+                <label data-i18n="label.source_profile_override">源 Profile 覆盖</label>
+                <select id="source_profile_override"></select>
+              </div>
+              <div>
+                <label data-i18n="label.override_note">覆盖说明</label>
+                <div class="notice" id="source-profile-override-notice" data-i18n="desc.source_profile_override">默认按挂载驱动自动匹配 source profile；如果当前驱动识别不准，可以在这里手动改绑。</div>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="secondary" id="save-source-profile-override" data-i18n="btn.save_source_profile_override">保存源 Profile 覆盖</button>
+              <button class="secondary" id="clear-source-profile-override" data-i18n="btn.clear_override">清除覆盖</button>
+            </div>
+          </details>
+
+          <details class="panel collapsible-panel">
+            <summary>
+              <span data-i18n="panel.source_analyze">源端元数据分析</span>
+              <small data-i18n="desc.panel_source_analyze_summary">低频分析工具，默认收起。</small>
+            </summary>
             <h2 class="help-anchor" data-i18n="panel.source_analyze" data-help-key="panel_source_analyze">源端元数据分析</h2>
             <div class="subtle" data-i18n="desc.source_analyze">开始真正同步前，先做一次源目录分析。这里会统计当前目录中有多少文件带 MD5、多少文件带 GCID、各 provider 占比，以及抽样展示前几条源文件元数据。</div>
             <div class="actions">
@@ -123,13 +154,14 @@
             </div>
             <div class="notice" id="source-analyze-notice">等待分析</div>
             <div class="mount-list" id="source-analyze-summary">暂无分析结果</div>
-          </div>
+          </details>
 
         </section>
 
         <section class="tab-panel" data-panel="task">
           <div class="panel">
             <h2 class="help-anchor" data-i18n="panel.current_task" data-help-key="panel_current_task">当前任务</h2>
+            <div class="notice" id="task-mode-summary">等待任务策略分析...</div>
             <div class="panel-grid">
               <div>
                 <label class="help-anchor" data-i18n="label.source_path" data-help-key="source_path">当前源目录</label>
@@ -143,6 +175,16 @@
                 <label class="help-anchor" id="target-path-label" data-i18n="label.target_path" data-help-key="target_path">光鸭目标目录</label>
                 <input id="target_path">
               </div>
+              <div class="col-span-2 hidden" data-target-only="openlist">
+                <div class="notice" id="task-openlist-target-hint" data-i18n="desc.task_openlist_target_hint">当前目标端是 OpenList 挂载目标。你可以在这里直接选具体挂载，也可以去“目标端”页先选挂载后再回到这里确认目标目录。</div>
+              </div>
+              <div class="col-span-2 hidden" data-target-only="openlist">
+                <label class="help-anchor" data-i18n="label.openlist_target_mount_select_task" data-help-key="openlist_target_mount_select_task">OpenList 目标挂载</label>
+                <select id="openlist_target_mount_select_task"></select>
+                <div class="actions">
+                  <button class="secondary" id="apply-openlist-target-mount-task" data-i18n="btn.apply_openlist_target_mount" data-help-key="btn_apply_openlist_target_mount_task">写入目标目录</button>
+                </div>
+              </div>
               <div>
                 <label class="help-anchor" data-i18n="label.effective_openlist_url" data-help-key="effective_openlist_url">OpenList 实际访问地址</label>
                 <input id="effective_openlist_url" readonly>
@@ -151,6 +193,19 @@
                 <label class="help-anchor" data-i18n="label.mounted_source_select" data-help-key="mounted_source_select">已挂载源目录</label>
                 <select id="mounted_source_select"></select>
               </div>
+            </div>
+            <div class="actions">
+              <button class="accent" id="save-config-overview" data-i18n="btn.save_task_config" data-help-key="btn_save_task_config">保存当前任务配置</button>
+              <button class="secondary" id="use-mounted-source" data-i18n="btn.use_mounted_source" data-help-key="btn_use_mounted_source">使用挂载源目录</button>
+            </div>
+          </div>
+
+          <details class="panel collapsible-panel">
+            <summary>
+              <span data-i18n="panel.task_advanced">更多任务选项</span>
+              <small data-i18n="desc.panel_task_advanced_summary">执行偏好、小文件补传阈值、删除策略等低频项收在这里。</small>
+            </summary>
+            <div class="panel-grid">
               <div>
                 <label class="help-anchor" data-i18n="label.source_provider_preference" data-help-key="source_provider_preference">源端执行偏好</label>
                 <select id="source_provider_preference">
@@ -178,27 +233,27 @@
                 <div class="subtle" data-i18n="desc.target_delete_removed">默认只做新增 + 覆盖。只有同时开启这两个选项时，才会尝试删除目标端真实文件。</div>
               </div>
             </div>
-            <div class="actions">
-              <button class="accent" id="save-config-overview" data-i18n="btn.save_task_config" data-help-key="btn_save_task_config">保存当前任务配置</button>
-              <button class="secondary" id="use-mounted-source" data-i18n="btn.use_mounted_source" data-help-key="btn_use_mounted_source">使用挂载源目录</button>
-            </div>
-            <div class="notice" id="task-mode-summary">等待任务策略分析...</div>
-          </div>
+          </details>
         </section>
 
         <section class="tab-panel" data-panel="execute">
           <div class="panel">
             <h2 class="help-anchor" data-i18n="panel.sync_actions" data-help-key="panel_sync_actions">同步执行</h2>
+            <div class="subtle" data-i18n="desc.execute_primary">先在这里完成主执行；补传、秒传和能力说明都在下方折叠区，按需展开即可。</div>
             <div class="actions">
               <button class="secondary" id="run-dry" data-i18n="btn.run_dry" data-help-key="btn_run_dry">只看计划 dry-run</button>
               <button class="warn" id="run-direct" data-i18n="btn.direct_sync" data-help-key="btn_direct_sync">直接同步当前目录</button>
               <button class="secondary" id="run-next-queue" data-i18n="btn.run_next_queue" data-help-key="btn_run_next_queue">执行队列下一个</button>
               <button class="secondary" id="run-all-queue" data-i18n="btn.run_all_queue" data-help-key="btn_run_all_queue">连续执行整个队列</button>
             </div>
-            <div class="notice" id="sync-notice">等待操作</div>
+            <div class="notice" id="sync-notice" data-i18n="notice.sync_idle">等待操作</div>
           </div>
 
-          <div class="panel">
+          <details class="panel collapsible-panel">
+            <summary>
+              <span data-i18n="panel.leaf_mode">最底层目录模式</span>
+              <small data-i18n="desc.panel_leaf_mode_summary">慢跑、防风控和队列准备放这里。</small>
+            </summary>
             <h2 class="help-anchor" data-i18n="panel.leaf_mode" data-help-key="panel_leaf_mode">最底层目录模式</h2>
             <div class="subtle" data-i18n="desc.leaf_mode">适合防风控慢跑。可以直接边扫边同步，也可以先把叶子目录加入队列后分批执行。</div>
             <div class="actions">
@@ -207,16 +262,22 @@
               <button class="warn" id="run-leaf-direct" data-i18n="btn.run_leaf_direct" data-help-key="btn_run_leaf_direct">最底层边扫边秒传</button>
               <button class="warn" id="run-leaf-full" data-i18n="btn.run_leaf_full" data-help-key="btn_run_leaf_full">最底层边扫边同步+补传</button>
             </div>
-          </div>
+          </details>
 
-          <div class="panel">
+          <details class="panel collapsible-panel">
+            <summary>
+              <span data-i18n="panel.queue">目录队列</span>
+              <small data-i18n="desc.panel_queue_summary">当前目录队列与连续执行入口。</small>
+            </summary>
             <h2 data-i18n="panel.queue">目录队列</h2>
             <div class="queue-list" id="queue-list">暂无目录队列</div>
-          </div>
-        </section>
+          </details>
 
-        <section class="tab-panel" data-panel="pending">
-          <div class="panel">
+          <details class="panel collapsible-panel" id="execute-pending-details">
+            <summary>
+              <span data-i18n="panel.pending_tree">待补传目录树</span>
+              <small data-i18n="desc.panel_pending_summary">执行失败后再展开这里处理补传。</small>
+            </summary>
             <h2 class="help-anchor" data-i18n="panel.pending_tree" data-help-key="panel_pending_tree">待补传目录树</h2>
             <div class="actions">
               <button class="secondary" id="pending-select-all" data-i18n="btn.select_all">全选</button>
@@ -226,29 +287,35 @@
             </div>
             <div class="subtle" data-i18n="desc.pending_tree">这里按真实目录树展示，父目录勾选会联动所有子目录和文件。</div>
             <div class="tree-wrap" id="pending-tree">暂无待补传文件</div>
-          </div>
-        </section>
+          </details>
 
-        <section class="tab-panel" data-panel="miaochuan">
-          <div class="panel">
+          <details class="panel collapsible-panel" id="execute-capability-details">
+            <summary>
+              <span data-i18n="panel.capability">能力矩阵与建议</span>
+              <small data-i18n="desc.panel_capability_summary">是否能秒传、怎么降级，看这里。</small>
+            </summary>
             <h2 data-i18n="panel.capability">能力矩阵与建议</h2>
             <div class="subtle" id="capability-desc" data-i18n="desc.capability">根据当前选择的源驱动和现有目标端 Guangya，给出诚实降级后的推荐路径。这里不会把“只能补传”的组合误导成可秒传。</div>
             <div class="notice" id="capability-summary">等待驱动信息...</div>
             <div class="actions" id="capability-quick-actions"></div>
-          </div>
+          </details>
 
-          <div class="panel">
+          <details class="panel collapsible-panel" id="execute-miaochuan-details">
+            <summary>
+              <span id="tab-miaochuan-label" data-i18n="tab.miaochuan">秒传</span>
+              <small data-i18n="desc.panel_miaochuan_summary">增强入口，默认收起，支持时再用。</small>
+            </summary>
             <h2 class="help-anchor" id="miaochuan-panel-title" data-i18n="panel.miaochuan" data-help-key="panel_miaochuan">秒传 JSON 直导</h2>
             <div class="subtle" id="miaochuan-desc" data-i18n="desc.miaochuan">支持直接粘贴油猴或插件导出的 JSON。若你已自动抓取到光鸭 Authorization，会优先使用它。</div>
             <label class="help-anchor" data-i18n="label.miaochuan_payload" data-help-key="miaochuan_payload">秒传 JSON</label>
-            <textarea id="miaochuan_payload" placeholder='{"files":[{"path":"/demo.zip","size":"123","etag":"md5"}]}'></textarea>
+            <textarea id="miaochuan_payload" data-i18n-placeholder="placeholder.miaochuan_payload" placeholder='{"files":[{"path":"/demo.zip","size":"123","etag":"md5"}]}'></textarea>
             <div class="actions">
               <button class="secondary" id="diagnose-miaochuan" data-i18n="btn.diagnose_miaochuan" data-help-key="btn_diagnose_miaochuan">诊断当前秒传 JSON</button>
               <button class="warn" id="run-miaochuan" data-i18n="btn.run_miaochuan" data-help-key="btn_run_miaochuan">直接导入光鸭</button>
             </div>
             <div class="notice" id="miaochuan-notice">等待操作</div>
             <div class="mount-list" id="miaochuan-diagnosis">暂无诊断结果</div>
-          </div>
+          </details>
         </section>
 
         <section class="tab-panel" data-panel="mounts">
@@ -258,95 +325,202 @@
               <div>
                 <label class="help-anchor" data-i18n="label.openlist_mode" data-help-key="openlist_mode">OpenList 模式</label>
                 <select id="openlist_mode">
-                  <option value="external_local" data-i18n-option="option.openlist_mode.external_local">external_local</option>
-                  <option value="external_remote" data-i18n-option="option.openlist_mode.external_remote">external_remote</option>
-                  <option value="managed_binary" data-i18n-option="option.openlist_mode.managed_binary">managed_binary</option>
-                  <option value="managed_docker" data-i18n-option="option.openlist_mode.managed_docker">managed_docker</option>
+                  <option value="external_local" data-i18n-option="option.openlist_mode.external_local">外部模式（本机）</option>
+                  <option value="external_remote" data-i18n-option="option.openlist_mode.external_remote">外部模式（远程）</option>
+                  <option value="managed_binary" data-i18n-option="option.openlist_mode.managed_binary">托管模式（本机二进制）</option>
+                  <option value="managed_docker" data-i18n-option="option.openlist_mode.managed_docker">托管模式（Docker）</option>
                 </select>
               </div>
-              <div>
-                <label class="help-anchor" data-i18n="label.rate_limit_mode" data-help-key="rate_limit_mode">Rate Limit 模式</label>
-                <select id="rate_limit_mode">
-                  <option value="safe" data-i18n-option="option.rate_limit_mode.safe">safe</option>
-                  <option value="balanced" data-i18n-option="option.rate_limit_mode.balanced">balanced</option>
-                  <option value="fast" data-i18n-option="option.rate_limit_mode.fast">fast</option>
-                  <option value="custom" data-i18n-option="option.rate_limit_mode.custom">custom</option>
-                </select>
+            </div>
+            <div class="notice" id="openlist-mode-summary">等待选择 OpenList 运行方式。</div>
+            <div class="mode-active-chip" id="openlist-mode-chip">当前模式：外部模式（本机）</div>
+            <div class="compact-summary-grid">
+              <div class="compact-summary-card">
+                <strong data-i18n="card.console_auth">控制台登录</strong>
+                <div class="subtle" data-i18n="desc.console_auth_card">控制整个控制台页面访问。开启后，必须先通过右上角登录弹窗进入。</div>
               </div>
-              <div>
-                <label class="help-anchor" data-i18n="label.openlist_url" data-help-key="openlist_url">OpenList 地址</label>
-                <input id="openlist_url">
+              <div class="compact-summary-card">
+                <strong data-i18n="card.openlist_auth">OpenList 登录</strong>
+                <div class="subtle" data-i18n="desc.openlist_auth_card">用于把用户名密码登录成 Token，并写回当前模式配置。</div>
               </div>
-              <div>
-                <label class="help-anchor" data-i18n="label.openlist_token" data-help-key="openlist_token">OpenList Token</label>
-                <input id="openlist_token">
+              <div class="compact-summary-card">
+                <strong data-i18n="card.provider_auth">源网盘网页登录抓取</strong>
+                <div class="subtle" data-i18n="desc.provider_auth_card">用于抓浏览器登录态，再尽量自动回填挂载字段，减少手工抄写。</div>
               </div>
-              <div>
-                <label class="help-anchor" data-i18n="label.openlist_username" data-help-key="openlist_username">OpenList 用户名</label>
-                <input id="openlist_username">
+            </div>
+            <details class="panel collapsible-panel compact-inner-panel">
+              <summary>
+                <span data-i18n="panel.connection_advanced">连接节奏与说明</span>
+                <small data-i18n="desc.panel_connection_advanced_summary">Rate limit 和接入说明默认收起，避免第一屏过满。</small>
+              </summary>
+              <div class="notice" id="connection-login-summary" data-i18n="desc.connection_login_summary">这里已经内置 3 类登录/接入能力：控制台登录、OpenList 登录回写 Token、源网盘网页登录抓取并回填挂载表单。</div>
+              <div class="panel-grid">
+                <div>
+                  <label class="help-anchor" data-i18n="label.rate_limit_mode" data-help-key="rate_limit_mode">Rate Limit 模式</label>
+                  <select id="rate_limit_mode">
+                    <option value="safe" data-i18n-option="option.rate_limit_mode.safe">稳妥</option>
+                    <option value="balanced" data-i18n-option="option.rate_limit_mode.balanced">平衡</option>
+                    <option value="fast" data-i18n-option="option.rate_limit_mode.fast">快速</option>
+                    <option value="custom" data-i18n-option="option.rate_limit_mode.custom">自定义</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label class="help-anchor" data-i18n="label.openlist_password" data-help-key="openlist_password">OpenList 密码</label>
-                <input id="openlist_password" type="password">
-              </div>
-              <div data-managed-binary-only>
-                <label class="help-anchor" data-i18n="label.managed_openlist_bin" data-help-key="managed_openlist_bin">托管 OpenList 可执行文件</label>
-                <input id="managed_openlist_bin">
-              </div>
-              <div data-managed-only>
-                <label class="help-anchor" data-i18n="label.managed_openlist_data_dir" data-help-key="managed_openlist_data_dir">托管 OpenList 数据目录</label>
-                <input id="managed_openlist_data_dir">
-              </div>
-              <div data-managed-only>
-                <label class="help-anchor" data-i18n="label.managed_openlist_port" data-help-key="managed_openlist_port">托管 OpenList 端口</label>
-                <input id="managed_openlist_port" type="number" min="1">
-              </div>
-              <div data-managed-docker-only>
-                <label class="help-anchor" data-i18n="label.managed_openlist_docker_image" data-help-key="managed_openlist_docker_image">Docker 镜像</label>
-                <input id="managed_openlist_docker_image">
-              </div>
-              <div data-managed-docker-only>
-                <label class="help-anchor" data-i18n="label.managed_openlist_docker_container_name" data-help-key="managed_openlist_docker_container_name">Docker 容器名</label>
-                <input id="managed_openlist_docker_container_name">
-              </div>
-              <div data-managed-only>
-                <label data-i18n="label.managed_openlist_init_username">托管初始化管理员账号</label>
-                <input id="managed_openlist_init_username">
-              </div>
-              <div data-managed-only>
-                <label data-i18n="label.managed_openlist_init_password">托管初始化管理员密码</label>
-                <input id="managed_openlist_init_password" type="password" placeholder="留空表示启动时自动生成建议密码">
-              </div>
-              <div>
-                <label class="help-anchor" data-help-key="app_admin_username">控制台管理员账号</label>
-                <input id="app_admin_username" placeholder="留空表示不启用控制台登录">
-              </div>
-              <div>
-                <label class="help-anchor" data-help-key="app_admin_password">控制台管理员密码</label>
-                <input id="app_admin_password" type="password" placeholder="留空表示不启用控制台登录">
-              </div>
+            </details>
+            <div class="mode-switch-grid">
+              <section class="mode-section" data-openlist-section="external_local">
+                <h3 data-i18n="mounts.mode.external_local.title">连接已有实例（本机）</h3>
+                <div class="subtle" data-i18n="mounts.mode.external_local.desc">适合你已经在本机启动了 OpenList，只需要填写地址、账号密码或 Token 并回写。</div>
+                <div class="panel-grid">
+                  <div>
+                    <label class="help-anchor" data-i18n="label.openlist_url" data-help-key="openlist_url">OpenList 地址</label>
+                    <input id="openlist_url">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.openlist_token" data-help-key="openlist_token">OpenList Token</label>
+                    <input id="openlist_token">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.openlist_username" data-help-key="openlist_username">OpenList 用户名</label>
+                    <input id="openlist_username">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.openlist_password" data-help-key="openlist_password">OpenList 密码</label>
+                    <input id="openlist_password" type="password" form="openlist-password-form" autocomplete="off">
+                  </div>
+                </div>
+                <div class="actions">
+                  <button class="secondary" id="login-openlist" data-i18n="btn.login_openlist" data-help-key="btn_login_openlist">登录 OpenList 并写回 Token</button>
+                </div>
+              </section>
+
+              <section class="mode-section hidden" data-openlist-section="external_remote">
+                <h3 data-i18n="mounts.mode.external_remote.title">连接已有实例（远程）</h3>
+                <div class="subtle" data-i18n="mounts.mode.external_remote.desc">适合 NAS、服务器或远程机器上已运行的 OpenList。这里只显示远程实例相关配置，不再混进托管参数。</div>
+                <div class="panel-grid">
+                  <div>
+                    <label class="help-anchor" data-i18n="label.openlist_url" data-help-key="openlist_url">OpenList 地址</label>
+                    <input data-openlist-mirror="openlist_url">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.openlist_token" data-help-key="openlist_token">OpenList Token</label>
+                    <input data-openlist-mirror="openlist_token">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.openlist_username" data-help-key="openlist_username">OpenList 用户名</label>
+                    <input data-openlist-mirror="openlist_username">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.openlist_password" data-help-key="openlist_password">OpenList 密码</label>
+                    <input data-openlist-mirror="openlist_password" type="password" form="openlist-password-mirror-form" autocomplete="off">
+                  </div>
+                </div>
+                <div class="actions">
+                  <button class="secondary" id="login-openlist-remote" data-i18n="btn.login_openlist" data-help-key="btn_login_openlist">登录 OpenList 并写回 Token</button>
+                </div>
+              </section>
+
+              <section class="mode-section hidden" data-openlist-section="managed_binary">
+                <h3 data-i18n="mounts.mode.managed_binary.title">托管模式（本机二进制）</h3>
+                <div class="subtle" data-i18n="mounts.mode.managed_binary.desc">适合你本机直接托管 OpenList。这里会单独显示运行参数、初始化管理员和运行时操作按钮。</div>
+                <div class="panel-grid">
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.openlist_url" data-help-key="openlist_url">OpenList 地址</label>
+                    <input data-openlist-mirror="openlist_url">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.managed_openlist_bin" data-help-key="managed_openlist_bin">托管 OpenList 可执行文件</label>
+                    <input id="managed_openlist_bin">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.managed_openlist_data_dir" data-help-key="managed_openlist_data_dir">托管 OpenList 数据目录</label>
+                    <input id="managed_openlist_data_dir">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.managed_openlist_port" data-help-key="managed_openlist_port">托管 OpenList 端口</label>
+                    <input id="managed_openlist_port" type="number" min="1">
+                  </div>
+                  <div></div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.managed_openlist_init_username" data-help-key="managed_openlist_init_username">托管初始化管理员账号</label>
+                    <input id="managed_openlist_init_username">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.managed_openlist_init_password" data-help-key="managed_openlist_init_password">托管初始化管理员密码</label>
+                    <input id="managed_openlist_init_password" type="password" form="managed-init-password-form" autocomplete="off">
+                  </div>
+                </div>
+                <div class="actions">
+                  <button class="secondary" id="install-runtime" data-i18n="btn.install_runtime" data-help-key="btn_install_runtime">拉取本机 OpenList 运行时</button>
+                  <button class="secondary" id="start-runtime" data-i18n="btn.start_runtime" data-help-key="btn_start_runtime">启动托管 OpenList</button>
+                </div>
+              </section>
+
+              <section class="mode-section hidden" data-openlist-section="managed_docker">
+                <h3 data-i18n="mounts.mode.managed_docker.title">托管模式（Docker 预留）</h3>
+                <div class="subtle" data-i18n="mounts.mode.managed_docker.desc">这块先做结构化预留与参数保存，不会假装已经完整实现自动起容器。</div>
+                <div class="panel-grid">
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.openlist_url" data-help-key="openlist_url">OpenList 地址</label>
+                    <input data-openlist-mirror="openlist_url">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.managed_openlist_data_dir" data-help-key="managed_openlist_data_dir">托管 OpenList 数据目录</label>
+                    <input data-openlist-mirror="managed_openlist_data_dir">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.managed_openlist_port" data-help-key="managed_openlist_port">托管 OpenList 端口</label>
+                    <input data-openlist-mirror="managed_openlist_port" type="number" min="1">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.managed_openlist_docker_image" data-help-key="managed_openlist_docker_image">Docker 镜像</label>
+                    <input id="managed_openlist_docker_image">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.managed_openlist_docker_container_name" data-help-key="managed_openlist_docker_container_name">Docker 容器名</label>
+                    <input id="managed_openlist_docker_container_name">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.managed_openlist_init_username" data-help-key="managed_openlist_init_username">托管初始化管理员账号</label>
+                    <input data-openlist-mirror="managed_openlist_init_username">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.managed_openlist_init_password" data-help-key="managed_openlist_init_password">托管初始化管理员密码</label>
+                    <input data-openlist-mirror="managed_openlist_init_password" type="password" form="managed-init-password-mirror-form" autocomplete="off">
+                  </div>
+                </div>
+                <div class="actions">
+                  <button class="secondary" id="start-runtime-docker" data-i18n="btn.start_runtime" data-help-key="btn_start_runtime">启动托管 OpenList</button>
+                </div>
+              </section>
             </div>
             <div class="actions">
-              <button class="secondary" id="install-runtime" data-i18n="btn.install_runtime">拉取本机 OpenList 运行时</button>
-              <button class="secondary" id="start-runtime" data-i18n="btn.start_runtime" data-help-key="btn_start_runtime">启动托管 OpenList</button>
-              <button class="secondary" id="login-openlist" data-i18n="btn.login_openlist" data-help-key="btn_login_openlist">登录 OpenList 并写回 Token</button>
               <button class="accent" id="save-config-bottom" data-i18n="btn.save_all_config">保存全部配置</button>
+              <button class="secondary" id="open-advanced-settings-mounts" data-i18n="btn.open_advanced_settings">打开高级设置</button>
             </div>
-            <div class="notice" id="runtime-action-notice">等待运行时检查。</div>
+            <div class="notice" id="runtime-action-notice" data-i18n="notice.runtime_wait">等待运行时检查。</div>
           </div>
 
-          <div class="panel">
+          <details class="panel collapsible-panel">
+            <summary>
+              <span data-i18n="panel.mount_overview">OpenList 挂载总览</span>
+              <small data-i18n="desc.panel_mount_overview_summary">已挂载内容与驱动列表，默认收起。</small>
+            </summary>
             <h2 data-i18n="panel.mount_overview">OpenList 挂载总览</h2>
             <div class="actions">
               <button class="secondary" id="refresh-storages" data-i18n="btn.refresh_storages">刷新挂载列表</button>
               <button class="secondary" id="refresh-drivers" data-i18n="btn.refresh_drivers">刷新驱动列表</button>
             </div>
             <div class="mount-list" id="storage-list">正在载入挂载列表...</div>
-          </div>
+          </details>
 
-          <div class="panel">
+          <details class="panel collapsible-panel">
+            <summary>
+              <span data-i18n="panel.provider_capture">源网盘登录抓取</span>
+              <small data-i18n="desc.panel_provider_capture_summary">没挂载时再展开这里接入源网盘。</small>
+            </summary>
             <h2 class="help-anchor" data-i18n="panel.provider_capture" data-help-key="panel_provider_capture">源网盘登录抓取</h2>
             <div class="subtle" data-i18n="desc.provider_capture">如果还没有挂载，或想直接从网页登录态抓取 Cookie / Token / Header，可以先在这里选网盘类型，打开登录页抓取，再一键写入当前挂载表单。</div>
+            <div class="quick-pick-strip" id="provider-quick-picks"></div>
             <div class="panel-grid">
               <div>
                 <label class="help-anchor" data-i18n="label.provider_select" data-help-key="provider_select">源网盘类型</label>
@@ -357,8 +531,8 @@
                 <div class="notice" id="provider-driver-hint">等待选择网盘类型。</div>
               </div>
               <div class="col-span-2">
-                <label class="help-anchor" data-help-key="provider_login_url">Login URL</label>
-                <input id="provider-login-url" placeholder="https://...">
+                <label class="help-anchor" data-help-key="provider_login_url" data-i18n="label.provider_login_url">登录地址</label>
+                <input id="provider-login-url" data-i18n-placeholder="placeholder.provider_login_url" placeholder="https://...">
               </div>
               <div class="col-span-2">
                 <div class="notice" id="provider-capture-summary">等待抓取状态...</div>
@@ -369,9 +543,13 @@
               <button class="secondary" id="show-provider-guide" data-i18n="btn.show_provider_guide" data-help-key="btn_show_provider_guide">查看该网盘接入流程</button>
               <button class="accent" id="apply-provider-fields" data-i18n="btn.apply_provider_fields" data-help-key="btn_apply_provider_fields">写入当前挂载表单</button>
             </div>
-          </div>
+          </details>
 
-          <div class="panel">
+          <details class="panel collapsible-panel">
+            <summary>
+              <span data-i18n="panel.create_mount">新增挂载</span>
+              <small data-i18n="desc.panel_create_mount_summary">需要手动建挂载时再展开。</small>
+            </summary>
             <h2 class="help-anchor" data-i18n="panel.create_mount" data-help-key="panel_create_mount">新增挂载</h2>
             <div class="panel-grid">
               <div>
@@ -394,242 +572,238 @@
               <button class="secondary" id="apply-driver-defaults" data-i18n="btn.apply_driver_defaults" data-help-key="btn_apply_driver_defaults">套用推荐默认值</button>
               <button class="accent" id="create-storage" data-i18n="btn.create_storage" data-help-key="btn_create_storage">创建挂载</button>
             </div>
-          </div>
+          </details>
         </section>
 
         <section class="tab-panel" data-panel="config">
           <div class="panel">
             <h2 class="help-anchor" data-i18n="panel.config" data-help-key="panel_config">目标端配置</h2>
+            <div class="subtle" data-i18n="desc.target_primary">这一页只保留目标端选择、目标端凭证和目标挂载。日志路径、状态文件、控制台管理员等高级项已移到二级弹窗。</div>
             <div class="panel-grid">
-              <div>
-                <label class="help-anchor" data-i18n="label.log_file" data-help-key="log_file">日志文件</label>
-                <input id="log_file">
+              <div class="col-span-2">
+                <label class="help-anchor" data-i18n="label.target_key" data-help-key="target_key_config">当前目标端</label>
+                <select id="target_key_config"></select>
               </div>
-              <div>
-                <label class="help-anchor" data-i18n="label.temp_dir" data-help-key="temp_dir">临时下载目录</label>
-                <input id="temp_dir">
-              </div>
-              <div>
-                <label class="help-anchor" data-i18n="label.state_file" data-help-key="state_file">状态文件</label>
-                <input id="state_file">
-              </div>
-              <div>
-                <label class="help-anchor" data-i18n="label.openlist_page_size" data-help-key="openlist_page_size">OpenList 每页数</label>
-                <input id="openlist_page_size" type="number" min="1">
-              </div>
-              <div>
-                <label class="help-anchor" data-i18n="label.openlist_request_interval_ms" data-help-key="openlist_request_interval_ms">OpenList 请求间隔(ms)</label>
-                <input id="openlist_request_interval_ms" type="number" min="0">
-              </div>
-              <div>
-                <label class="help-anchor" data-i18n="label.queue_interval_ms" data-help-key="queue_interval_ms">目录间隔(ms)</label>
-                <input id="queue_interval_ms" type="number" min="0">
-              </div>
+            </div>
+            <div class="actions">
+              <button class="secondary" id="open-advanced-settings" data-i18n="btn.open_advanced_settings">打开高级设置</button>
+              <button class="secondary" id="open-help-center-target" data-i18n="btn.open_help_center">帮助与能力</button>
             </div>
             <div class="notice" id="target-preflight-notice">等待目标端检查...</div>
           </div>
 
           <div class="panel">
             <h2 id="target-auth-panel-title" data-i18n="panel.guangya_auth">目标端连接参数</h2>
+            <div class="quick-pick-strip" id="target-quick-picks"></div>
+            <div class="mode-active-chip" id="target-mode-chip">当前目标端：光鸭云盘</div>
+            <div class="target-summary-grid">
+              <div id="target-auth-guide" class="compact-summary-card">当前目标端说明将显示在这里。</div>
+              <div id="target-auth-summary" class="compact-summary-card">等待目标端能力摘要...</div>
+              <div id="target-popular-summary" class="compact-summary-card">常用目标端会在这里显示说明。</div>
+            </div>
             <div class="panel-grid">
-              <div id="target-auth-guide" class="notice col-span-2">当前目标端说明将显示在这里。</div>
-              <div data-target-only="guangya">
-                <label data-i18n="label.guangya_phone">光鸭手机号</label>
-                <input id="guangya_phone">
-              </div>
-              <div data-target-only="guangya">
-                <label data-i18n="label.guangya_device_id">光鸭 Device ID</label>
-                <input id="guangya_device_id">
-              </div>
-              <div data-target-only="guangya">
-                <label data-i18n="label.guangya_access_token">光鸭 Access Token</label>
-                <input id="guangya_access_token">
-              </div>
-              <div data-target-only="guangya">
-                <label data-i18n="label.guangya_refresh_token">光鸭 Refresh Token</label>
-                <input id="guangya_refresh_token">
-              </div>
-              <div class="col-span-2" data-target-only="guangya">
-                <label data-i18n="label.guangya_authorization">光鸭 Authorization</label>
-                <input id="guangya_authorization" placeholder="Bearer ...">
-              </div>
-              <div class="col-span-2" data-target-only="localfs">
-                <label data-i18n="label.local_target_root">本地目标根目录</label>
-                <input id="local_target_root" placeholder="E:\\CloudPanBridge\\Exports">
-              </div>
-              <div class="col-span-2" data-target-only="webdav">
-                <label data-i18n="label.webdav_target_url">WebDAV 目标地址</label>
-                <input id="webdav_target_url" placeholder="https://dav.example.com/remote.php/dav/files/demo">
-              </div>
-              <div data-target-only="webdav">
-                <label data-i18n="label.webdav_target_username">WebDAV 用户名</label>
-                <input id="webdav_target_username">
-              </div>
-              <div data-target-only="webdav">
-                <label data-i18n="label.webdav_target_password">WebDAV 密码</label>
-                <input id="webdav_target_password" type="password">
-              </div>
-              <div class="col-span-2" data-target-only="s3">
-                <label data-i18n="label.s3_target_endpoint">S3 Endpoint</label>
-                <input id="s3_target_endpoint" placeholder="https://s3.example.com">
-              </div>
-              <div data-target-only="s3">
-                <label data-i18n="label.s3_target_bucket">S3 Bucket</label>
-                <input id="s3_target_bucket" placeholder="bucket-name">
-              </div>
-              <div data-target-only="s3">
-                <label data-i18n="label.s3_target_region">S3 Region</label>
-                <input id="s3_target_region" placeholder="ap-southeast-1">
-              </div>
-              <div class="col-span-2" data-target-only="s3">
-                <label data-i18n="label.s3_target_prefix">S3 Prefix</label>
-                <input id="s3_target_prefix" placeholder="cloudpan-bridge/archive">
-              </div>
-              <div data-target-only="s3">
-                <label data-i18n="label.s3_target_access_key">S3 Access Key</label>
-                <input id="s3_target_access_key">
-              </div>
-              <div data-target-only="s3">
-                <label data-i18n="label.s3_target_secret_key">S3 Secret Key</label>
-                <input id="s3_target_secret_key" type="password">
-              </div>
-              <div class="col-span-2" data-target-only="seafile">
-                <label data-i18n="label.seafile_target_url">Seafile 目标地址</label>
-                <input id="seafile_target_url" placeholder="https://seafile.example.com">
-              </div>
-              <div data-target-only="seafile">
-                <label data-i18n="label.seafile_target_repo_id">Seafile Repo ID</label>
-                <input id="seafile_target_repo_id" placeholder="repo-id">
-              </div>
-              <div data-target-only="seafile">
-                <label data-i18n="label.seafile_target_repo_name">Seafile Repo Name</label>
-                <input id="seafile_target_repo_name" placeholder="My Library">
-              </div>
-              <div class="col-span-2" data-target-only="seafile">
-                <label data-i18n="label.seafile_target_token">Seafile Token</label>
-                <input id="seafile_target_token" type="password">
-              </div>
-              <div data-target-only="seafile">
-                <label data-i18n="label.seafile_target_username">Seafile 用户名</label>
-                <input id="seafile_target_username">
-              </div>
-              <div data-target-only="seafile">
-                <label data-i18n="label.seafile_target_password">Seafile 密码</label>
-                <input id="seafile_target_password" type="password">
-              </div>
-              <div class="col-span-2" data-target-only="azureblob">
-                <label data-i18n="label.azureblob_target_account_url">Azure Blob Account URL</label>
-                <input id="azureblob_target_account_url" placeholder="https://demo.blob.core.windows.net">
-              </div>
-              <div data-target-only="azureblob">
-                <label data-i18n="label.azureblob_target_container">Azure Blob Container</label>
-                <input id="azureblob_target_container" placeholder="archive-container">
-              </div>
-              <div data-target-only="azureblob">
-                <label data-i18n="label.azureblob_target_account_name">Azure Blob Account Name</label>
-                <input id="azureblob_target_account_name">
-              </div>
-              <div class="col-span-2" data-target-only="azureblob">
-                <label data-i18n="label.azureblob_target_prefix">Azure Blob Prefix</label>
-                <input id="azureblob_target_prefix" placeholder="cloudpan-bridge/archive">
-              </div>
-              <div class="col-span-2" data-target-only="azureblob">
-                <label data-i18n="label.azureblob_target_account_key">Azure Blob Account Key</label>
-                <input id="azureblob_target_account_key" type="password">
-              </div>
-              <div class="col-span-2" data-target-only="smb">
-                <label data-i18n="label.smb_target_url">SMB 目标地址</label>
-                <input id="smb_target_url" placeholder="smb://server/share/path">
-              </div>
-              <div data-target-only="smb">
-                <label data-i18n="label.smb_target_username">SMB 用户名</label>
-                <input id="smb_target_username">
-              </div>
-              <div data-target-only="smb">
-                <label data-i18n="label.smb_target_password">SMB 密码</label>
-                <input id="smb_target_password" type="password">
-              </div>
-              <div class="col-span-2" data-target-only="ftp">
-                <label data-i18n="label.ftp_target_url">FTP 目标地址</label>
-                <input id="ftp_target_url" placeholder="ftp://example.com:21/uploads">
-              </div>
-              <div data-target-only="ftp">
-                <label data-i18n="label.ftp_target_username">FTP 用户名</label>
-                <input id="ftp_target_username">
-              </div>
-              <div data-target-only="ftp">
-                <label data-i18n="label.ftp_target_password">FTP 密码</label>
-                <input id="ftp_target_password" type="password">
-              </div>
-              <div class="col-span-2" data-target-only="sftp">
-                <label data-i18n="label.sftp_target_url">SFTP 目标地址</label>
-                <input id="sftp_target_url" placeholder="sftp://example.com:22/uploads">
-              </div>
-              <div data-target-only="sftp">
-                <label data-i18n="label.sftp_target_username">SFTP 用户名</label>
-                <input id="sftp_target_username">
-              </div>
-              <div data-target-only="sftp">
-                <label data-i18n="label.sftp_target_password">SFTP 密码</label>
-                <input id="sftp_target_password" type="password">
-              </div>
+              <section class="target-section col-span-2" data-target-section="guangya">
+                <h3 data-i18n="target.title.guangya">光鸭云盘</h3>
+                <div class="panel-grid">
+                  <div>
+                    <label class="help-anchor" data-i18n="label.guangya_phone" data-help-key="guangya_phone">光鸭手机号</label>
+                    <input id="guangya_phone">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.guangya_device_id" data-help-key="guangya_device_id">光鸭 Device ID</label>
+                    <input id="guangya_device_id">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.guangya_access_token" data-help-key="guangya_access_token">光鸭 Access Token</label>
+                    <input id="guangya_access_token">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.guangya_refresh_token" data-help-key="guangya_refresh_token">光鸭 Refresh Token</label>
+                    <input id="guangya_refresh_token">
+                  </div>
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.guangya_authorization" data-help-key="guangya_authorization">光鸭 Authorization</label>
+                    <input id="guangya_authorization" data-i18n-placeholder="placeholder.guangya_authorization" placeholder="Bearer ...">
+                  </div>
+                </div>
+              </section>
+              <section class="target-section col-span-2 hidden" data-target-section="localfs">
+                <h3 data-i18n="target.title.localfs">本地目录</h3>
+                <div class="panel-grid">
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.local_target_root" data-help-key="local_target_root">本地目标根目录</label>
+                    <input id="local_target_root" data-i18n-placeholder="placeholder.local_target_root" placeholder="E:\\CloudPanBridge\\Exports">
+                  </div>
+                </div>
+              </section>
+              <section class="target-section col-span-2 hidden" data-target-section="openlist">
+                <h3 data-i18n="target.title.openlist">OpenList 挂载目标</h3>
+                <div class="notice" id="openlist-target-bridge-notice" data-i18n="desc.openlist_target_bridge">当前目标端会复用上方“连接”页里已经配置好的 OpenList 连接信息。这里不用重复填目标端账号密码；只要先把 OpenList 连接打通，再在任务区填写目标目录即可。</div>
+                <div class="panel-grid" style="margin-top:12px;">
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.openlist_target_mount_select" data-help-key="openlist_target_mount_select">OpenList 目标挂载</label>
+                    <select id="openlist_target_mount_select"></select>
+                  </div>
+                </div>
+                <div class="actions">
+                  <button class="secondary" id="apply-openlist-target-mount" data-i18n="btn.apply_openlist_target_mount" data-help-key="btn_apply_openlist_target_mount">写入目标目录</button>
+                </div>
+              </section>
+              <section class="target-section col-span-2 hidden" data-target-section="webdav">
+                <h3 data-i18n="target.title.webdav">WebDAV</h3>
+                <div class="panel-grid">
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.webdav_target_url" data-help-key="webdav_target_url">WebDAV 目标地址</label>
+                    <input id="webdav_target_url" data-i18n-placeholder="placeholder.webdav_target_url" placeholder="https://dav.example.com/remote.php/dav/files/demo">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.webdav_target_username" data-help-key="webdav_target_username">WebDAV 用户名</label>
+                    <input id="webdav_target_username">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.webdav_target_password" data-help-key="webdav_target_password">WebDAV 密码</label>
+                    <input id="webdav_target_password" type="password" form="webdav-password-form" autocomplete="off">
+                  </div>
+                </div>
+              </section>
+              <section class="target-section col-span-2 hidden" data-target-section="s3">
+                <h3 data-i18n="target.title.s3">S3 / 对象存储</h3>
+                <div class="panel-grid">
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.s3_target_endpoint" data-help-key="s3_target_endpoint">S3 Endpoint</label>
+                    <input id="s3_target_endpoint" data-i18n-placeholder="placeholder.s3_target_endpoint" placeholder="https://s3.example.com">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.s3_target_bucket" data-help-key="s3_target_bucket">S3 Bucket</label>
+                    <input id="s3_target_bucket" data-i18n-placeholder="placeholder.s3_target_bucket" placeholder="bucket-name">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.s3_target_region" data-help-key="s3_target_region">S3 Region</label>
+                    <input id="s3_target_region" data-i18n-placeholder="placeholder.s3_target_region" placeholder="ap-southeast-1">
+                  </div>
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.s3_target_prefix" data-help-key="s3_target_prefix">S3 Prefix</label>
+                    <input id="s3_target_prefix" data-i18n-placeholder="placeholder.s3_target_prefix" placeholder="cloudpan-bridge/archive">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.s3_target_access_key" data-help-key="s3_target_access_key">S3 Access Key</label>
+                    <input id="s3_target_access_key">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.s3_target_secret_key" data-help-key="s3_target_secret_key">S3 Secret Key</label>
+                    <input id="s3_target_secret_key" type="password" form="s3-secret-form" autocomplete="off">
+                  </div>
+                </div>
+              </section>
+              <section class="target-section col-span-2 hidden" data-target-section="seafile">
+                <h3 data-i18n="target.title.seafile">Seafile</h3>
+                <div class="panel-grid">
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.seafile_target_url" data-help-key="seafile_target_url">Seafile 目标地址</label>
+                    <input id="seafile_target_url" data-i18n-placeholder="placeholder.seafile_target_url" placeholder="https://seafile.example.com">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.seafile_target_repo_id" data-help-key="seafile_target_repo_id">Seafile Repo ID</label>
+                    <input id="seafile_target_repo_id" data-i18n-placeholder="placeholder.seafile_target_repo_id" placeholder="repo-id">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.seafile_target_repo_name" data-help-key="seafile_target_repo_name">Seafile Repo Name</label>
+                    <input id="seafile_target_repo_name" data-i18n-placeholder="placeholder.seafile_target_repo_name" placeholder="My Library">
+                  </div>
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.seafile_target_token" data-help-key="seafile_target_token">Seafile Token</label>
+                    <input id="seafile_target_token" type="password" form="seafile-token-form" autocomplete="off">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.seafile_target_username" data-help-key="seafile_target_username">Seafile 用户名</label>
+                    <input id="seafile_target_username">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.seafile_target_password" data-help-key="seafile_target_password">Seafile 密码</label>
+                    <input id="seafile_target_password" type="password" form="seafile-password-form" autocomplete="off">
+                  </div>
+                </div>
+              </section>
+              <section class="target-section col-span-2 hidden" data-target-section="azureblob">
+                <h3 data-i18n="target.title.azureblob">Azure Blob</h3>
+                <div class="panel-grid">
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.azureblob_target_account_url" data-help-key="azureblob_target_account_url">Azure Blob Account URL</label>
+                    <input id="azureblob_target_account_url" data-i18n-placeholder="placeholder.azureblob_target_account_url" placeholder="https://demo.blob.core.windows.net">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.azureblob_target_container" data-help-key="azureblob_target_container">Azure Blob Container</label>
+                    <input id="azureblob_target_container" data-i18n-placeholder="placeholder.azureblob_target_container" placeholder="archive-container">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.azureblob_target_account_name" data-help-key="azureblob_target_account_name">Azure Blob Account Name</label>
+                    <input id="azureblob_target_account_name">
+                  </div>
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.azureblob_target_prefix" data-help-key="azureblob_target_prefix">Azure Blob Prefix</label>
+                    <input id="azureblob_target_prefix" data-i18n-placeholder="placeholder.azureblob_target_prefix" placeholder="cloudpan-bridge/archive">
+                  </div>
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.azureblob_target_account_key" data-help-key="azureblob_target_account_key">Azure Blob Account Key</label>
+                    <input id="azureblob_target_account_key" type="password" form="azureblob-key-form" autocomplete="off">
+                  </div>
+                </div>
+              </section>
+              <section class="target-section col-span-2 hidden" data-target-section="smb">
+                <h3 data-i18n="target.title.smb">SMB</h3>
+                <div class="panel-grid">
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.smb_target_url" data-help-key="smb_target_url">SMB 目标地址</label>
+                    <input id="smb_target_url" data-i18n-placeholder="placeholder.smb_target_url" placeholder="smb://server/share/path">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.smb_target_username" data-help-key="smb_target_username">SMB 用户名</label>
+                    <input id="smb_target_username">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.smb_target_password" data-help-key="smb_target_password">SMB 密码</label>
+                    <input id="smb_target_password" type="password" form="smb-password-form" autocomplete="off">
+                  </div>
+                </div>
+              </section>
+              <section class="target-section col-span-2 hidden" data-target-section="ftp">
+                <h3 data-i18n="target.title.ftp">FTP</h3>
+                <div class="panel-grid">
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.ftp_target_url" data-help-key="ftp_target_url">FTP 目标地址</label>
+                    <input id="ftp_target_url" data-i18n-placeholder="placeholder.ftp_target_url" placeholder="ftp://example.com:21/uploads">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.ftp_target_username" data-help-key="ftp_target_username">FTP 用户名</label>
+                    <input id="ftp_target_username">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.ftp_target_password" data-help-key="ftp_target_password">FTP 密码</label>
+                    <input id="ftp_target_password" type="password" form="ftp-password-form" autocomplete="off">
+                  </div>
+                </div>
+              </section>
+              <section class="target-section col-span-2 hidden" data-target-section="sftp">
+                <h3 data-i18n="target.title.sftp">SFTP</h3>
+                <div class="panel-grid">
+                  <div class="col-span-2">
+                    <label class="help-anchor" data-i18n="label.sftp_target_url" data-help-key="sftp_target_url">SFTP 目标地址</label>
+                    <input id="sftp_target_url" data-i18n-placeholder="placeholder.sftp_target_url" placeholder="sftp://example.com:22/uploads">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.sftp_target_username" data-help-key="sftp_target_username">SFTP 用户名</label>
+                    <input id="sftp_target_username">
+                  </div>
+                  <div>
+                    <label class="help-anchor" data-i18n="label.sftp_target_password" data-help-key="sftp_target_password">SFTP 密码</label>
+                    <input id="sftp_target_password" type="password" form="sftp-password-form" autocomplete="off">
+                  </div>
+                </div>
+              </section>
             </div>
             <div class="actions">
               <button class="secondary" id="capture-guangya" data-i18n="btn.capture_guangya" data-target-only="guangya" data-help-key="btn_capture_guangya">打开光鸭登录并自动抓取</button>
             </div>
-          </div>
-        </section>
-
-        <section class="tab-panel" data-panel="about">
-          <div class="panel">
-            <h2 data-i18n="panel.about">关于与计划</h2>
-            <div class="notice" id="about-summary">等待载入...</div>
-          </div>
-
-          <div class="panel">
-            <h2 data-i18n="panel.source_profiles">源端 Profiles</h2>
-            <div class="subtle" data-i18n="desc.source_profiles">这里列出当前内置的 OpenList 源端 profile、常见哈希和推荐频率。后续继续扩全驱动时，就往这层补。</div>
-            <div class="mount-list" id="about-source-profiles">等待载入...</div>
-          </div>
-
-          <div class="panel">
-            <h2 data-i18n="panel.target_profiles">目标端 Profiles</h2>
-            <div class="subtle" id="target-profiles-desc" data-i18n="desc.target_profiles">这里列出当前目标端适配器支持的快传指纹和降级方式。当前内置目标端包括 Guangya、OpenList、LocalFS、WebDAV、S3、Seafile、Azure Blob、SMB、FTP 与 SFTP，其中只有 Guangya 支持元数据秒传。</div>
-            <div class="mount-list" id="about-target-profiles">等待载入...</div>
-          </div>
-
-          <div class="panel">
-            <h2 data-i18n="panel.driver_matrix">Driver 能力矩阵</h2>
-            <div class="subtle" id="driver-matrix-desc" data-i18n="desc.driver_matrix">这是当前内置的“源驱动 -> Guangya”能力矩阵，只表示当前项目的真实支持判断，不等于所有跨网盘都能秒传。</div>
-            <div class="mount-list" id="about-driver-matrix">等待载入...</div>
-          </div>
-
-          <div class="panel">
-            <h2 data-i18n="panel.coverage_audit">驱动覆盖审计</h2>
-            <div class="subtle" data-i18n="desc.coverage_audit">这里会把当前 OpenList 实际驱动列表和内置 registry 对比，直接看出哪些驱动已经具备 profile、guide、capture、capability，方便后续继续补全。</div>
-            <div class="actions">
-              <label class="checkbox-inline"><input type="checkbox" id="coverage-only-gaps"> 只看有缺口</label>
-              <label class="checkbox-inline"><input type="checkbox" id="coverage-only-onboarding-ready"> 只看可直接接入</label>
-              <select id="coverage-next-action-filter" style="width:auto;min-width:220px;"></select>
-              <select id="coverage-missing-item-filter" style="width:auto;min-width:220px;">
-                <option value="">全部缺口类型</option>
-                <option value="profile">缺 profile</option>
-                <option value="guide">缺 guide</option>
-                <option value="capture">缺 capture</option>
-                <option value="capability">缺 capability</option>
-              </select>
-              <select id="coverage-capability-level-filter" style="width:auto;min-width:220px;"></select>
-              <select id="coverage-profile-key-filter" style="width:auto;min-width:220px;"></select>
-              <select id="coverage-onboarding-stage-filter" style="width:auto;min-width:220px;"></select>
-              <button class="secondary" id="export-coverage-json" data-i18n="btn.export_coverage_json">导出覆盖审计 JSON</button>
-              <button class="secondary" id="export-coverage-md" data-i18n="btn.export_coverage_md">导出覆盖审计 Markdown</button>
-              <button class="secondary" id="export-coverage-scaffold" data-i18n="btn.export_coverage_scaffold_json">导出待补 Scaffold JSON</button>
-              <button class="secondary" id="export-coverage-scaffold-md" data-i18n="btn.export_coverage_scaffold_md">导出补全任务 Markdown</button>
-            </div>
-            <div class="notice" id="about-coverage-backlog">等待载入...</div>
-            <div class="notice" id="about-coverage-action-stats">等待载入...</div>
-            <div class="notice" id="about-coverage-plan">等待载入...</div>
-            <div class="mount-list" id="about-coverage-audit">等待载入...</div>
           </div>
         </section>
       </div>
@@ -664,30 +838,155 @@
     </div>
   </div>
 
-  <div class="dialog-backdrop hidden" id="auth-dialog">
-    <div class="dialog-card auth-dialog-card">
+  <div class="dialog-backdrop hidden" id="advanced-settings-dialog">
+    <div class="dialog-card dialog-card-wide">
       <div class="dialog-head">
         <div>
-          <h3 style="margin:0;">控制台登录</h3>
-          <div class="subtle" id="auth-dialog-desc">如果你在配置里设置了控制台管理员账号密码，这里需要先登录后才能继续调用接口。</div>
+          <h2 style="margin:0;" data-i18n="dialog.advanced_title">高级设置</h2>
+          <div class="subtle" data-i18n="dialog.advanced_desc">低频运行参数、路径类配置和控制台保护统一放到这里，避免主流程页面太杂。</div>
+        </div>
+        <button class="secondary" id="close-advanced-settings" data-i18n="btn.close_dialog">关闭</button>
+      </div>
+      <div class="panel-grid">
+        <div>
+          <label class="help-anchor" data-i18n="label.log_file" data-help-key="log_file">日志文件</label>
+          <input id="log_file">
+        </div>
+        <div>
+          <label class="help-anchor" data-i18n="label.temp_dir" data-help-key="temp_dir">临时下载目录</label>
+          <input id="temp_dir">
+        </div>
+        <div>
+          <label class="help-anchor" data-i18n="label.state_file" data-help-key="state_file">状态文件</label>
+          <input id="state_file">
+        </div>
+        <div>
+          <label class="help-anchor" data-i18n="label.openlist_page_size" data-help-key="openlist_page_size">OpenList 每页数</label>
+          <input id="openlist_page_size" type="number" min="1">
+        </div>
+        <div>
+          <label class="help-anchor" data-i18n="label.openlist_request_interval_ms" data-help-key="openlist_request_interval_ms">OpenList 请求间隔(ms)</label>
+          <input id="openlist_request_interval_ms" type="number" min="0">
+        </div>
+        <div>
+          <label class="help-anchor" data-i18n="label.queue_interval_ms" data-help-key="queue_interval_ms">目录间隔(ms)</label>
+          <input id="queue_interval_ms" type="number" min="0">
+        </div>
+        <div>
+          <label class="help-anchor" data-help-key="app_admin_username" data-i18n="label.app_admin_username">控制台管理员账号</label>
+          <input id="app_admin_username">
+        </div>
+        <div>
+          <label class="help-anchor" data-help-key="app_admin_password" data-i18n="label.app_admin_password">控制台管理员密码</label>
+          <input id="app_admin_password" type="password" form="app-admin-password-form" autocomplete="off">
         </div>
       </div>
-      <div class="stack">
+      <div class="actions">
+        <button class="accent" id="save-config-advanced" data-i18n="btn.save_all_config">保存全部配置</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog-backdrop hidden" id="help-center-dialog">
+    <div class="dialog-card dialog-card-wide dialog-card-tall">
+      <div class="dialog-head">
         <div>
-          <label>用户名</label>
-          <input id="auth-username" class="auth-input" autocomplete="username">
+          <h2 style="margin:0;" data-i18n="panel.about">关于与计划</h2>
+          <div class="subtle" data-i18n="dialog.help_center_desc">帮助说明、能力矩阵和覆盖审计统一收进这里，主流程页面只保留必要操作。</div>
         </div>
-        <div>
-          <label>密码</label>
-          <input id="auth-password" class="auth-input" type="password" autocomplete="current-password">
+        <button class="secondary" id="close-help-center" data-i18n="btn.close_dialog">关闭</button>
+      </div>
+      <div class="dialog-scroll stack">
+        <div class="panel">
+          <h2 data-i18n="panel.about">关于与计划</h2>
+          <div class="notice" id="about-summary">等待载入...</div>
         </div>
-        <div class="notice" id="auth-notice">等待登录。</div>
-        <div class="actions">
-          <button class="accent" id="submit-auth-login">登录控制台</button>
+        <div class="panel">
+          <h2 data-i18n="panel.source_profiles">源端 Profiles</h2>
+          <div class="subtle" data-i18n="desc.source_profiles">这里列出当前内置的 OpenList 源端 profile、常见哈希和推荐频率。后续继续扩全驱动时，就往这层补。</div>
+          <div class="mount-list" id="about-source-profiles">等待载入...</div>
+        </div>
+        <div class="panel">
+          <h2 data-i18n="panel.target_profiles">目标端 Profiles</h2>
+          <div class="subtle" id="target-profiles-desc" data-i18n="desc.target_profiles">这里列出当前目标端适配器支持的快传指纹和降级方式。当前内置目标端包括 Guangya、OpenList、LocalFS、WebDAV、S3、Seafile、Azure Blob、SMB、FTP 与 SFTP，其中只有 Guangya 支持元数据秒传。</div>
+          <div class="mount-list" id="about-target-profiles">等待载入...</div>
+        </div>
+        <div class="panel">
+          <h2 data-i18n="panel.driver_matrix">Driver 能力矩阵</h2>
+          <div class="subtle" id="driver-matrix-desc" data-i18n="desc.driver_matrix">这是当前内置的“源驱动 -> Guangya”能力矩阵，只表示当前项目的真实支持判断，不等于所有跨网盘都能秒传。</div>
+          <div class="mount-list" id="about-driver-matrix">等待载入...</div>
+        </div>
+        <div class="panel">
+          <h2 data-i18n="panel.coverage_audit">驱动覆盖审计</h2>
+          <div class="subtle" data-i18n="desc.coverage_audit">这里会把当前 OpenList 实际驱动列表和内置 registry 对比，直接看出哪些驱动已经具备 profile、guide、capture、capability，方便后续继续补全。</div>
+          <div class="actions">
+            <label class="checkbox-inline"><input type="checkbox" id="coverage-only-gaps"> 只看有缺口</label>
+            <label class="checkbox-inline"><input type="checkbox" id="coverage-only-onboarding-ready"> 只看可直接接入</label>
+            <select id="coverage-next-action-filter" style="width:auto;min-width:220px;"></select>
+            <select id="coverage-missing-item-filter" style="width:auto;min-width:220px;">
+              <option value="">全部缺口类型</option>
+              <option value="profile">缺 profile</option>
+              <option value="guide">缺 guide</option>
+              <option value="capture">缺 capture</option>
+              <option value="capability">缺 capability</option>
+            </select>
+            <select id="coverage-capability-level-filter" style="width:auto;min-width:220px;"></select>
+            <select id="coverage-profile-key-filter" style="width:auto;min-width:220px;"></select>
+            <select id="coverage-onboarding-stage-filter" style="width:auto;min-width:220px;"></select>
+            <button class="secondary" id="export-coverage-json" data-i18n="btn.export_coverage_json">导出覆盖审计 JSON</button>
+            <button class="secondary" id="export-coverage-md" data-i18n="btn.export_coverage_md">导出覆盖审计 Markdown</button>
+            <button class="secondary" id="export-coverage-scaffold" data-i18n="btn.export_coverage_scaffold_json">导出待补 Scaffold JSON</button>
+            <button class="secondary" id="export-coverage-scaffold-md" data-i18n="btn.export_coverage_scaffold_md">导出补全任务 Markdown</button>
+          </div>
+          <div class="notice" id="about-coverage-backlog">等待载入...</div>
+          <div class="notice" id="about-coverage-action-stats">等待载入...</div>
+          <div class="notice" id="about-coverage-plan">等待载入...</div>
+          <div class="mount-list" id="about-coverage-audit">等待载入...</div>
         </div>
       </div>
     </div>
   </div>
+  </div>
+
+  <div class="dialog-backdrop hidden" id="auth-dialog">
+    <div class="dialog-card auth-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <h3 style="margin:0;" data-i18n="dialog.auth_title">控制台登录</h3>
+          <div class="subtle" id="auth-dialog-desc" data-i18n="dialog.auth_desc">如果你在配置里设置了控制台管理员账号密码，这里需要先登录后才能继续调用接口。</div>
+        </div>
+        <button class="secondary" id="close-auth-dialog" type="button" data-i18n="btn.close_dialog">关闭</button>
+      </div>
+      <form class="stack" id="auth-login-form">
+        <div>
+          <label class="help-anchor" data-i18n="label.auth_username" data-help-key="auth_username">用户名</label>
+          <input id="auth-username" class="auth-input" autocomplete="username" data-i18n-placeholder="placeholder.auth_username">
+        </div>
+        <div>
+          <label class="help-anchor" data-i18n="label.auth_password" data-help-key="auth_password">密码</label>
+          <input id="auth-password" class="auth-input" type="password" autocomplete="current-password" data-i18n-placeholder="placeholder.auth_password">
+        </div>
+        <div class="notice" id="auth-notice" data-i18n="notice.auth_idle">等待登录。</div>
+        <div class="actions">
+          <button class="accent" id="submit-auth-login" type="submit" data-i18n="btn.console_login">登录控制台</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <form id="openlist-password-form" class="hidden" aria-hidden="true"><input type="submit" tabindex="-1"></form>
+  <form id="openlist-password-mirror-form" class="hidden" aria-hidden="true"><input type="submit" tabindex="-1"></form>
+  <form id="managed-init-password-form" class="hidden" aria-hidden="true"><input type="submit" tabindex="-1"></form>
+  <form id="managed-init-password-mirror-form" class="hidden" aria-hidden="true"><input type="submit" tabindex="-1"></form>
+  <form id="app-admin-password-form" class="hidden" aria-hidden="true"><input type="submit" tabindex="-1"></form>
+  <form id="webdav-password-form" class="hidden" aria-hidden="true"><input type="submit" tabindex="-1"></form>
+  <form id="s3-secret-form" class="hidden" aria-hidden="true"><input type="submit" tabindex="-1"></form>
+  <form id="seafile-token-form" class="hidden" aria-hidden="true"><input type="submit" tabindex="-1"></form>
+  <form id="seafile-password-form" class="hidden" aria-hidden="true"><input type="submit" tabindex="-1"></form>
+  <form id="azureblob-key-form" class="hidden" aria-hidden="true"><input type="submit" tabindex="-1"></form>
+  <form id="smb-password-form" class="hidden" aria-hidden="true"><input type="submit" tabindex="-1"></form>
+  <form id="ftp-password-form" class="hidden" aria-hidden="true"><input type="submit" tabindex="-1"></form>
+  <form id="sftp-password-form" class="hidden" aria-hidden="true"><input type="submit" tabindex="-1"></form>
 
     <script src="/assets/app.data.js"></script>
     <script src="/assets/app.bridgeview.js"></script>

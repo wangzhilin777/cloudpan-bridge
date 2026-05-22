@@ -384,22 +384,25 @@
     const captureCacheSummary = captureCacheAvailable
       ? `entries=${bridgePreparation.capture_cache_entry_count ?? 0} | lookup=${captureCacheLookupModes.join(", ") || "-"} | hashes=${captureCacheHashFields.join(", ") || "-"}`
       : "-";
+    const routeBucket = String(sourceTargetRoute.decision_bucket || "-");
+    const selectedMode = String(sourceRuntime.selected_source_mode || "-");
+    const hasFast = !!statusTargetCapability.supports_fast_upload;
+    const nextFocus = String(sourceTargetRoute.next_focus || "-");
     root.innerHTML = `
-      <div class="mono">source=${escapeHtml(sourcePath)} -> target=${escapeHtml(targetKey)}:${escapeHtml(targetPath)}</div>
-      <div class="mono">recommended=${escapeHtml(recommendedMode)} | level=${escapeHtml(assessedLevel)} | auto_small_mb=${escapeHtml(autoThreshold)}</div>
-      <div class="mono">source_route_pref=${escapeHtml(sourcePreference)} | selected=${escapeHtml(sourceRuntime.selected_source_mode || "-")} | provider=${escapeHtml(sourceRuntime.selected_provider_key || "-")}</div>
-      <div class="mono">source_target_route=${escapeHtml(sourceTargetRoute.decision_bucket || "-")} | focus=${escapeHtml(sourceTargetRoute.next_focus || "-")} | honesty=${escapeHtml(sourceTargetRoute.route_honesty || "-")}</div>
-      <div class="mono">source_target_mode=${escapeHtml(sourceTargetRoute.preferred_execution_mode || "-")} | fallback=${escapeHtml(sourceTargetRoute.fallback_execution_mode || "-")} | native=${escapeHtml((sourceTargetRoute.native_fast_candidate_hashes || []).join(", ") || "-")} | bridge=${escapeHtml((sourceTargetRoute.bridge_recoverable_fast_hashes || []).join(", ") || "-")} | cache=${escapeHtml((sourceTargetRoute.capture_cache_fast_hashes || []).join(", ") || "-")}</div>
-      <div class="mono">source_cache=${escapeHtml(captureCacheSummary)}</div>
-      <div class="mono">target_fast_upload=${escapeHtml(String(!!statusTargetCapability.supports_fast_upload))} | hashes=${escapeHtml((statusTargetCapability.fast_upload_hashes || []).join(", ") || "-")} | fallback=${escapeHtml((statusTargetCapability.fallback_modes || []).join(", ") || "-")}</div>
-      <div class="mono">transfer_preview=${escapeHtml(transferPreviewText)}</div>
-      <div class="mono">transfer_reason=${escapeHtml(previewReasonText)}</div>
-      <div class="mono">transfer_next=${escapeHtml(previewNextActionText)}</div>
-      <div class="mono">transfer_fast_gap=${escapeHtml(previewTargetFastGapText)}</div>
-      <div class="mono">delete_state=${deleteRemoved ? "on" : "off"} | delete_target=${deleteRealTarget ? "on" : "off"}</div>
-      ${sourceRuntime.selection_reason ? `<div>${escapeHtml(sourceRuntime.selection_reason)}</div>` : ""}
-      ${sourceRuntime.fallback_reason ? `<div>${escapeHtml(sourceRuntime.fallback_reason)}</div>` : ""}
-      ${rationale ? `<div>${escapeHtml(rationale)}</div>` : ""}
+      <div class="summary-stack">
+        <div><strong>${escapeHtml(sourcePath)}</strong> -> <strong>${escapeHtml(targetKey)}:${escapeHtml(targetPath)}</strong></div>
+        <div class="summary-pill ${sourcePath === "/" || targetPath === "/" ? "warn" : ""}">${escapeHtml(currentLang() === "en" ? `Current route: ${selectedMode}` : currentLang() === "mix" ? `当前路线：${selectedMode} / Current route` : `当前路线：${selectedMode}`)}</div>
+        <div class="summary-pill ${hasFast ? "" : "warn"}">${escapeHtml(currentLang() === "en" ? `Target fast upload: ${hasFast ? "available" : "fallback only"}` : currentLang() === "mix" ? `目标端快传：${hasFast ? "可用" : "仅降级"} / Target fast upload` : `目标端快传：${hasFast ? "可用" : "仅降级"}`)}</div>
+        <div class="mono">${currentLang() === "en" ? "Recommended mode" : currentLang() === "mix" ? "建议模式 / Recommended mode" : "建议模式"}=${escapeHtml(recommendedMode)} | level=${escapeHtml(assessedLevel)} | auto_small_mb=${escapeHtml(autoThreshold)}</div>
+        <div class="mono">${currentLang() === "en" ? "Source preference" : currentLang() === "mix" ? "源端偏好 / Source preference" : "源端偏好"}=${escapeHtml(sourcePreference)} | ${currentLang() === "en" ? "next focus" : currentLang() === "mix" ? "下一步关注 / next focus" : "下一步关注"}=${escapeHtml(nextFocus)} | ${currentLang() === "en" ? "route bucket" : currentLang() === "mix" ? "路线分桶 / route bucket" : "路线分桶"}=${escapeHtml(routeBucket)}</div>
+        <div class="mono">${currentLang() === "en" ? "Transfer preview" : currentLang() === "mix" ? "传输预览 / Transfer preview" : "传输预览"}=${escapeHtml(transferPreviewText)}</div>
+        <div class="mono">${currentLang() === "en" ? "Fast hashes" : currentLang() === "mix" ? "目标快传哈希 / Fast hashes" : "目标快传哈希"}=${escapeHtml((statusTargetCapability.fast_upload_hashes || []).join(", ") || "-")} | ${currentLang() === "en" ? "fallback" : currentLang() === "mix" ? "降级 / fallback" : "降级"}=${escapeHtml((statusTargetCapability.fallback_modes || []).join(", ") || "-")}</div>
+        <div class="mono">${currentLang() === "en" ? "Cache and bridge" : currentLang() === "mix" ? "缓存与桥接 / Cache and bridge" : "缓存与桥接"}=${escapeHtml(captureCacheSummary)}</div>
+        <div class="mono">${currentLang() === "en" ? "Delete policy" : currentLang() === "mix" ? "删除策略 / Delete policy" : "删除策略"}=${deleteRemoved ? "state:on" : "state:off"} | ${deleteRealTarget ? "target:on" : "target:off"}</div>
+        ${sourceRuntime.selection_reason ? `<div>${escapeHtml(sourceRuntime.selection_reason)}</div>` : ""}
+        ${sourceRuntime.fallback_reason ? `<div>${escapeHtml(sourceRuntime.fallback_reason)}</div>` : ""}
+        ${rationale ? `<div>${escapeHtml(rationale)}</div>` : ""}
+      </div>
     `;
   }
 

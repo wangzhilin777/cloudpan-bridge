@@ -6,9 +6,10 @@
 
 主计划文档：
 
-- `docs/cloudpan-bridge-master-plan.md`
-- 历史计划：`docs/cloud2guangya-rebuild-plan.md`
-- 后续 TODO：`docs/cloudpan-bridge-todo.md`
+- `docs/02-cloudpan-bridge-master-plan.md`
+- 合并执行计划：`docs/04-cloudpan-bridge-merged-plan.md`
+- 主流网盘阶段计划：`docs/05-cloudpan-bridge-mainstream-plan.md`
+- 后续 TODO：`docs/06-cloudpan-bridge-todo.md`
 
 当前主路线：
 
@@ -17,6 +18,8 @@
 - 其中 `Guangya` 仍是当前唯一支持元数据秒传/秒传 JSON 直导的正式目标端
 - `OpenList` 目标端已经可写入，但按普通上传/覆盖链路处理，不宣传跨盘秒传
 - `LocalFS` 目标端已经可写入，但只负责把结果落到本地目录，不宣传成跨盘秒传目标
+- 其它内置目标端当前也都走“普通上传/覆盖 + 自动建目录 + 诚实降级”路线，不把它们误写成已经支持跨盘元数据秒传
+- 连接页现在区分 `外部本机 / 外部远程 / 本机托管 / Docker 预留` 四种模式，并只显示当前模式对应的配置块
 - `WebDAV` 目标端已经可写入，适合 NAS / 私有云 / 第三方 WebDAV 存储，但当前同样只走普通上传/覆盖
 - `S3` 目标端已经可写入，适合作为对象存储桶 / 备份桶 / 云原生归档目标，但当前同样只走普通对象上传/覆盖
 - `Seafile` 目标端已经可写入，适合作为团队资料库 / 私有云文档库目标，但当前同样只走普通上传/覆盖

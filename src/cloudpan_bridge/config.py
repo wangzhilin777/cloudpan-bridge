@@ -160,13 +160,21 @@ class AppConfig:
         managed_token = str(_pick(managed_connection.get("token"), legacy_token if cls.is_managed_openlist_mode(mode) else "", default=""))
         managed_username = str(_pick(managed_connection.get("username"), legacy_username if cls.is_managed_openlist_mode(mode) else "admin", default="admin"))
         managed_password = str(_pick(managed_connection.get("password"), legacy_password if cls.is_managed_openlist_mode(mode) else "", default=""))
+        managed_runtime_port = _int_or_default(_pick(payload.get("managed_openlist_port"), managed_runtime.get("port"), default=5244), 5244, minimum=1)
+        managed_connection_url = str(
+            _pick(
+                managed_connection.get("url"),
+                legacy_url if cls.is_managed_openlist_mode(mode) else "",
+                default=f"http://127.0.0.1:{managed_runtime_port}",
+            )
+        ) or f"http://127.0.0.1:{managed_runtime_port}"
         if mode == "external_remote":
             effective_url = external_remote_url
             effective_token = external_remote_token
             effective_username = external_remote_username
             effective_password = external_remote_password
         elif cls.is_managed_openlist_mode(mode):
-            effective_url = legacy_url or "http://127.0.0.1:5244"
+            effective_url = managed_connection_url
             effective_token = managed_token
             effective_username = managed_username
             effective_password = managed_password
@@ -184,7 +192,7 @@ class AppConfig:
             openlist_mode=mode,
             managed_openlist_bin=str(_pick(payload.get("managed_openlist_bin"), managed_runtime.get("bin"), default="")),
             managed_openlist_data_dir=Path(_pick(payload.get("managed_openlist_data_dir"), managed_runtime.get("data_dir"), default=".runtime/openlist")),
-            managed_openlist_port=_int_or_default(_pick(payload.get("managed_openlist_port"), managed_runtime.get("port"), default=5244), 5244, minimum=1),
+            managed_openlist_port=managed_runtime_port,
             managed_openlist_docker_image=str(_pick(payload.get("managed_openlist_docker_image"), managed_docker.get("image"), default="openlistteam/openlist:latest")) or "openlistteam/openlist:latest",
             managed_openlist_docker_container_name=str(_pick(payload.get("managed_openlist_docker_container_name"), managed_docker.get("container_name"), default="cloudpan-bridge-openlist")) or "cloudpan-bridge-openlist",
             openlist_url=effective_url,
@@ -202,8 +210,8 @@ class AppConfig:
             managed_openlist_token=managed_token,
             managed_openlist_username=managed_username,
             managed_openlist_password=managed_password,
-            managed_openlist_init_username=str(_pick(managed_init_admin.get("username"), default="admin")) or "admin",
-            managed_openlist_init_password=str(_pick(managed_init_admin.get("password"), default="")),
+            managed_openlist_init_username=str(_pick(payload.get("managed_openlist_init_username"), managed_init_admin.get("username"), default="admin")) or "admin",
+            managed_openlist_init_password=str(_pick(payload.get("managed_openlist_init_password"), managed_init_admin.get("password"), default="")),
             guangya_phone=str(_pick(payload.get("guangya_phone"), guangya.get("phone"), default="")),
             target_key=str(_pick(payload.get("target_key"), targets.get("active_target"), default="guangya")),
             guangya_authorization=str(_pick(payload.get("guangya_authorization"), guangya.get("authorization"), default="")),
@@ -409,6 +417,7 @@ class AppConfig:
                         "password": self.external_remote_openlist_password,
                     },
                     "managed_binary": {
+                        "url": self.openlist_url,
                         "token": self.managed_openlist_token,
                         "username": self.managed_openlist_username,
                         "password": self.managed_openlist_password,
