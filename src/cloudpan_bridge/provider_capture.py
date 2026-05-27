@@ -915,7 +915,10 @@ class ProviderCaptureManager:
             return not spec.domains or any(domain in url for domain in spec.domains)
 
         def complete_if_ready() -> bool:
-            return any(str(captured.get(key) or "").strip() for key in spec.required_keys)
+            required = [str(key or "").strip().lower() for key in spec.required_keys if str(key or "").strip()]
+            if not required:
+                return False
+            return all(str(captured.get(key) or "").strip() for key in required)
 
         try:
             with sync_playwright() as pw:
